@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}My Exams{% endblock %}
+{% block page_title %}<i class="bi bi-journals me-2"></i>Exams & Marks{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <form method="GET" class="d-flex gap-2 align-items-center">
+    <select name="subject_id" class="form-select form-select-sm" style="width:220px" onchange="this.form.submit()">
+      <option value="">All Subjects</option>
+      {% for sub in subjects %}
+      <option value="{{ sub.id }}" {% if selected_subject == sub.id %}selected{% endif %}>{{ sub.name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <a href="{{ url_for('exam.create_exam') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle-fill me-2"></i>Create Exam
+  </a>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Title</th>
+            <th>Subject</th>
+            <th>Type</th>
+            <th>Date</th>
+            <th>Total Marks</th>
+            <th>Entries</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in exams %}
+          {% set entered = e.marks | selectattr('marks_obtained', 'ne', None) | list | length %}
+          {% set total_s = e.marks | length %}
+          <tr>
+            <td class="px-4 fw-semibold">{{ e.title }}</td>
+            <td>{{ e.subject.name }}</td>
+            <td>
+              <span class="badge bg-info-subtle text-info">{{ e.exam_type.replace('_',' ').title() }}</span>
+            </td>
+            <td>{{ e.exam_date.strftime('%d %b %Y') }}</td>
+            <td>{{ e.total_marks }}</td>
+            <td>
+              <span class="badge {% if entered == total_s %}bg-success{% elif entered > 0 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ entered }}/{{ total_s }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('exam.enter_marks', exam_id=e.id) }}"
+                   class="btn btn-sm btn-outline-primary" title="Enter Marks">
+                  <i class="bi bi-pencil-square"></i>
+                </a>
+                <form method="POST" action="{{ url_for('exam.delete_exam', exam_id=e.id) }}"
+                      data-confirm="Delete exam '{{ e.title }}'? All associated marks will also be removed." data-confirm-title="Delete Exam">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-5">No exams yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

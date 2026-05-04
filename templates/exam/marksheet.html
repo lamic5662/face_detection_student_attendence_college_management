@@ -1,0 +1,430 @@
+{% extends "base.html" %}
+{% block title %}Marksheet — {{ student.user.name }}{% endblock %}
+{% block page_title %}
+  <i class="bi bi-award-fill me-2"></i>
+  {% if is_admin %}Student Marksheet{% else %}My Marksheet{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ── Action bar (hidden on print) ── #}
+<div class="d-flex justify-content-between align-items-center mb-3 no-print">
+  {% if is_admin %}
+  <a href="{{ url_for('admin.marksheet_list') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Students
+  </a>
+  {% else %}
+  <a href="{{ url_for('exam.student_results') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Results
+  </a>
+  {% endif %}
+  <button onclick="window.print()" class="btn btn-primary btn-sm">
+    <i class="bi bi-printer-fill me-1"></i>Print / Save as PDF
+  </button>
+</div>
+
+{# ── Marksheet document ── #}
+<div class="marksheet-doc" id="marksheet">
+
+  {# College header #}
+  <div class="ms-header text-center">
+    <div class="ms-college-name">{{ college.college_name }}</div>
+    {% if college.address %}
+    <div class="ms-college-addr">{{ college.address }}</div>
+    {% endif %}
+    <div class="ms-doc-title">STUDENT MARKSHEET</div>
+    <div class="ms-semester-label">
+      Semester {{ student.semester }} &nbsp;|&nbsp;
+      {{ student.department.name if student.department else '' }}
+    </div>
+  </div>
+
+  {# Student info box #}
+  <div class="ms-info-grid">
+    <div class="ms-info-row">
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Student Name</span>
+        <span class="ms-info-val">{{ student.user.name }}</span>
+      </div>
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Roll Number</span>
+        <span class="ms-info-val">{{ student.roll_number }}</span>
+      </div>
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Department</span>
+        <span class="ms-info-val">{{ student.department.name if student.department else '—' }}</span>
+      </div>
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Semester</span>
+        <span class="ms-info-val">{{ student.semester }}</span>
+      </div>
+    </div>
+    <div class="ms-info-row">
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Date of Birth</span>
+        <span class="ms-info-val">{{ student.dob.strftime('%d %B %Y') if student.dob else '—' }}</span>
+      </div>
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Admission Year</span>
+        <span class="ms-info-val">{{ student.admission_year or '—' }}</span>
+      </div>
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Parent / Guardian</span>
+        <span class="ms-info-val">{{ student.parent_name or '—' }}</span>
+      </div>
+      <div class="ms-info-cell">
+        <span class="ms-info-lbl">Date Printed</span>
+        <span class="ms-info-val">{{ now().strftime('%d %B %Y') }}</span>
+      </div>
+    </div>
+  </div>
+
+  {# Marks table #}
+  {% if subjects %}
+  <table class="ms-table">
+    <thead>
+      <tr>
+        <th class="ms-th-subject">Subject</th>
+        <th class="ms-th-exam">Exam / Assessment</th>
+        <th class="ms-th-type">Type</th>
+        <th class="ms-th-num">Full<br>Marks</th>
+        <th class="ms-th-num">Pass<br>Marks</th>
+        <th class="ms-th-num">Marks<br>Obtained</th>
+        <th class="ms-th-num">%</th>
+        <th class="ms-th-grade">Grade</th>
+        <th class="ms-th-status">Result</th>
+        <th class="ms-th-att">Classes<br>Held</th>
+        <th class="ms-th-att">Present</th>
+        <th class="ms-th-att">Absent</th>
+        <th class="ms-th-att">Att.%</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in subjects %}
+
+      {% if s.exams %}
+      {% set total_rows = s.exams|length + 1 %}
+      {% for er in s.exams %}
+      <tr class="ms-exam-row">
+        {% if loop.first %}
+        <td class="ms-subject-cell" rowspan="{{ total_rows }}">
+          <div class="ms-subj-name">{{ s.subject.name }}</div>
+          <div class="ms-subj-code">{{ s.subject.code }}</div>
+        </td>
+        {% endif %}
+        <td>{{ er.exam.title }}</td>
+        <td><span class="ms-type-badge ms-type-{{ er.exam.exam_type }}">{{ er.exam.exam_type.replace('_',' ').title() }}</span></td>
+        <td class="ms-num">{{ er.total | int }}</td>
+        <td class="ms-num">{{ er.pass_marks | int if er.pass_marks else '—' }}</td>
+        <td class="ms-num ms-obtained">
+          {% if er.mark and er.mark.is_absent %}<span class="ms-absent">Absent</span>
+          {% elif er.obtained is not none %}{{ er.obtained | int if er.obtained == (er.obtained | int) else er.obtained }}
+          {% else %}<span class="ms-pending">—</span>{% endif %}
+        </td>
+        <td class="ms-num">{{ er.percentage if er.percentage is not none else '—' }}</td>
+        <td class="ms-grade">
+          {% if er.grade == 'AB' %}<span class="ms-grade-ab">AB</span>
+          {% elif er.grade in ['A+','A'] %}<span class="ms-grade-high">{{ er.grade }}</span>
+          {% elif er.grade in ['B+','B','C+','C','D'] %}<span class="ms-grade-mid">{{ er.grade }}</span>
+          {% elif er.grade == 'F' %}<span class="ms-grade-fail">F</span>
+          {% else %}{{ er.grade }}{% endif %}
+        </td>
+        <td class="ms-status-cell">
+          {% if er.mark and er.mark.is_absent %}<span class="ms-status-fail">Absent</span>
+          {% elif er.obtained is not none and er.pass_marks and er.obtained < er.pass_marks %}<span class="ms-status-fail">Fail</span>
+          {% elif er.obtained is not none %}<span class="ms-status-pass">Pass</span>
+          {% else %}—{% endif %}
+        </td>
+        {# Attendance — only on the first exam row of each subject (rowspan) #}
+        {% if loop.first %}
+        <td class="ms-att-cell" rowspan="{{ total_rows }}">
+          {{ s.total_classes if s.total_classes > 0 else '—' }}
+        </td>
+        <td class="ms-att-cell ms-att-present" rowspan="{{ total_rows }}">
+          {{ s.present if s.total_classes > 0 else '—' }}
+        </td>
+        <td class="ms-att-cell ms-att-absent" rowspan="{{ total_rows }}">
+          {{ s.absent if s.total_classes > 0 else '—' }}
+        </td>
+        <td class="ms-att-cell" rowspan="{{ total_rows }}">
+          {% if s.att_pct is not none %}
+          <span class="{% if s.att_pct >= 75 %}ms-att-ok{% elif s.att_pct >= 60 %}ms-att-warn{% else %}ms-att-low{% endif %}">
+            {{ s.att_pct }}%
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+
+      {# Subject sub-total row #}
+      <tr class="ms-subtotal-row">
+        <td colspan="3" class="ms-subtotal-lbl"><strong>{{ s.subject.code }} — Subject Total</strong></td>
+        <td class="ms-num"><strong>{{ s.total | int if s.has_marks else '—' }}</strong></td>
+        <td class="ms-num">—</td>
+        <td class="ms-num ms-obtained"><strong>{{ s.obtained | int if s.has_marks else '—' }}</strong></td>
+        <td class="ms-num"><strong>{{ s.percentage if s.percentage is not none else '—' }}</strong></td>
+        <td class="ms-grade">
+          {% if s.grade not in ['—','AB'] %}
+            {% if s.grade in ['A+','A'] %}<span class="ms-grade-high"><strong>{{ s.grade }}</strong></span>
+            {% elif s.grade in ['B+','B','C+','C','D'] %}<span class="ms-grade-mid"><strong>{{ s.grade }}</strong></span>
+            {% elif s.grade == 'F' %}<span class="ms-grade-fail"><strong>F</strong></span>
+            {% else %}<strong>{{ s.grade }}</strong>{% endif %}
+          {% else %}{{ s.grade }}{% endif %}
+        </td>
+        <td class="ms-status-cell">
+          {% if s.has_marks %}
+            {% if s.passed %}<span class="ms-status-pass"><strong>Pass</strong></span>
+            {% else %}<span class="ms-status-fail"><strong>Fail</strong></span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+
+      {% else %}
+      {# No exams yet #}
+      <tr class="ms-exam-row">
+        <td class="ms-subject-cell">
+          <div class="ms-subj-name">{{ s.subject.name }}</div>
+          <div class="ms-subj-code">{{ s.subject.code }}</div>
+        </td>
+        <td colspan="8" class="text-center text-muted" style="font-size:12px;font-style:italic">No exams scheduled yet</td>
+        <td class="ms-att-cell">{{ s.total_classes if s.total_classes > 0 else '—' }}</td>
+        <td class="ms-att-cell ms-att-present">{{ s.present if s.total_classes > 0 else '—' }}</td>
+        <td class="ms-att-cell ms-att-absent">{{ s.absent if s.total_classes > 0 else '—' }}</td>
+        <td class="ms-att-cell">
+          {% if s.att_pct is not none %}
+          <span class="{% if s.att_pct >= 75 %}ms-att-ok{% elif s.att_pct >= 60 %}ms-att-warn{% else %}ms-att-low{% endif %}">{{ s.att_pct }}%</span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endif %}
+
+      {% endfor %}
+
+      {# Grand total row #}
+      <tr class="ms-grandtotal-row">
+        <td colspan="4" class="ms-grandtotal-lbl">GRAND TOTAL</td>
+        <td class="ms-num">—</td>
+        <td class="ms-num ms-obtained"><strong>{{ overall.obtained | int if overall.total > 0 else '—' }} / {{ overall.total | int if overall.total > 0 else '—' }}</strong></td>
+        <td class="ms-num"><strong>{{ overall.percentage if overall.percentage is not none else '—' }}</strong></td>
+        <td class="ms-grade">
+          {% if overall.grade not in ['—','AB'] %}
+            {% if overall.grade in ['A+','A'] %}<span class="ms-grade-high"><strong>{{ overall.grade }}</strong></span>
+            {% elif overall.grade in ['B+','B','C+','C','D'] %}<span class="ms-grade-mid"><strong>{{ overall.grade }}</strong></span>
+            {% elif overall.grade == 'F' %}<span class="ms-grade-fail"><strong>F</strong></span>
+            {% else %}<strong>{{ overall.grade }}</strong>{% endif %}
+          {% else %}{{ overall.grade }}{% endif %}
+        </td>
+        <td class="ms-status-cell" colspan="5">
+          {% if overall.total > 0 %}
+            {% if overall.passed %}<span class="ms-status-pass"><strong>PASS</strong></span>
+            {% else %}<span class="ms-status-fail"><strong>FAIL</strong></span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  {# Result summary banner #}
+  {% if overall.total > 0 %}
+  <div class="ms-result-banner {% if overall.passed %}ms-result-pass{% else %}ms-result-fail{% endif %}">
+    <div class="ms-result-main">
+      RESULT: <strong>{% if overall.passed %}PASS{% else %}FAIL{% endif %}</strong>
+    </div>
+    <div class="ms-result-details">
+      Marks Obtained: <strong>{{ overall.obtained | int }} / {{ overall.total | int }}</strong>
+      &emsp;|&emsp;
+      Overall Percentage: <strong>{{ overall.percentage }}%</strong>
+      &emsp;|&emsp;
+      Grade: <strong>{{ overall.grade }}</strong>
+    </div>
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="text-center text-muted py-5">
+    <i class="bi bi-journals fs-1 d-block mb-3 opacity-25"></i>
+    No subjects found for this semester.
+  </div>
+  {% endif %}
+
+  {# Digital Signatures #}
+  <div class="ms-signatures">
+    {% for sig, fallback_title in [
+      (hod_sig,       'Head of Department'),
+      (principal_sig, 'Principal / Registrar'),
+    ] %}
+    <div class="ms-sig-block">
+      <div class="ms-sig-img-area">
+        {% if sig and sig.sign_path %}
+        <img src="{{ url_for('static', filename=sig.sign_path) }}" alt="{{ fallback_title }} signature" class="ms-sig-img">
+        {% endif %}
+      </div>
+      <div class="ms-sig-line"></div>
+      <div class="ms-sig-name">{{ sig.name if sig else '' }}</div>
+      <div class="ms-sig-desig">{{ sig.designation if sig and sig.designation else fallback_title }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="ms-disclaimer">
+    This is a computer-generated marksheet. &nbsp;|&nbsp; {{ college.college_name }}
+    {% if college.address %}&nbsp;|&nbsp; {{ college.address }}{% endif %}
+  </div>
+
+</div>{# end .marksheet-doc #}
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* ── Wrapper ── */
+.marksheet-doc {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  padding: 40px 48px;
+  max-width: 1100px;
+  margin: 0 auto;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 12px;
+  color: #1e293b;
+}
+
+/* ── Header ── */
+.ms-header { border-bottom: 3px double #1e3a5f; padding-bottom: 14px; margin-bottom: 20px; }
+.ms-college-name { font-size: 22px; font-weight: 800; color: #1e3a5f; letter-spacing: .5px; }
+.ms-college-addr { font-size: 12px; color: #64748b; margin-top: 2px; }
+.ms-doc-title {
+  font-size: 14px; font-weight: 700; letter-spacing: 3px;
+  text-transform: uppercase; color: #1e3a5f;
+  margin-top: 10px; border-top: 1px solid #cbd5e1; padding-top: 8px;
+}
+.ms-semester-label { font-size: 12px; color: #475569; margin-top: 2px; }
+
+/* ── Student info grid ── */
+.ms-info-grid { border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 20px; overflow: hidden; }
+.ms-info-row { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid #e2e8f0; }
+.ms-info-row:last-child { border-bottom: none; }
+.ms-info-cell { display: flex; flex-direction: column; padding: 8px 14px; border-right: 1px solid #e2e8f0; }
+.ms-info-cell:last-child { border-right: none; }
+.ms-info-lbl { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+.ms-info-val { font-size: 13px; font-weight: 600; color: #0f172a; margin-top: 2px; }
+
+/* ── Marks table ── */
+.ms-table { width: 100%; border-collapse: collapse; margin-bottom: 0; font-size: 11px; }
+.ms-table th {
+  background: #1e3a5f; color: #fff;
+  padding: 7px 8px; text-align: center; font-size: 10px;
+  font-weight: 700; letter-spacing: .3px; border: 1px solid #2d5282;
+}
+.ms-th-subject { text-align: left; width: 130px; }
+.ms-th-exam    { text-align: left; }
+.ms-th-type    { width: 80px; }
+.ms-th-num     { width: 52px; }
+.ms-th-grade   { width: 46px; }
+.ms-th-status  { width: 52px; }
+.ms-th-att     { width: 46px; background: #164e35 !important; }
+
+.ms-table td { padding: 6px 8px; border: 1px solid #e2e8f0; vertical-align: middle; }
+.ms-num { text-align: center; }
+.ms-grade { text-align: center; font-weight: 700; }
+.ms-status-cell { text-align: center; }
+.ms-obtained { font-weight: 700; }
+
+/* Subject cell */
+.ms-subject-cell { background: #f1f5f9 !important; vertical-align: middle; border-right: 2px solid #cbd5e1 !important; }
+.ms-subj-name { font-weight: 700; font-size: 11px; color: #1e3a5f; }
+.ms-subj-code { font-size: 10px; color: #64748b; margin-top: 1px; }
+
+/* Attendance cells */
+.ms-att-cell { text-align: center; background: #f0fdf4 !important; font-weight: 600; }
+.ms-att-present { color: #15803d; }
+.ms-att-absent  { color: #b91c1c; }
+.ms-att-ok   { color: #15803d; font-weight: 800; }
+.ms-att-warn { color: #b45309; font-weight: 800; }
+.ms-att-low  { color: #b91c1c; font-weight: 800; }
+
+/* Sub-total row */
+.ms-subtotal-row td { background: #eff6ff !important; border-top: 2px solid #bfdbfe !important; border-bottom: 2px solid #bfdbfe !important; }
+.ms-subtotal-lbl { font-size: 11px; text-align: right; padding-right: 12px; }
+
+/* Grand total row */
+.ms-grandtotal-row td { background: #1e3a5f !important; color: #fff !important; font-size: 11px; border-color: #2d5282 !important; }
+.ms-grandtotal-lbl { text-align: right; padding-right: 12px; letter-spacing: .5px; }
+
+/* Type badges */
+.ms-type-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 9px; font-weight: 700; }
+.ms-type-quiz       { background:#dcfce7; color:#15803d; }
+.ms-type-mid_term   { background:#dbeafe; color:#1d4ed8; }
+.ms-type-final      { background:#fee2e2; color:#b91c1c; }
+.ms-type-practical  { background:#ffedd5; color:#c2410c; }
+.ms-type-assignment { background:#ede9fe; color:#6d28d9; }
+
+/* Grade colours */
+.ms-grade-high { color: #15803d; }
+.ms-grade-mid  { color: #1d4ed8; }
+.ms-grade-fail { color: #b91c1c; }
+.ms-grade-ab   { color: #64748b; }
+
+/* Status */
+.ms-status-pass { color: #15803d; font-weight: 700; font-size: 10px; }
+.ms-status-fail { color: #b91c1c; font-weight: 700; font-size: 10px; }
+.ms-absent  { color: #64748b; font-style: italic; font-size: 10px; }
+.ms-pending { color: #94a3b8; }
+
+/* Result banner */
+.ms-result-banner {
+  margin-top: 14px; border-radius: 8px; padding: 10px 18px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+}
+.ms-result-pass { background: #dcfce7; border: 2px solid #86efac; }
+.ms-result-fail { background: #fee2e2; border: 2px solid #fca5a5; }
+.ms-result-main { font-size: 15px; color: #0f172a; }
+.ms-result-pass .ms-result-main strong { color: #15803d; }
+.ms-result-fail .ms-result-main strong { color: #b91c1c; }
+.ms-result-details { font-size: 12px; color: #334155; }
+
+/* ── Digital Signatures ── */
+.ms-signatures {
+  display: flex; justify-content: space-around; align-items: flex-end;
+  margin-top: 50px; padding-top: 10px;
+}
+.ms-sig-block { text-align: center; width: 200px; }
+.ms-sig-img-area {
+  height: 70px; display: flex; align-items: flex-end; justify-content: center;
+  margin-bottom: 4px;
+}
+.ms-sig-img { max-height: 65px; max-width: 180px; object-fit: contain; }
+.ms-sig-line { border-top: 1.5px solid #334155; margin-bottom: 4px; }
+.ms-sig-name  { font-size: 12px; font-weight: 700; color: #0f172a; }
+.ms-sig-desig { font-size: 10px; color: #64748b; font-weight: 600; letter-spacing: .3px; }
+
+/* Disclaimer */
+.ms-disclaimer {
+  text-align: center; margin-top: 16px;
+  font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px;
+}
+
+/* ── Print ── */
+@media print {
+  .no-print, nav, .sidebar, header, footer,
+  [class*="sidebar"], [class*="navbar"], [class*="topbar"] { display: none !important; }
+
+  body, html { background: #fff !important; margin: 0 !important; }
+  .marksheet-doc { border: none !important; box-shadow: none !important; padding: 8px 14px !important; max-width: 100% !important; border-radius: 0 !important; }
+
+  .ms-table th          { background: #1e3a5f !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ms-th-att            { background: #164e35 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ms-subtotal-row td   { background: #eff6ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ms-grandtotal-row td { background: #1e3a5f !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ms-result-pass       { background: #dcfce7 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ms-result-fail       { background: #fee2e2 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ms-subject-cell      { background: #f1f5f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .ms-att-cell          { background: #f0fdf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  @page { margin: 12mm 10mm; size: A4 landscape; }
+}
+</style>
+{% endblock %}

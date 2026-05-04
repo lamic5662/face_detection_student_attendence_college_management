@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from 'partials/pagination.html' import render_pagination %}
+{% block title %}Notice Board{% endblock %}
+{% block page_title %}<i class="bi bi-megaphone-fill me-2"></i>Notice Board{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="d-flex gap-2 flex-wrap">
+    {% for cat in ['general','exam','holiday','event','fee','urgent'] %}
+    <a href="{{ url_for('notice.list_notices', category=cat) }}"
+       class="btn btn-sm {% if category == cat %}btn-{{ colors[cat] }}{% else %}btn-outline-{{ colors[cat] }}{% endif %}">
+      {{ cat.capitalize() }}
+    </a>
+    {% endfor %}
+    {% if category %}
+    <a href="{{ url_for('notice.list_notices') }}" class="btn btn-sm btn-outline-secondary">All</a>
+    {% endif %}
+  </div>
+  {% if current_user.role in ['admin','teacher'] %}
+  <a href="{{ url_for('notice.create') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle-fill me-2"></i>Post Notice
+  </a>
+  {% endif %}
+</div>
+
+{% if notices %}
+<div class="d-flex flex-column gap-3">
+  {% for n in notices %}
+  <div class="card border-0 shadow-sm {% if n.is_pinned %}border-start border-4 border-warning{% endif %}">
+    <div class="card-body px-4 py-3">
+      <div class="d-flex justify-content-between align-items-start gap-3">
+        <div class="flex-grow-1">
+          <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+            {% if n.is_pinned %}<i class="bi bi-pin-angle-fill text-warning"></i>{% endif %}
+            <span class="badge bg-{{ colors[n.category] }}-subtle text-{{ colors[n.category] }}">
+              {{ n.category.capitalize() }}
+            </span>
+            {% if n.target_role != 'all' %}
+            <span class="badge bg-secondary-subtle text-secondary">{{ n.target_role.capitalize() }}s only</span>
+            {% endif %}
+            {% if n.is_expired %}<span class="badge bg-light text-muted">Expired</span>{% endif %}
+          </div>
+          <h6 class="fw-bold mb-1">
+            <a href="{{ url_for('notice.detail', nid=n.id) }}" class="text-decoration-none text-dark">
+              {{ n.title }}
+            </a>
+          </h6>
+          <p class="text-muted small mb-0">{{ n.content[:180] }}{% if n.content|length > 180 %}…{% endif %}</p>
+        </div>
+        <div class="text-end flex-shrink-0">
+          <div class="text-muted small">{{ n.author.name }}</div>
+          <div class="text-muted" style="font-size:11px">{{ n.created_at.strftime('%d %b %Y') }}</div>
+          {% if current_user.id == n.author_id or current_user.role == 'admin' %}
+          <div class="d-flex gap-1 mt-2 justify-content-end">
+            <a href="{{ url_for('notice.edit', nid=n.id) }}" class="btn btn-xs btn-outline-secondary" style="padding:2px 8px;font-size:12px">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <form method="POST" action="{{ url_for('notice.delete', nid=n.id) }}" data-confirm="Delete this notice? This cannot be undone." data-confirm-title="Delete Notice">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-xs btn-outline-danger" style="padding:2px 8px;font-size:12px">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{{ render_pagination(pagination, request.args) }}
+{% else %}
+<div class="card border-0 shadow-sm text-center py-5 text-muted">
+  <i class="bi bi-megaphone fs-1 mb-3 d-block opacity-25"></i>
+  <p>No notices posted yet.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,626 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block page_title %}<i class="bi bi-speedometer2 me-2"></i>My Dashboard{% endblock %}
+
+{% block content %}
+<!-- Profile Banner -->
+<div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#0d6efd,#0dcaf0)">
+  <div class="card-body px-4 py-4 text-white d-flex align-items-center gap-4">
+    <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center fw-bold fs-2"
+         style="width:64px;height:64px;flex-shrink:0">
+      {{ current_user.name[0].upper() }}
+    </div>
+    <div class="flex-grow-1">
+      <h4 class="mb-0 fw-bold">{{ current_user.name }}</h4>
+      <div class="opacity-75">{{ student.roll_number }} &bull; {{ student.department.name }} &bull; Semester {{ student.semester }}</div>
+    </div>
+    <div class="text-center">
+      <div class="fs-2 fw-bold">{{ overall_pct }}%</div>
+      <div class="opacity-75 small">Overall Attendance</div>
+    </div>
+    <div>
+      {% if not student.is_face_enrolled %}
+      <a href="{{ url_for('student.enroll') }}" class="btn btn-warning fw-semibold">
+        <i class="bi bi-person-bounding-box me-2"></i>Enroll Face
+      </a>
+      {% else %}
+      <span class="badge bg-success-subtle text-success px-3 py-2">
+        <i class="bi bi-shield-check-fill me-1"></i>Face Enrolled
+      </span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Location Sharing Widget -->
+<div class="card border-0 shadow-sm mb-4" id="loc-card">
+  <div class="card-body px-4 py-3 d-flex flex-wrap align-items-center gap-3">
+
+    <!-- Icon + status -->
+    <div class="d-flex align-items-center gap-3 flex-grow-1">
+      <div class="rounded-circle d-flex align-items-center justify-content-center
+        {% if location and location.is_sharing %}bg-success{% else %}bg-secondary{% endif %}
+        bg-opacity-10" style="width:42px;height:42px;flex-shrink:0" id="loc-icon-wrap">
+        <i class="bi bi-geo-alt-fill fs-5
+          {% if location and location.is_sharing %}text-success{% else %}text-secondary{% endif %}"
+           id="loc-icon"></i>
+      </div>
+      <div>
+        <div class="fw-semibold small">Live Location Sharing</div>
+        <div id="loc-status-text" style="font-size:12px">
+          {% if location and location.is_sharing %}
+            <span class="text-success fw-semibold">
+              <i class="bi bi-circle-fill me-1" style="font-size:8px"></i>Active
+            </span> — your parents can see your live location
+            {% if location.updated_at %}
+              <span class="text-muted ms-2">(last sent {{ location.updated_at.strftime('%H:%M') }})</span>
+            {% endif %}
+          {% else %}
+            <span class="text-muted">Off</span> — turn on so your parents know you're safe
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Toggle button (Stop Sharing = normal form submit, Share = JS permission first) -->
+    {% if location and location.is_sharing %}
+    <form method="POST" action="{{ url_for('student.location_toggle') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn-sm btn-outline-danger fw-semibold">
+        <i class="bi bi-geo-alt-fill me-1"></i>Stop Sharing
+      </button>
+    </form>
+    {% else %}
+    <button type="button" class="btn btn-sm btn-success fw-semibold" id="start-sharing-btn"
+            onclick="requestLocationPermission()">
+      <i class="bi bi-geo-alt-fill me-1"></i>Share Location
+    </button>
+    <!-- Hidden form submitted only after permission granted -->
+    <form id="enable-loc-form" method="POST"
+          action="{{ url_for('student.location_toggle') }}" style="display:none">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endif %}
+
+  </div>
+
+  <!-- Permission denied — full fix guide -->
+  <div id="loc-denied-msg" class="px-4 pb-3" style="display:none">
+    <div class="alert alert-danger border-0 mb-0 p-3">
+      <div class="d-flex gap-3">
+        <i class="bi bi-geo-alt-slash-fill fs-4 text-danger flex-shrink-0 mt-1"></i>
+        <div class="flex-grow-1">
+          <div class="fw-bold mb-2">Location access was blocked by your browser</div>
+
+          <!-- Steps based on browser detected by JS -->
+          <div id="fix-chrome" style="display:none">
+            <div class="small mb-2 fw-semibold text-dark">Fix in Chrome / Edge:</div>
+            <ol class="small mb-2 ps-3">
+              <li>Click the <strong>🔒 lock icon</strong> (or <strong>ⓘ</strong>) in the address bar</li>
+              <li>Click <strong>Site settings</strong></li>
+              <li>Under <strong>Location</strong>, change to <strong>Allow</strong></li>
+              <li>Come back and click <strong>Try Again</strong> below</li>
+            </ol>
+          </div>
+          <div id="fix-firefox" style="display:none">
+            <div class="small mb-2 fw-semibold text-dark">Fix in Firefox:</div>
+            <ol class="small mb-2 ps-3">
+              <li>Click the <strong>🔒 lock icon</strong> in the address bar</li>
+              <li>Click the <strong>×</strong> next to <em>Blocked Temporarily</em> under Location</li>
+              <li>Reload the page and click <strong>Allow</strong> when asked</li>
+            </ol>
+          </div>
+          <div id="fix-safari" style="display:none">
+            <div class="small mb-2 fw-semibold text-dark">Fix in Safari:</div>
+            <ol class="small mb-2 ps-3">
+              <li>Open <strong>Safari → Settings for This Website</strong></li>
+              <li>Set <strong>Location</strong> to <strong>Allow</strong></li>
+              <li>Reload and try again</li>
+            </ol>
+          </div>
+          <div id="fix-generic" style="display:none">
+            <div class="small mb-2 fw-semibold text-dark">How to fix:</div>
+            <ol class="small mb-2 ps-3">
+              <li>Look for a <strong>🔒 lock</strong> or <strong>ⓘ</strong> icon in your address bar</li>
+              <li>Find <strong>Location / Permissions</strong> and set it to <strong>Allow</strong></li>
+              <li>Reload the page and try again</li>
+            </ol>
+          </div>
+
+          <button type="button" class="btn btn-sm btn-danger fw-semibold mt-1"
+                  onclick="retryPermission()">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            {% if location and location.is_sharing %}Reload &amp; Try Again{% else %}Try Again{% endif %}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Permission Request Modal -->
+<div class="modal fade" id="locPermModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-body text-center px-4 py-5">
+
+        <!-- Animated location icon -->
+        <div class="position-relative d-inline-flex align-items-center justify-content-center mb-4"
+             style="width:80px;height:80px" id="perm-anim">
+          <span style="position:absolute;inset:0;border-radius:50%;background:rgba(25,135,84,.15);animation:locRing 1.6s ease-out infinite"></span>
+          <span style="position:absolute;inset:12px;border-radius:50%;background:rgba(25,135,84,.25);animation:locRing 1.6s ease-out .5s infinite"></span>
+          <div class="rounded-circle bg-success d-flex align-items-center justify-content-center"
+               style="width:44px;height:44px;z-index:1">
+            <i class="bi bi-geo-alt-fill text-white fs-4"></i>
+          </div>
+        </div>
+
+        <h5 class="fw-bold mb-1">Allow Location Access</h5>
+        <p class="text-muted small mb-4">
+          Your browser will ask for permission to use your GPS.<br>
+          Tap <strong>"Allow"</strong> so your parents can track you live.
+        </p>
+
+        <div class="d-grid gap-2">
+          <button class="btn btn-success btn-lg fw-semibold" id="grant-btn"
+                  onclick="doRequestPermission()">
+            <i class="bi bi-geo-alt-fill me-2"></i>Allow & Enable Sharing
+          </button>
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            Cancel
+          </button>
+        </div>
+
+        <div id="perm-checking" style="display:none" class="mt-3 text-muted small">
+          <div class="spinner-border spinner-border-sm me-2"></div>Requesting permission…
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+@keyframes locRing {
+  0%   { transform:scale(.6); opacity:.9; }
+  100% { transform:scale(1.8); opacity:0; }
+}
+</style>
+
+<script>
+// ── Browser detection (always runs) ────────────────────────────────────────
+(function detectBrowser() {
+  const ua = navigator.userAgent;
+  let browser = 'generic';
+  if (/Firefox/i.test(ua))                            browser = 'firefox';
+  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'safari';
+  else if (/Chrome|Edg/i.test(ua))                    browser = 'chrome';
+  const el = document.getElementById('fix-' + browser);
+  if (el) el.style.display = '';
+  else document.getElementById('fix-generic').style.display = '';
+})();
+
+function showDenied() {
+  document.getElementById('loc-denied-msg').style.display = '';
+  const btn = document.getElementById('start-sharing-btn');
+  if (btn) { btn.innerHTML = '<i class="bi bi-geo-alt-slash-fill me-1"></i>Blocked'; btn.disabled = true; }
+}
+
+window.retryPermission = function () {
+  document.getElementById('loc-denied-msg').style.display = 'none';
+  {% if location and location.is_sharing %}
+  // Sharing is already on — reload so tracking restarts with granted permission
+  window.location.reload();
+  {% else %}
+  const btn = document.getElementById('start-sharing-btn');
+  if (btn) { btn.innerHTML = '<i class="bi bi-geo-alt-fill me-1"></i>Share Location'; btn.disabled = false; }
+  setTimeout(() => window.requestLocationPermission(), 200);
+  {% endif %}
+};
+
+{% if not (location and location.is_sharing) %}
+// ── Permission-first flow ──────────────────────────────────────────────────
+window.requestLocationPermission = function () {
+  if (!navigator.geolocation) {
+    alert('Your browser does not support location services. Please use Chrome or Firefox on your phone.');
+    return;
+  }
+  if (navigator.permissions) {
+    navigator.permissions.query({ name: 'geolocation' }).then(r => {
+      if (r.state === 'denied') { showDenied(); }
+      else { new bootstrap.Modal(document.getElementById('locPermModal')).show(); }
+    });
+  } else {
+    new bootstrap.Modal(document.getElementById('locPermModal')).show();
+  }
+};
+
+window.doRequestPermission = function () {
+  const btn      = document.getElementById('grant-btn');
+  const checking = document.getElementById('perm-checking');
+  btn.disabled   = true;
+  checking.style.display = '';
+
+  navigator.geolocation.getCurrentPosition(
+    function () {
+      // Permission granted and position received — enable sharing
+      const m = bootstrap.Modal.getInstance(document.getElementById('locPermModal'));
+      if (m) m.hide();
+      document.getElementById('enable-loc-form').submit();
+    },
+    function (err) {
+      const m = bootstrap.Modal.getInstance(document.getElementById('locPermModal'));
+      if (m) m.hide();
+      btn.disabled = false;
+      checking.style.display = 'none';
+      if (err.code === 1) {
+        // PERMISSION_DENIED — user explicitly blocked location
+        showDenied();
+      } else {
+        // TIMEOUT (3) or POSITION_UNAVAILABLE (2):
+        // Permission was granted but GPS signal is weak right now.
+        // Enable sharing anyway — watchPosition will get a fix when signal improves.
+        document.getElementById('enable-loc-form').submit();
+      }
+    },
+    // Low accuracy = uses network/WiFi location (instant), accepts recent cached fix
+    { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+  );
+};
+{% endif %}
+</script>
+
+{% if location and location.is_sharing %}
+<script>
+(function () {
+  const UPDATE_URL = "{{ url_for('student.location_update') }}";
+  let lastSent = 0;
+  const MIN_MS  = 5000;
+
+  function send(lat, lng, accuracy) {
+    const now = Date.now();
+    if (now - lastSent < MIN_MS) return;
+    lastSent = now;
+    fetch(UPDATE_URL, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng, accuracy })
+    }).catch(() => {});
+  }
+
+  // High-accuracy for watchPosition (GPS when available); low-accuracy fallback for heartbeat
+  const opts      = { enableHighAccuracy: true,  timeout: 15000, maximumAge: 0 };
+  const optsLow   = { enableHighAccuracy: false, timeout: 8000,  maximumAge: 60000 };
+
+  if (!navigator.geolocation) {
+    document.getElementById('loc-status-text').innerHTML =
+      '<span class="text-danger">Location not supported by this browser.</span>';
+    return;
+  }
+
+  // Check current permission state first (Chrome/Firefox/Edge)
+  if (navigator.permissions) {
+    navigator.permissions.query({ name: 'geolocation' }).then(result => {
+      if (result.state === 'denied') {
+        document.getElementById('loc-denied-msg').style.display = '';
+        document.getElementById('loc-status-text').innerHTML =
+          '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>Permission denied — update browser settings</span>';
+        return;
+      }
+      startTracking();
+      result.onchange = () => { if (result.state === 'denied') location.reload(); };
+    });
+  } else {
+    startTracking();
+  }
+
+  function startTracking() {
+    // watchPosition fires on every GPS movement
+    navigator.geolocation.watchPosition(
+      p => send(p.coords.latitude, p.coords.longitude, p.coords.accuracy),
+      err => {
+        if (err.code === 1) {
+          document.getElementById('loc-denied-msg').style.display = '';
+        }
+      },
+      opts
+    );
+    // Heartbeat every 5s using network location (works even with weak GPS signal)
+    setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        p => send(p.coords.latitude, p.coords.longitude, p.coords.accuracy),
+        () => {}, optsLow
+      );
+    }, 5000);
+  }
+})();
+</script>
+{% endif %}
+
+<!-- Low Attendance Alert -->
+{% set low_subjects = subject_attendance|selectattr('low')|list %}
+{% if low_subjects %}
+<div class="alert alert-danger border-0 shadow-sm mb-4">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  <strong>Low Attendance Warning!</strong> You are below {{ threshold }}% in
+  {% for s in low_subjects %}<strong>{{ s.subject.name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}.
+  Attend classes regularly to avoid academic consequences.
+</div>
+{% endif %}
+
+<!-- Subject Cards -->
+<h6 class="fw-semibold mb-3">Subject-wise Attendance</h6>
+<div class="row g-3 mb-4">
+  {% for s in subject_attendance %}
+  <div class="col-xl-4 col-md-6">
+    <div class="card border-0 shadow-sm {% if s.low %}border-danger{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <div class="fw-semibold">{{ s.subject.name }}</div>
+            <div class="text-muted small">{{ s.subject.code }}</div>
+          </div>
+          <span class="badge fs-6 {% if s.percentage >= 75 %}bg-success{% elif s.percentage >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+            {{ s.percentage }}%
+          </span>
+        </div>
+        <div class="progress mb-2" style="height:8px">
+          <div class="progress-bar {% if s.percentage >= 75 %}bg-success{% elif s.percentage >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+               style="width:{{ s.percentage }}%"></div>
+        </div>
+        <div class="d-flex justify-content-between text-muted small">
+          <span><i class="bi bi-check-circle text-success me-1"></i>{{ s.present }} Present</span>
+          <span><i class="bi bi-x-circle text-danger me-1"></i>{{ s.absent }} Absent</span>
+          <span>{{ s.total }} Total</span>
+        </div>
+        {% if s.low %}
+        <div class="mt-2 text-danger small fw-semibold">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>Below minimum requirement
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="card border-0 shadow-sm text-center py-5 text-muted">
+      <i class="bi bi-journal-x fs-1 mb-3"></i>
+      <p>No subjects assigned for your semester/department yet.</p>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Quick Info Row: Upcoming Exams / Fee Status / Notices -->
+<div class="row g-3 mb-4">
+  <!-- Upcoming Exams -->
+  {% if upcoming_exams %}
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header border-0 px-4 py-3 d-flex align-items-center justify-content-between"
+           style="background:linear-gradient(135deg,#6610f2,#0dcaf0)">
+        <h6 class="fw-semibold mb-0 text-white">
+          <i class="bi bi-alarm-fill me-2"></i>Upcoming Exams
+          <span class="badge ms-2" style="background:rgba(255,255,255,.25);color:#fff">
+            {{ upcoming_exams|length }}
+          </span>
+        </h6>
+        <a href="{{ url_for('exam.student_results') }}" class="btn btn-sm btn-light btn-sm fw-semibold"
+           style="font-size:12px">
+          <i class="bi bi-list-check me-1"></i>All Results
+        </a>
+      </div>
+      <div class="card-body px-4 py-3">
+        <div class="row g-3">
+          {% for e in upcoming_exams %}
+          {% set days_left = (e.exam_date - today).days %}
+          <div class="col-xl-4 col-md-6">
+            <div class="exam-upcoming-card">
+              {# Top row: type badge + days left #}
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="eu-type-badge eu-{{ e.exam_type }}">
+                  {{ e.exam_type.replace('_', ' ').title() }}
+                </span>
+                <span class="eu-days
+                  {% if days_left == 0 %}eu-today
+                  {% elif days_left <= 2 %}eu-soon
+                  {% else %}eu-ok{% endif %}">
+                  {% if days_left == 0 %}<i class="bi bi-exclamation-circle-fill me-1"></i>Today!
+                  {% elif days_left == 1 %}Tomorrow
+                  {% else %}{{ days_left }} days left{% endif %}
+                </span>
+              </div>
+
+              {# Title + subject #}
+              <div class="fw-bold mb-1" style="font-size:14px">{{ e.title }}</div>
+              <div class="text-muted small mb-2">
+                <i class="bi bi-book-fill me-1 text-primary"></i>
+                {{ e.subject.name }} <span class="opacity-50">({{ e.subject.code }})</span>
+              </div>
+
+              {# Details grid #}
+              <div class="eu-meta">
+                <div class="eu-meta-item">
+                  <i class="bi bi-calendar-event text-primary"></i>
+                  <span>{{ e.exam_date.strftime('%a, %d %b %Y') }}</span>
+                </div>
+                {% if e.start_time %}
+                <div class="eu-meta-item">
+                  <i class="bi bi-clock-fill text-success"></i>
+                  <span>{{ e.start_time.strftime('%I:%M %p') }}</span>
+                </div>
+                {% endif %}
+                {% if e.room %}
+                <div class="eu-meta-item">
+                  <i class="bi bi-geo-alt-fill text-danger"></i>
+                  <span>{{ e.room }}</span>
+                </div>
+                {% endif %}
+                {% if e.duration_mins %}
+                <div class="eu-meta-item">
+                  <i class="bi bi-hourglass-split text-warning"></i>
+                  <span>{{ e.duration_mins }} mins</span>
+                </div>
+                {% endif %}
+                <div class="eu-meta-item">
+                  <i class="bi bi-trophy-fill text-info"></i>
+                  <span>{{ e.total_marks | int }} marks
+                    {% if e.pass_marks %}· Pass: {{ e.pass_marks | int }}{% endif %}
+                  </span>
+                </div>
+              </div>
+
+              {% if e.instructions %}
+              <div class="eu-instructions mt-2">
+                <i class="bi bi-info-circle me-1"></i>{{ e.instructions | truncate(80) }}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Fee Alert -->
+  {% if total_fee_due > 0 %}
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm border-start border-danger border-4">
+      <div class="card-body px-3 py-3 d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-danger-subtle d-flex align-items-center justify-content-center" style="width:44px;height:44px;flex-shrink:0">
+          <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
+        </div>
+        <div class="flex-grow-1">
+          <div class="fw-bold text-danger">Rs. {{ '{:,.0f}'.format(total_fee_due) }} Due</div>
+          <div class="text-muted small">Outstanding fee balance</div>
+        </div>
+        <a href="{{ url_for('fee.student_fees') }}" class="btn btn-sm btn-danger">View</a>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm border-start border-success border-4">
+      <div class="card-body px-3 py-3 d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-success-subtle d-flex align-items-center justify-content-center" style="width:44px;height:44px;flex-shrink:0">
+          <i class="bi bi-check-circle-fill text-success fs-5"></i>
+        </div>
+        <div>
+          <div class="fw-bold text-success">Fees Cleared</div>
+          <div class="text-muted small">No outstanding balance</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Notices -->
+  {% if notices %}
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body px-3 py-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-semibold small"><i class="bi bi-megaphone-fill text-warning me-1"></i>Notices</span>
+          <a href="{{ url_for('notice.list_notices') }}" class="small text-primary">All</a>
+        </div>
+        {% for n in notices %}
+        <div class="{% if not loop.last %}border-bottom pb-1 mb-1{% endif %}">
+          {% if n.is_pinned %}<i class="bi bi-pin-fill text-warning me-1" style="font-size:10px"></i>{% endif %}
+          <a href="{{ url_for('notice.detail', nid=n.id) }}" class="small text-decoration-none fw-semibold">{{ n.title | truncate(45) }}</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Recent Activity -->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-0 pt-4 px-4">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent Attendance</h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Subject</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Liveness</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent_records %}
+          <tr>
+            <td class="px-4 fw-semibold">{{ r.session.subject.name }}</td>
+            <td class="text-muted">{{ r.session.date.strftime('%d %b %Y') }}</td>
+            <td>
+              <span class="badge {% if r.status == 'present' %}bg-success{% elif r.status == 'late' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                {{ r.status.capitalize() }}
+              </span>
+            </td>
+            <td>
+              {% if r.liveness_verified %}
+                <i class="bi bi-eye-fill text-success" title="Liveness verified"></i>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted py-4">No attendance records yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Upcoming exam cards ─────────────────────────────────────────────── */
+.exam-upcoming-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  border-left: 4px solid #6610f2;
+  transition: box-shadow .18s;
+  height: 100%;
+}
+.exam-upcoming-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.09); }
+
+.eu-type-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 10px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+}
+.eu-quiz        { background: #dbeafe; color: #1d4ed8; }
+.eu-mid_term    { background: #ede9fe; color: #6d28d9; }
+.eu-final       { background: #fee2e2; color: #b91c1c; }
+.eu-practical   { background: #dcfce7; color: #15803d; }
+.eu-assignment  { background: #ffedd5; color: #c2410c; }
+
+.eu-days {
+  font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 20px;
+}
+.eu-today { background: #fee2e2; color: #b91c1c; animation: euPulse 1.2s ease-in-out infinite; }
+.eu-soon  { background: #fef3c7; color: #92400e; }
+.eu-ok    { background: #dcfce7; color: #15803d; }
+@keyframes euPulse { 0%,100%{opacity:1} 50%{opacity:.65} }
+
+.eu-meta { display: flex; flex-direction: column; gap: 4px; }
+.eu-meta-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #475569; }
+.eu-meta-item i { font-size: 12px; flex-shrink: 0; }
+
+.eu-instructions {
+  font-size: 11px; color: #64748b;
+  background: #f8fafc; border-radius: 6px;
+  padding: 5px 10px; font-style: italic;
+}
+</style>
+{% endblock %}

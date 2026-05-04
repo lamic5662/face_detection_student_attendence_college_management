@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Enter Marks — {{ exam.title }}{% endblock %}
+{% block page_title %}<i class="bi bi-pencil-square me-2"></i>Enter Marks{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body px-4 py-3 d-flex flex-wrap gap-4 align-items-center">
+    <div>
+      <div class="fw-bold">{{ exam.title }}</div>
+      <div class="text-muted small">{{ exam.subject.name }} &bull; {{ exam.exam_type.replace('_',' ').title() }}</div>
+    </div>
+    <div class="ms-auto d-flex gap-4 text-center">
+      <div><div class="fw-bold text-primary">{{ exam.total_marks }}</div><div class="small text-muted">Total Marks</div></div>
+      <div><div class="fw-bold text-info">{{ exam.exam_date.strftime('%d %b %Y') }}</div><div class="small text-muted">Date</div></div>
+      {% if exam.room %}<div><div class="fw-bold">{{ exam.room }}</div><div class="small text-muted">Room</div></div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body px-4 pb-2 pt-3 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0">{{ marks|length }} Students</h6>
+    <div class="d-flex gap-2 align-items-center">
+      <button class="btn btn-outline-secondary btn-sm" onclick="markAllPresent()">Clear Absent</button>
+      <button class="btn btn-outline-warning btn-sm" onclick="markAllAbsent()">Mark All Absent</button>
+    </div>
+  </div>
+  <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Roll No.</th>
+            <th>Student Name</th>
+            <th style="width:130px">Marks (/ {{ exam.total_marks }})</th>
+            <th>Grade</th>
+            <th>Absent</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in marks %}
+          <tr id="row-{{ m.student_id }}" {% if m.is_absent %}class="table-secondary"{% endif %}>
+            <td class="px-4"><span class="badge bg-secondary">{{ m.student.roll_number }}</span></td>
+            <td class="fw-semibold">{{ m.student.user.name }}</td>
+            <td>
+              <input type="number" name="marks_{{ m.student_id }}"
+                     class="form-control form-control-sm marks-input"
+                     data-sid="{{ m.student_id }}"
+                     value="{{ m.marks_obtained if m.marks_obtained is not none else '' }}"
+                     min="0" max="{{ exam.total_marks }}" step="0.5"
+                     {% if m.is_absent %}disabled{% endif %}
+                     oninput="updateGrade(this, {{ exam.total_marks }})">
+            </td>
+            <td id="grade-{{ m.student_id }}">
+              {% if m.is_absent %}
+                <span class="badge bg-secondary">AB</span>
+              {% elif m.marks_obtained is not none %}
+                <span class="badge bg-{{ 'success' if m.grade not in ['D','F'] else 'danger' }}">{{ m.grade }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <div class="form-check">
+                <input class="form-check-input absent-cb" type="checkbox"
+                       name="absent_{{ m.student_id }}" id="ab_{{ m.student_id }}"
+                       data-sid="{{ m.student_id }}"
+                       {% if m.is_absent %}checked{% endif %}
+                       onchange="toggleAbsent(this)">
+              </div>
+            </td>
+            <td>
+              <input type="text" name="remarks_{{ m.student_id }}" class="form-control form-control-sm"
+                     value="{{ m.remarks or '' }}" placeholder="Optional">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="d-flex gap-2 p-4 pt-3">
+      <a href="{{ url_for('exam.teacher_exams') }}" class="btn btn-light">Cancel</a>
+      <button type="submit" class="btn btn-success fw-semibold px-5">
+        <i class="bi bi-save me-2"></i>Save All Marks
+      </button>
+    </div>
+  </form>
+</div>
+
+{% set grades = [('A+',90),('A',80),('B+',70),('B',60),('C+',50),('C',40),('D',33),('F',0)] %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TOTAL = {{ exam.total_marks }};
+const SCALE = [[90,'A+'],[80,'A'],[70,'B+'],[60,'B'],[50,'C+'],[40,'C'],[33,'D'],[0,'F']];
+
+function getGrade(val) {
+  const pct = val / TOTAL * 100;
+  for (const [t,g] of SCALE) { if (pct >= t) return g; }
+  return 'F';
+}
+
+function updateGrade(input, total) {
+  const sid = input.dataset.sid;
+  const cell = document.getElementById('grade-' + sid);
+  const val  = parseFloat(input.value);
+  if (isNaN(val)) { cell.innerHTML = '—'; return; }
+  const grade = getGrade(val);
+  const cls   = ['D','F'].includes(grade) ? 'danger' : 'success';
+  cell.innerHTML = `<span class="badge bg-${cls}">${grade}</span>`;
+}
+
+function toggleAbsent(cb) {
+  const sid   = cb.dataset.sid;
+  const input = document.querySelector(`input[name="marks_${sid}"]`);
+  const row   = document.getElementById('row-' + sid);
+  const grade = document.getElementById('grade-' + sid);
+  if (cb.checked) {
+    input.disabled = true; input.value = '';
+    row.classList.add('table-secondary');
+    grade.innerHTML = '<span class="badge bg-secondary">AB</span>';
+  } else {
+    input.disabled = false;
+    row.classList.remove('table-secondary');
+    grade.innerHTML = '—';
+  }
+}
+
+function markAllAbsent() {
+  document.querySelectorAll('.absent-cb').forEach(cb => { cb.checked = true; toggleAbsent(cb); });
+}
+function markAllPresent() {
+  document.querySelectorAll('.absent-cb').forEach(cb => { cb.checked = false; toggleAbsent(cb); });
+}
+</script>
+{% endblock %}

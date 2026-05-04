@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% from 'partials/pagination.html' import render_pagination %}
+{% block title %}My Content{% endblock %}
+{% block page_title %}<i class="bi bi-collection-fill me-2"></i>Content Manager{% endblock %}
+
+{% block content %}
+
+{# ── Stat cards ── #}
+<div class="row g-3 mb-4">
+  {% set stats = [
+    ('note',       'Notes',       'bi-journal-text',       'primary',  counts.note),
+    ('assignment', 'Assignments', 'bi-clipboard-check',    'purple',   counts.assignment),
+    ('lab',        'Lab Work',    'bi-flask',              'orange',   counts.lab),
+    ('question',   'Questions',   'bi-patch-question-fill','teal',     counts.question),
+  ] %}
+  {% for slug, label, icon, color, cnt in stats %}
+  <div class="col-xl-3 col-md-6">
+    <a href="{{ url_for('teacher.content_list', type=slug, subject=subj_filter, pub=pub_filter, q=q) }}"
+       class="text-decoration-none">
+      <div class="card border-0 shadow-sm stat-card stat-{{ color }} {% if type_filter == slug %}ring-active{% endif %}">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <div class="stat-icon-wrap">
+            <i class="bi {{ icon }}"></i>
+          </div>
+          <div>
+            <div class="stat-num">{{ cnt }}</div>
+            <div class="stat-lbl">{{ label }}</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Filter + actions bar ── #}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body px-4 py-3">
+    <form method="GET" action="{{ url_for('teacher.content_list') }}" id="filterForm"
+          class="row g-2 align-items-end">
+      <input type="hidden" name="type" value="{{ type_filter }}">
+
+      <div class="col-lg-4 col-md-12">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" class="form-control"
+                 placeholder="Search by title…" value="{{ q }}" autocomplete="off">
+          {% if q %}<a href="{{ url_for('teacher.content_list', type=type_filter, subject=subj_filter, pub=pub_filter) }}"
+             class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>{% endif %}
+        </div>
+      </div>
+
+      <div class="col-lg-3 col-md-5">
+        <select name="subject" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="0">All Subjects</option>
+          {% for s in subjects %}
+          <option value="{{ s.id }}" {% if subj_filter == s.id %}selected{% endif %}>
+            {{ s.name }} ({{ s.code }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-lg-2 col-md-4">
+        <select name="pub" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value=""    {% if not pub_filter %}selected{% endif %}>All Status</option>
+          <option value="published" {% if pub_filter=='published' %}selected{% endif %}>Published</option>
+          <option value="draft"     {% if pub_filter=='draft'     %}selected{% endif %}>Draft</option>
+        </select>
+      </div>
+
+      <div class="col-lg-1 col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel-fill"></i>
+        </button>
+      </div>
+
+      <div class="col-lg-2 col-md-2 ms-auto text-end">
+        <a href="{{ url_for('teacher.content_create') }}" class="btn btn-primary btn-sm fw-semibold">
+          <i class="bi bi-plus-circle-fill me-1"></i>New Content
+        </a>
+      </div>
+    </form>
+
+    {# Type filter pills #}
+    <div class="d-flex gap-2 flex-wrap mt-2 pt-2 border-top">
+      {% set kw = {'subject': subj_filter, 'pub': pub_filter, 'q': q} %}
+      <a href="{{ url_for('teacher.content_list', **kw) }}"
+         class="badge rounded-pill text-decoration-none {% if not type_filter %}bg-dark{% else %}bg-secondary-subtle text-secondary{% endif %}">
+        All ({{ counts.all }})
+      </a>
+      {% for slug, label, icon in [('note','Notes','bi-journal-text'),('assignment','Assignments','bi-clipboard-check'),('lab','Lab Work','bi-flask'),('question','Questions','bi-patch-question-fill')] %}
+      <a href="{{ url_for('teacher.content_list', type=slug, **kw) }}"
+         class="badge rounded-pill text-decoration-none type-pill-{{ slug }} {% if type_filter == slug %}active{% endif %}">
+        <i class="bi {{ icon }} me-1"></i>{{ label }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ── Content table ── #}
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4" style="width:44px">#</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Subject</th>
+            <th>Due / Marks</th>
+            <th>Created</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in items %}
+          <tr id="row-{{ item.id }}">
+            <td class="px-4 text-muted small">
+              {{ (pagination.page - 1) * pagination.per_page + loop.index }}
+            </td>
+            <td>
+              <div class="fw-semibold" style="font-size:13px">{{ item.title }}</div>
+              {% if item.body %}
+              <div class="text-muted small text-truncate" style="max-width:260px">
+                {{ item.body | truncate(80) }}
+              </div>
+              {% endif %}
+              {% if item.file_path %}
+              <a href="{{ url_for('teacher.content_file', cid=item.id) }}"
+                 target="_blank" class="small text-primary">
+                <i class="bi bi-paperclip me-1"></i>Attachment
+              </a>
+              {% endif %}
+            </td>
+            <td>
+              <span class="type-badge type-{{ item.content_type }}">
+                {% if item.content_type == 'note' %}<i class="bi bi-journal-text me-1"></i>Note
+                {% elif item.content_type == 'assignment' %}<i class="bi bi-clipboard-check me-1"></i>Assignment
+                {% elif item.content_type == 'lab' %}<i class="bi bi-flask me-1"></i>Lab
+                {% else %}<i class="bi bi-patch-question-fill me-1"></i>Question
+                {% endif %}
+              </span>
+            </td>
+            <td class="text-muted small">
+              {{ item.subject.name if item.subject else '—' }}
+            </td>
+            <td class="small">
+              {% if item.due_date %}
+              <div><i class="bi bi-calendar-event me-1 text-danger"></i>{{ item.due_date.strftime('%d %b %Y') }}</div>
+              {% endif %}
+              {% if item.marks %}
+              <div class="text-muted"><i class="bi bi-trophy me-1"></i>{{ item.marks }} marks</div>
+              {% endif %}
+              {% if not item.due_date and not item.marks %}—{% endif %}
+            </td>
+            <td class="text-muted small">{{ item.created_at.strftime('%d %b %Y') }}</td>
+            <td>
+              <div class="form-check form-switch mb-0" title="{{ 'Published' if item.is_published else 'Draft' }}">
+                <input class="form-check-input publish-toggle" type="checkbox"
+                       data-id="{{ item.id }}"
+                       {% if item.is_published %}checked{% endif %}>
+              </div>
+              <small class="text-muted toggle-label" id="lbl-{{ item.id }}" style="font-size:10px">
+                {{ 'Published' if item.is_published else 'Draft' }}
+              </small>
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('teacher.content_preview', cid=item.id) }}"
+                   class="btn btn-sm btn-outline-info" title="Preview">
+                  <i class="bi bi-eye-fill"></i>
+                </a>
+                <a href="{{ url_for('teacher.content_edit', cid=item.id) }}"
+                   class="btn btn-sm btn-outline-primary" title="Edit">
+                  <i class="bi bi-pencil-fill"></i>
+                </a>
+                <form method="POST"
+                      action="{{ url_for('teacher.content_delete', cid=item.id) }}"
+                      data-confirm="Delete &quot;{{ item.title }}&quot;? This cannot be undone."
+                      data-confirm-title="Delete Content"
+                      data-confirm-type="danger"
+                      data-confirm-ok="Delete"
+                      data-confirm-icon="bi-trash3-fill">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger" title="Delete">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-5">
+              <i class="bi bi-collection fs-1 d-block mb-2 opacity-25"></i>
+              No content found.
+              <a href="{{ url_for('teacher.content_create') }}" class="d-block mt-2 btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle me-1"></i>Create your first content
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="card-footer bg-transparent border-0 px-4 pb-3">
+    {{ render_pagination(pagination, request.args) }}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* Stat cards */
+.stat-card { transition: box-shadow .18s, transform .18s; }
+.stat-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,.12) !important; transform: translateY(-2px); }
+.stat-card.ring-active { outline: 2px solid #3b82f6; outline-offset: 2px; }
+.stat-icon-wrap {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.stat-num  { font-size: 24px; font-weight: 800; line-height: 1; color: #0f172a; }
+.stat-lbl  { font-size: 12px; color: #64748b; font-weight: 600; }
+
+.stat-primary  .stat-icon-wrap { background: #dbeafe; color: #3b82f6; }
+.stat-purple   .stat-icon-wrap { background: #ede9fe; color: #8b5cf6; }
+.stat-orange   .stat-icon-wrap { background: #ffedd5; color: #f97316; }
+.stat-teal     .stat-icon-wrap { background: #ccfbf1; color: #14b8a6; }
+
+/* Type filter pills */
+.type-pill-note       { background: #dbeafe; color: #1d4ed8; }
+.type-pill-assignment { background: #ede9fe; color: #6d28d9; }
+.type-pill-lab        { background: #ffedd5; color: #c2410c; }
+.type-pill-question   { background: #ccfbf1; color: #0f766e; }
+.type-pill-note.active,       .type-pill-note:hover       { background: #3b82f6; color: #fff; }
+.type-pill-assignment.active, .type-pill-assignment:hover { background: #8b5cf6; color: #fff; }
+.type-pill-lab.active,        .type-pill-lab:hover        { background: #f97316; color: #fff; }
+.type-pill-question.active,   .type-pill-question:hover   { background: #14b8a6; color: #fff; }
+.badge.rounded-pill { padding: 5px 12px; font-size: 12px; cursor: pointer; transition: background .15s, color .15s; }
+
+/* Type badges in table */
+.type-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+}
+.type-note       { background: #dbeafe; color: #1d4ed8; }
+.type-assignment { background: #ede9fe; color: #6d28d9; }
+.type-lab        { background: #ffedd5; color: #c2410c; }
+.type-question   { background: #ccfbf1; color: #0f766e; }
+</style>
+
+<script>
+document.querySelectorAll('.publish-toggle').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    const id   = this.dataset.id;
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    fetch(`/teacher/content/${id}/toggle`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+      const lbl = document.getElementById('lbl-' + id);
+      if (lbl) lbl.textContent = data.label;
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,57 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Flask / App
+instance/
+logs/
+*.log
+static/uploads/faces/
+static/uploads/content/
+static/uploads/id_photos/
+static/uploads/signatures/
+
+# Database
+*.db
+*.sqlite3
+
+# Migrations (keep the folder, ignore compiled)
+migrations/__pycache__/
+
+# IDE
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/

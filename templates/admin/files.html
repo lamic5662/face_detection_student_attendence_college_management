@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}File Manager{% endblock %}
+{% block page_title %}<i class="bi bi-folder2-open me-2"></i>File Manager{% endblock %}
+
+{% block content %}
+
+{# ── Summary bar ── #}
+<div class="row g-3 mb-4">
+  <div class="col-xl-3 col-md-6">
+    <div class="fm-stat">
+      <div class="fm-stat-icon bg-primary-subtle text-primary">
+        <i class="bi bi-files"></i>
+      </div>
+      <div>
+        <div class="fm-num">{{ files|length }}</div>
+        <div class="fm-lbl">Total Files</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-3 col-md-6">
+    <div class="fm-stat">
+      <div class="fm-stat-icon bg-info-subtle text-info">
+        <i class="bi bi-hdd-fill"></i>
+      </div>
+      <div>
+        <div class="fm-num">{{ total_size }}</div>
+        <div class="fm-lbl">Total Size</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-3 col-md-6">
+    <div class="fm-stat">
+      <div class="fm-stat-icon bg-warning-subtle text-warning">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+      </div>
+      <div>
+        <div class="fm-num">{{ orphan_count }}</div>
+        <div class="fm-lbl">Orphaned Files</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-3 col-md-6">
+    <div class="fm-stat">
+      <div class="fm-stat-icon bg-success-subtle text-success">
+        <i class="bi bi-link-45deg"></i>
+      </div>
+      <div>
+        <div class="fm-num">{{ (files|length) - orphan_count }}</div>
+        <div class="fm-lbl">Linked to Content</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Filter + bulk actions bar ── #}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body px-4 py-3">
+    <div class="row g-2 align-items-end">
+
+      {# Filter form — standalone, no nesting #}
+      <div class="col-lg-9">
+        <form method="GET" id="filterForm" class="row g-2 align-items-end">
+          <div class="col-lg-5">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input type="text" name="q" class="form-control"
+                     placeholder="Search filename or content title…"
+                     value="{{ q }}" autocomplete="off">
+              {% if q %}
+              <a href="{{ url_for('admin.file_manager', type=type_filter) }}"
+                 class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <select name="type" class="form-select form-select-sm" onchange="this.form.submit()">
+              <option value="">All Types</option>
+              {% for ext, cnt in ext_counts.items() | sort %}
+              <option value="{{ ext }}" {% if type_filter == ext %}selected{% endif %}>
+                .{{ ext | upper }} ({{ cnt }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-funnel-fill me-1"></i>Filter
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {# Action buttons — separate from the filter form #}
+      <div class="col-lg-3 text-end d-flex gap-2 justify-content-end align-items-end">
+        {% if orphan_count > 0 %}
+        <form method="POST" action="{{ url_for('admin.bulk_delete_files') }}"
+              data-confirm="Delete all {{ orphan_count }} orphaned file(s) with no linked content? This cannot be undone."
+              data-confirm-title="Delete Orphaned Files"
+              data-confirm-type="danger"
+              data-confirm-ok="Yes, Delete All"
+              data-confirm-icon="bi-trash3-fill">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="scope" value="orphans">
+          <button class="btn btn-sm btn-outline-warning">
+            <i class="bi bi-trash3 me-1"></i>Delete {{ orphan_count }} Orphan{% if orphan_count != 1 %}s{% endif %}
+          </button>
+        </form>
+        {% endif %}
+        <button class="btn btn-sm btn-danger" id="bulkDelBtn" disabled
+                onclick="submitBulkDelete()">
+          <i class="bi bi-trash3-fill me-1"></i>Delete Selected
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{# ── File table ── #}
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    {% if files %}
+    {# Standalone bulk-delete form — checkboxes reference it via form="bulkForm" #}
+    <form method="POST" action="{{ url_for('admin.bulk_delete_files') }}"
+          id="bulkForm" style="display:none">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="scope" value="selected">
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="px-4" style="width:40px">
+                <input type="checkbox" id="selectAll" class="form-check-input">
+              </th>
+              <th>File</th>
+              <th>Linked Content</th>
+              <th>Uploaded By</th>
+              <th>Size</th>
+              <th>Modified</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in files %}
+            <tr class="{% if f.orphan %}table-warning{% endif %}">
+              <td class="px-4">
+                <input type="checkbox" name="files" value="{{ f.rel }}"
+                       class="form-check-input file-check" form="bulkForm">
+              </td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="file-icon {{ f.ext }}">{{ f.ext | upper }}</span>
+                  <div>
+                    <div class="fw-semibold small" style="font-size:12px; word-break:break-all">
+                      {{ f.name }}
+                    </div>
+                    {% if f.orphan %}
+                    <span class="badge bg-warning text-dark" style="font-size:10px">
+                      <i class="bi bi-exclamation-triangle me-1"></i>Orphaned
+                    </span>
+                    {% endif %}
+                  </div>
+                </div>
+              </td>
+              <td>
+                {% if f.content %}
+                <div class="fw-semibold small">{{ f.content.title | truncate(40) }}</div>
+                <div class="text-muted" style="font-size:11px">
+                  <span class="type-dot type-{{ f.content.content_type }}"></span>
+                  {{ f.content.content_type.capitalize() }}
+                  {% if f.content.subject %}· {{ f.content.subject.code }}{% endif %}
+                </div>
+                {% else %}
+                <span class="text-muted small">— No linked record</span>
+                {% endif %}
+              </td>
+              <td class="text-muted small">
+                {% if f.content and f.content.teacher %}
+                {{ f.content.teacher.user.name }}
+                {% else %}
+                —
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-secondary-subtle text-secondary">{{ f.size_str }}</span>
+              </td>
+              <td class="text-muted small">{{ f.mtime.strftime('%d %b %Y %H:%M') }}</td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="{{ url_for('admin.view_file', rel=f.rel, download=0) }}" target="_blank"
+                     class="btn btn-sm btn-outline-secondary py-1 px-2" title="View / Download">
+                    <i class="bi bi-eye-fill"></i>
+                  </a>
+                  {% if f.content %}
+                  <a href="{{ url_for('teacher.content_edit', cid=f.content.id) }}"
+                     class="btn btn-sm btn-outline-primary py-1 px-2" title="Edit Content">
+                    <i class="bi bi-pencil-fill"></i>
+                  </a>
+                  {% endif %}
+                  <form method="POST" action="{{ url_for('admin.delete_file') }}"
+                        data-confirm="Delete {{ f.name }}?{% if f.content %} This will also remove the attachment from &quot;{{ f.content.title }}&quot;.{% endif %}"
+                        data-confirm-title="Delete File"
+                        data-confirm-type="danger"
+                        data-confirm-ok="Delete"
+                        data-confirm-icon="bi-trash3-fill">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="rel" value="{{ f.rel }}">
+                    <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Delete File">
+                      <i class="bi bi-trash3"></i>
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-folder2 fs-1 d-block mb-3 opacity-25"></i>
+      <div class="fw-semibold">No uploaded files found.</div>
+      {% if q or type_filter %}
+      <a href="{{ url_for('admin.file_manager') }}" class="btn btn-sm btn-outline-secondary mt-2">
+        <i class="bi bi-x-circle me-1"></i>Clear filters
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* Summary stats */
+.fm-stat {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 16px 20px; display: flex; align-items: center; gap: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.fm-stat-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.fm-num { font-size: 22px; font-weight: 800; color: #0f172a; line-height: 1; }
+.fm-lbl { font-size: 12px; color: #64748b; font-weight: 600; }
+
+/* File type icon badges */
+.file-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 8px;
+  font-size: 9px; font-weight: 800; letter-spacing: .5px;
+  flex-shrink: 0;
+}
+.file-icon.pdf  { background: #fee2e2; color: #b91c1c; }
+.file-icon.pptx, .file-icon.ppt { background: #ffedd5; color: #c2410c; }
+.file-icon.docx, .file-icon.doc { background: #dbeafe; color: #1d4ed8; }
+.file-icon.xlsx, .file-icon.xls { background: #dcfce7; color: #15803d; }
+.file-icon.png, .file-icon.jpg,
+.file-icon.jpeg,.file-icon.gif,
+.file-icon.webp { background: #f3e8ff; color: #7c3aed; }
+.file-icon.zip  { background: #fef3c7; color: #92400e; }
+.file-icon      { background: #f1f5f9; color: #475569; } /* fallback */
+
+/* Content type dot */
+.type-dot {
+  display: inline-block; width: 7px; height: 7px;
+  border-radius: 50%; margin-right: 4px;
+}
+.type-note       .type-dot, .type-dot.type-note       { background: #3b82f6; }
+.type-assignment .type-dot, .type-dot.type-assignment { background: #8b5cf6; }
+.type-lab        .type-dot, .type-dot.type-lab        { background: #f97316; }
+.type-question   .type-dot, .type-dot.type-question   { background: #14b8a6; }
+
+/* Orphan row highlight */
+tr.table-warning td { background: #fffbeb !important; }
+</style>
+
+<script>
+// Select-all checkbox
+const selectAll  = document.getElementById('selectAll');
+const bulkDelBtn = document.getElementById('bulkDelBtn');
+
+if (selectAll) {
+  selectAll.addEventListener('change', function() {
+    document.querySelectorAll('.file-check').forEach(cb => cb.checked = this.checked);
+    updateBulkBtn();
+  });
+}
+
+document.querySelectorAll('.file-check').forEach(cb => {
+  cb.addEventListener('change', updateBulkBtn);
+});
+
+function updateBulkBtn() {
+  const count = document.querySelectorAll('.file-check:checked').length;
+  bulkDelBtn.disabled = count === 0;
+  bulkDelBtn.textContent = count > 0
+    ? `Delete Selected (${count})`
+    : 'Delete Selected';
+  // Re-add icon
+  bulkDelBtn.innerHTML = `<i class="bi bi-trash3-fill me-1"></i>${count > 0 ? `Delete Selected (${count})` : 'Delete Selected'}`;
+}
+
+async function submitBulkDelete() {
+  const count = document.querySelectorAll('.file-check:checked').length;
+  const ok = await SA.confirm({
+    title: 'Delete Selected Files',
+    message: `Delete ${count} selected file(s)? This also removes their attachments from content records and cannot be undone.`,
+    type: 'danger',
+    ok: `Delete ${count} File${count !== 1 ? 's' : ''}`,
+    icon: 'bi-trash3-fill'
+  });
+  if (!ok) return;
+  document.getElementById('bulkForm').submit();
+}
+</script>
+{% endblock %}

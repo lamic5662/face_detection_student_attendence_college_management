@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}<i class="bi bi-person-circle me-2"></i>My Profile{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Profile Card -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm text-center">
+      <div class="card-body py-5">
+        <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center
+                    text-white fw-bold mb-3"
+             style="width:80px;height:80px;font-size:2rem">
+          {{ current_user.name[0].upper() }}
+        </div>
+        <h5 class="fw-bold mb-1">{{ current_user.name }}</h5>
+        <div class="text-muted mb-3">{{ current_user.email }}</div>
+        <div class="d-flex justify-content-center gap-2 flex-wrap mb-3">
+          <span class="badge bg-primary-subtle text-primary px-3 py-2">{{ student.roll_number }}</span>
+          <span class="badge bg-success-subtle text-success px-3 py-2">{{ student.department.name }}</span>
+          <span class="badge bg-info-subtle text-info px-3 py-2">Semester {{ student.semester }}</span>
+        </div>
+        {% if student.is_face_enrolled %}
+        <div class="badge bg-success px-3 py-2 w-100">
+          <i class="bi bi-shield-check-fill me-1"></i>Face Recognition Active
+        </div>
+        {% else %}
+        <a href="{{ url_for('student.enroll') }}" class="btn btn-warning w-100">
+          <i class="bi bi-person-bounding-box me-2"></i>Enroll Face Now
+        </a>
+        {% endif %}
+        {% if student.face_image_path %}
+        <img src="{{ url_for('static', filename=student.face_image_path) }}"
+             class="rounded-circle border mt-3" style="width:64px;height:64px;object-fit:cover"
+             alt="Face photo">
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Overall Stats -->
+    <div class="card border-0 shadow-sm mt-4">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-3">Overall Statistics</h6>
+        {% set total_p = chart_data | sum(attribute='present') %}
+        {% set total_t = chart_data | sum(attribute='total') %}
+        {% set overall = (total_p / total_t * 100) | round(1) if total_t > 0 else 0 %}
+        <div class="text-center mb-3">
+          <div class="display-5 fw-bold {% if overall >= threshold %}text-success{% elif overall >= 60 %}text-warning{% else %}text-danger{% endif %}">
+            {{ overall }}%
+          </div>
+          <div class="text-muted small">Overall Attendance</div>
+        </div>
+        <canvas id="overallDonut" height="180"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Subject Charts -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Subject-wise Attendance</h6>
+      </div>
+      <div class="card-body">
+        <canvas id="subjectBar" height="80"></canvas>
+      </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+      {% for d in chart_data %}
+      <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div>
+                <div class="fw-semibold small">{{ d.subject }}</div>
+                <div class="text-muted" style="font-size:11px">{{ d.code }}</div>
+              </div>
+              <span class="badge fs-6 {% if d.percentage >= threshold %}bg-success{% elif d.percentage >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                {{ d.percentage }}%
+              </span>
+            </div>
+            <div class="progress mb-2" style="height:8px">
+              <div class="progress-bar {% if d.percentage >= threshold %}bg-success{% elif d.percentage >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+                   style="width:{{ d.percentage }}%"></div>
+            </div>
+            <div class="d-flex justify-content-between text-muted small">
+              <span><i class="bi bi-check-circle text-success me-1"></i>{{ d.present }} present</span>
+              <span><i class="bi bi-x-circle text-danger me-1"></i>{{ d.absent }} absent</span>
+              <span>{{ d.total }} total</span>
+            </div>
+            {% if d.percentage < threshold %}
+            <div class="mt-2 p-2 bg-danger-subtle rounded small text-danger">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              Need {{ ((threshold / 100 * d.total) - d.present) | int + 1 }} more classes to reach {{ threshold }}%
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartData = {{ chart_data | tojson }};
+const threshold = {{ threshold }};
+const colors = chartData.map(d =>
+  d.percentage >= threshold ? '#198754' : d.percentage >= 60 ? '#ffc107' : '#dc3545'
+);
+
+new Chart(document.getElementById('subjectBar'), {
+  type: 'bar',
+  data: {
+    labels: chartData.map(d => d.code),
+    datasets: [
+      { label: 'Present', data: chartData.map(d => d.present), backgroundColor: '#0d6efd', borderRadius: 4 },
+      { label: 'Absent',  data: chartData.map(d => d.absent),  backgroundColor: '#dee2e6', borderRadius: 4 },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, grid: { color: '#f0f0f0' } } }
+  }
+});
+
+const totalPresent = chartData.reduce((s, d) => s + d.present, 0);
+const totalAbsent  = chartData.reduce((s, d) => s + d.absent,  0);
+new Chart(document.getElementById('overallDonut'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Present', 'Absent'],
+    datasets: [{ data: [totalPresent, totalAbsent],
+                 backgroundColor: ['#198754', '#f8d7da'],
+                 borderWidth: 0 }]
+  },
+  options: {
+    cutout: '70%',
+    plugins: { legend: { position: 'bottom' } }
+  }
+});
+</script>
+{% endblock %}

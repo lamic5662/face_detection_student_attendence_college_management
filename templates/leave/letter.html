@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% block title %}Leave Letter — {{ lr.ref_number }}{% endblock %}
+{% block page_title %}<i class="bi bi-file-earmark-text-fill me-2"></i>Leave Application Letter{% endblock %}
+
+{% block content %}
+
+{# ── Toolbar ── #}
+<div class="d-flex align-items-center gap-2 mb-4 no-print">
+  <a href="{{ back_url }}" class="btn btn-light btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+  <div class="ms-auto d-flex gap-2">
+    {% if lr.status == 'approved' %}
+    <span class="badge bg-success px-3 py-2">
+      <i class="bi bi-patch-check-fill me-1"></i>Approved — {{ lr.reviewed_at.strftime('%d %b %Y') if lr.reviewed_at }}
+    </span>
+    {% endif %}
+    <button onclick="window.print()" class="btn btn-primary btn-sm">
+      <i class="bi bi-printer-fill me-1"></i>Print / Save as PDF
+    </button>
+  </div>
+</div>
+
+{# ── The Letter ── #}
+<div class="row justify-content-center">
+  <div class="col-xl-8 col-lg-10">
+    <div id="letterSheet" class="letter-sheet">
+
+      {# College Header #}
+      <div class="ltr-header text-center">
+        <div class="college-name">{{ cs.college_name }}</div>
+        {% if cs.address %}
+        <div class="college-addr">{{ cs.address }}</div>
+        {% endif %}
+        <div class="ltr-divider"></div>
+        <div class="ltr-doc-title">LEAVE APPLICATION</div>
+        <div class="ltr-divider mb-0"></div>
+      </div>
+
+      {# Ref + Date row #}
+      <div class="d-flex justify-content-between mt-4 mb-3">
+        <div class="ltr-meta">
+          <span class="ltr-meta-label">Ref. No.:</span>
+          <span class="ltr-meta-val">{{ lr.ref_number }}</span>
+        </div>
+        <div class="ltr-meta">
+          <span class="ltr-meta-label">Date:</span>
+          <span class="ltr-meta-val">{{ lr.created_at.strftime('%d %B %Y') }}</span>
+        </div>
+      </div>
+
+      {# Addressee #}
+      <div class="ltr-to mb-4">
+        <div class="fw-semibold">To,</div>
+        {% if lr.leave_type == 'student_subject' and lr.subject %}
+        <div>{{ lr.subject.teacher.user.name }}</div>
+        <div class="text-muted small">
+          Subject Teacher — {{ lr.subject.name }} ({{ lr.subject.code }})
+        </div>
+        {% else %}
+        <div>The Principal / Administrator</div>
+        {% endif %}
+        <div>{{ cs.college_name }}</div>
+      </div>
+
+      {# Subject line #}
+      <div class="ltr-subject mb-4">
+        <strong>Subject:</strong>
+        Leave Application for
+        {% if lr.days == 1 %}1 day{% else %}{{ lr.days }} days{% endif %}
+        ({{ lr.from_date.strftime('%d %b %Y') }}
+        {% if lr.from_date != lr.to_date %}
+        to {{ lr.to_date.strftime('%d %b %Y') }}
+        {% endif %})
+        {% if lr.leave_type == 'student_subject' and lr.subject %}
+        — {{ lr.subject.name }}
+        {% endif %}
+      </div>
+
+      {# Salutation #}
+      <p class="ltr-body">Respected Sir/Madam,</p>
+
+      {# Body #}
+      <p class="ltr-body">
+        I,
+        <strong>{{ lr.applicant_name }}</strong>
+        ({{ lr.applicant_id_str }}),
+        {% if lr.department %}
+        Department of <strong>{{ lr.department.name }}</strong>,
+        {% endif %}
+        {% if lr.student %}
+        Semester {{ lr.student.semester }},
+        {% endif %}
+        respectfully wish to inform you that I am unable to attend
+        {% if lr.leave_type == 'student_subject' and lr.subject %}
+        the classes of <strong>{{ lr.subject.name }}</strong>
+        {% else %}
+        college
+        {% endif %}
+        from <strong>{{ lr.from_date.strftime('%d %B %Y') }}</strong>
+        {% if lr.from_date != lr.to_date %}
+        to <strong>{{ lr.to_date.strftime('%d %B %Y') }}</strong>
+        {% endif %}
+        (total: {{ lr.days }} day{% if lr.days != 1 %}s{% endif %}).
+      </p>
+
+      <p class="ltr-body">
+        <strong>Reason for Leave:</strong>
+      </p>
+      <div class="ltr-reason-box">
+        {{ lr.reason }}
+      </div>
+
+      <p class="ltr-body mt-3">
+        I assure you that I will
+        {% if lr.student %}complete any missed coursework{% else %}hand over all pending responsibilities{% endif %}
+        promptly upon my return. I kindly request you to grant me
+        {% if lr.days == 1 %}leave for 1 day{% else %}leave for {{ lr.days }} days{% endif %}
+        as mentioned above.
+      </p>
+
+      <p class="ltr-body">Thanking you.</p>
+
+      {# Signature block #}
+      <div class="ltr-sign">
+        <div class="fw-semibold">Yours respectfully,</div>
+        <div class="mt-3 mb-1 fw-bold">{{ lr.applicant_name }}</div>
+        <div class="text-muted small">{{ lr.applicant_id_str }}</div>
+        {% if lr.department %}
+        <div class="text-muted small">Department of {{ lr.department.name }}</div>
+        {% endif %}
+        {% if lr.student %}
+        <div class="text-muted small">Semester {{ lr.student.semester }}</div>
+        {% endif %}
+        <div class="text-muted small mt-1">Date: {{ lr.created_at.strftime('%d %B %Y') }}</div>
+      </div>
+
+      {# ── Approval / Rejection block ── #}
+      {% if lr.status == 'approved' %}
+      <div class="ltr-approval-bar">
+        <div class="approval-info">
+          <div class="fw-semibold text-success">
+            <i class="bi bi-check-circle-fill me-1"></i>Application Approved
+          </div>
+          {% if lr.approver %}
+          <div class="small text-muted">Approved by: <strong>{{ lr.approver.name }}</strong></div>
+          {% endif %}
+          {% if lr.reviewed_at %}
+          <div class="small text-muted">Date: {{ lr.reviewed_at.strftime('%d %B %Y') }}</div>
+          {% endif %}
+          {% if lr.remark %}
+          <div class="small mt-1"><em>Remark: {{ lr.remark }}</em></div>
+          {% endif %}
+        </div>
+
+        {# Rubber Stamp #}
+        <div class="rubber-stamp">
+          <div class="stamp-ring">
+            <div class="stamp-inner">
+              <div class="stamp-line stamp-line-lg">APPROVED</div>
+              <div class="stamp-line stamp-line-sm">{{ cs.college_name | upper | truncate(22, true, '') }}</div>
+              {% if lr.reviewed_at %}
+              <div class="stamp-line stamp-line-xs">{{ lr.reviewed_at.strftime('%d/%m/%Y') }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% elif lr.status == 'rejected' %}
+      <div class="ltr-approval-bar rejected">
+        <div class="approval-info">
+          <div class="fw-semibold text-danger">
+            <i class="bi bi-x-circle-fill me-1"></i>Application Rejected
+          </div>
+          {% if lr.approver %}
+          <div class="small text-muted">Reviewed by: <strong>{{ lr.approver.name }}</strong></div>
+          {% endif %}
+          {% if lr.reviewed_at %}
+          <div class="small text-muted">Date: {{ lr.reviewed_at.strftime('%d %B %Y') }}</div>
+          {% endif %}
+          {% if lr.remark %}
+          <div class="small mt-1"><em>Reason: {{ lr.remark }}</em></div>
+          {% endif %}
+        </div>
+        <div class="rubber-stamp rejected-stamp">
+          <div class="stamp-ring">
+            <div class="stamp-inner">
+              <div class="stamp-line stamp-line-lg">REJECTED</div>
+              <div class="stamp-line stamp-line-sm">{{ cs.college_name | upper | truncate(22, true, '') }}</div>
+              {% if lr.reviewed_at %}
+              <div class="stamp-line stamp-line-xs">{{ lr.reviewed_at.strftime('%d/%m/%Y') }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% else %}
+      <div class="ltr-pending-bar">
+        <i class="bi bi-hourglass-split me-2 text-warning"></i>
+        Pending Review
+      </div>
+      {% endif %}
+
+    </div>{# /letter-sheet #}
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* ── Letter Sheet ── */
+.letter-sheet {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 52px 60px 48px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.08);
+  position: relative;
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
+
+/* College Header */
+.college-name {
+  font-size: 26px; font-weight: 800;
+  color: #0f172a; letter-spacing: .5px;
+  font-family: 'Segoe UI', sans-serif;
+}
+.college-addr {
+  font-size: 13px; color: #64748b; margin-top: 4px;
+  font-family: 'Segoe UI', sans-serif;
+}
+.ltr-divider {
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #3b82f6 30%, #3b82f6 70%, transparent);
+  margin: 12px 0;
+}
+.ltr-doc-title {
+  font-size: 15px; font-weight: 700; letter-spacing: 3px;
+  color: #1e40af; margin: 8px 0;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+/* Meta row */
+.ltr-meta { font-size: 13px; font-family: 'Segoe UI', sans-serif; }
+.ltr-meta-label { color: #64748b; margin-right: 4px; }
+.ltr-meta-val   { font-weight: 600; color: #0f172a; }
+
+/* To block */
+.ltr-to { font-size: 14px; line-height: 1.8; }
+
+/* Subject line */
+.ltr-subject {
+  font-size: 14px;
+  font-family: 'Segoe UI', sans-serif;
+  border-left: 3px solid #3b82f6;
+  padding-left: 12px;
+}
+
+/* Body paragraphs */
+.ltr-body {
+  font-size: 14.5px; line-height: 1.9;
+  color: #1e293b; margin-bottom: 12px;
+  text-align: justify;
+}
+
+/* Reason box */
+.ltr-reason-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #3b82f6;
+  border-radius: 6px;
+  padding: 14px 18px;
+  font-size: 14px;
+  color: #1e293b;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+/* Signature */
+.ltr-sign {
+  margin-top: 36px;
+  padding-left: 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* ── Approval bar ── */
+.ltr-approval-bar {
+  margin-top: 40px;
+  padding: 20px 24px;
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  font-family: 'Segoe UI', sans-serif;
+}
+.ltr-approval-bar.rejected {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+.ltr-pending-bar {
+  margin-top: 40px;
+  padding: 14px 20px;
+  background: #fffbeb;
+  border: 2px dashed #fbbf24;
+  border-radius: 10px;
+  font-size: 13px; font-weight: 600;
+  color: #92400e;
+  font-family: 'Segoe UI', sans-serif;
+}
+.approval-info { flex: 1; }
+
+/* ── Rubber Stamp ── */
+.rubber-stamp {
+  flex-shrink: 0;
+  transform: rotate(-12deg);
+  opacity: .88;
+}
+.stamp-ring {
+  width: 130px; height: 130px;
+  border: 6px double #15803d;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 8px;
+}
+.rejected-stamp .stamp-ring { border-color: #b91c1c; }
+
+.stamp-inner {
+  width: 100%; height: 100%;
+  border: 2px solid #15803d;
+  border-radius: 50%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px; padding: 6px;
+  text-align: center;
+}
+.rejected-stamp .stamp-inner { border-color: #b91c1c; }
+
+.stamp-line    { font-family: 'Impact', 'Arial Black', sans-serif; letter-spacing: 2px; }
+.stamp-line-lg { font-size: 17px; color: #15803d; font-weight: 900; }
+.stamp-line-sm { font-size: 7px;  color: #15803d; letter-spacing: 1px; line-height: 1.2; }
+.stamp-line-xs { font-size: 9px;  color: #15803d; letter-spacing: 1px; }
+.rejected-stamp .stamp-line-lg,
+.rejected-stamp .stamp-line-sm,
+.rejected-stamp .stamp-line-xs { color: #b91c1c; }
+
+/* ── Print ── */
+@media print {
+  .no-print { display: none !important; }
+  .letter-sheet {
+    box-shadow: none; border: none;
+    padding: 30px 40px;
+  }
+  body { background: #fff !important; }
+  .sidebar, .topbar, .main-content > nav { display: none !important; }
+  .main-content { margin: 0 !important; }
+  .content-area { padding: 0 !important; }
+}
+</style>
+{% endblock %}

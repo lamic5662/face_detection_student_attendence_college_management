@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+{% block title %}Leave Management{% endblock %}
+{% block page_title %}<i class="bi bi-calendar-x-fill me-2"></i>Leave Management{% endblock %}
+
+{% block content %}
+
+{# ── Tab nav ── #}
+<ul class="nav nav-tabs mb-4" id="leaveTabs">
+  <li class="nav-item">
+    <a class="nav-link {% if not request.args.get('tab') or request.args.get('tab') == 'student' %}active{% endif %}"
+       href="?tab=student">
+      <i class="bi bi-people-fill me-1"></i>Student Requests
+      {% if stu_pending %}
+      <span class="badge bg-warning text-dark ms-1">{{ stu_pending|length }}</span>
+      {% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.args.get('tab') == 'own' %}active{% endif %}"
+       href="?tab=own">
+      <i class="bi bi-person-fill me-1"></i>My Leaves
+      {% if own_leaves | selectattr('status','eq','pending') | list %}
+      <span class="badge bg-info ms-1">
+        {{ own_leaves | selectattr('status','eq','pending') | list | length }}
+      </span>
+      {% endif %}
+    </a>
+  </li>
+</ul>
+
+{# ════════════════════════════════════════════════════════════ #}
+{# Tab: Student subject-leave requests                         #}
+{# ════════════════════════════════════════════════════════════ #}
+<div {% if request.args.get('tab') == 'own' %}style="display:none"{% endif %} id="tabStudent">
+
+  {# Pending #}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+      <h6 class="fw-semibold mb-0">
+        <i class="bi bi-hourglass-split text-warning me-2"></i>Pending Requests
+      </h6>
+      <span class="badge bg-warning text-dark">{{ stu_pending|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      {% if stu_pending %}
+      <div class="d-flex flex-column gap-0">
+        {% for lr in stu_pending %}
+        <div class="stu-req-row px-4 py-3 border-bottom">
+          <div class="d-flex align-items-start gap-3">
+            <div class="sr-avatar">{{ lr.student.user.name[0].upper() }}</div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-semibold">{{ lr.student.user.name }}</span>
+                <span class="badge bg-secondary-subtle text-secondary" style="font-size:10px">
+                  {{ lr.student.roll_number }}
+                </span>
+                <span class="badge bg-primary-subtle text-primary" style="font-size:10px">
+                  {{ lr.ref_number }}
+                </span>
+              </div>
+              <div class="text-muted small mt-1">
+                <i class="bi bi-book me-1"></i>{{ lr.subject.name }}
+                &nbsp;·&nbsp;
+                <i class="bi bi-calendar3 me-1"></i>
+                {{ lr.from_date.strftime('%d %b') }}
+                {% if lr.from_date != lr.to_date %} – {{ lr.to_date.strftime('%d %b %Y') }}{% else %} {{ lr.from_date.strftime('%Y') }}{% endif %}
+                &nbsp;·&nbsp; {{ lr.days }} day{% if lr.days != 1 %}s{% endif %}
+              </div>
+              <div class="mt-1 text-muted small reason-preview">{{ lr.reason | truncate(140) }}</div>
+            </div>
+            <div class="d-flex gap-2 flex-shrink-0">
+              <a href="{{ url_for('leave.view_letter', lid=lr.id) }}"
+                 class="btn btn-sm btn-outline-secondary" title="View Letter">
+                <i class="bi bi-file-earmark-text"></i>
+              </a>
+              <button class="btn btn-sm btn-success" data-bs-toggle="modal"
+                      data-bs-target="#reviewModal{{ lr.id }}">
+                <i class="bi bi-pencil-square me-1"></i>Review
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {# Review Modal #}
+        <div class="modal fade" id="reviewModal{{ lr.id }}" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header border-0">
+                <h6 class="modal-title fw-semibold">Review Leave — {{ lr.student.user.name }}</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <div class="bg-light rounded p-3 mb-3 small">
+                  <div><strong>Subject:</strong> {{ lr.subject.name }}</div>
+                  <div><strong>Dates:</strong> {{ lr.from_date.strftime('%d %b %Y') }} →
+                    {{ lr.to_date.strftime('%d %b %Y') }} ({{ lr.days }} day(s))</div>
+                  <div><strong>Ref:</strong> {{ lr.ref_number }}</div>
+                  <div class="mt-1"><strong>Reason:</strong></div>
+                  <div class="fst-italic mt-1">{{ lr.reason }}</div>
+                </div>
+                <form method="POST" action="{{ url_for('leave.review_leave', lid=lr.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="action" id="raction{{ lr.id }}" value="approved">
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold small">Remark (optional)</label>
+                    <input type="text" name="remark" class="form-control form-control-sm"
+                           placeholder="Leave a note for the student…">
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success flex-grow-1"
+                            onclick="document.getElementById('raction{{ lr.id }}').value='approved'">
+                      <i class="bi bi-check-circle-fill me-1"></i>Approve
+                    </button>
+                    <button type="submit" class="btn btn-danger flex-grow-1"
+                            onclick="document.getElementById('raction{{ lr.id }}').value='rejected'">
+                      <i class="bi bi-x-circle-fill me-1"></i>Reject
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">
+        <i class="bi bi-check-all fs-2 text-success d-block mb-2"></i>
+        No pending student leave requests.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Reviewed history #}
+  {% if stu_reviewed %}
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-transparent border-0 pt-4 px-4">
+      <h6 class="fw-semibold mb-0 text-muted">
+        <i class="bi bi-clock-history me-2"></i>Recently Reviewed
+      </h6>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th class="px-4">Student</th>
+              <th>Subject</th>
+              <th>Dates</th>
+              <th>Status</th>
+              <th>Remark</th>
+              <th>Letter</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for lr in stu_reviewed %}
+            <tr>
+              <td class="px-4">
+                <div class="fw-semibold small">{{ lr.student.user.name }}</div>
+                <div class="text-muted" style="font-size:11px">{{ lr.student.roll_number }}</div>
+              </td>
+              <td class="small">{{ lr.subject.name }}</td>
+              <td class="text-muted small">
+                {{ lr.from_date.strftime('%d %b') }}–{{ lr.to_date.strftime('%d %b %Y') }}
+                <span class="badge bg-secondary ms-1">{{ lr.days }}d</span>
+              </td>
+              <td>
+                <span class="badge {% if lr.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">
+                  {{ lr.status.capitalize() }}
+                </span>
+              </td>
+              <td class="text-muted small">{{ lr.remark or '—' }}</td>
+              <td>
+                <a href="{{ url_for('leave.view_letter', lid=lr.id) }}"
+                   class="btn btn-xs btn-outline-secondary">
+                  <i class="bi bi-file-earmark-text"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ════════════════════════════════════════════════════════════ #}
+{# Tab: Teacher's own leave applications                       #}
+{# ════════════════════════════════════════════════════════════ #}
+<div {% if request.args.get('tab') != 'own' %}style="display:none"{% endif %} id="tabOwn">
+
+  <div class="row g-4">
+    {# Apply form #}
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0 sticky-top" style="top:80px">
+        <div class="card-header bg-transparent border-0 pt-4 px-4">
+          <h6 class="fw-semibold mb-0">
+            <i class="bi bi-plus-circle-fill text-primary me-2"></i>Apply for Leave
+          </h6>
+          <div class="small text-muted mt-1">Submitted to the administration for approval.</div>
+        </div>
+        <div class="card-body px-4 pb-4">
+          <form method="POST" action="{{ url_for('leave.teacher_apply_leave') }}" id="teacherLeaveForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label fw-semibold">From</label>
+                <input type="date" name="from_date" class="form-control"
+                       required min="{{ today }}" value="{{ today }}" id="tFromDate">
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold">To</label>
+                <input type="date" name="to_date" class="form-control"
+                       required min="{{ today }}" value="{{ today }}" id="tToDate">
+              </div>
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Reason for Leave</label>
+              <textarea name="reason" class="form-control" rows="5"
+                        placeholder="Describe your reason in detail…"
+                        required maxlength="500" id="tReasonTxt"></textarea>
+              <div class="form-text"><span id="tCharCount">0</span>/500</div>
+            </div>
+            <div class="alert alert-info py-2 px-3 small mb-3 border-0">
+              <i class="bi bi-info-circle me-1"></i>
+              A formal letter will be auto-generated. When approved, a stamped copy will be available.
+            </div>
+            <button type="submit" class="btn btn-primary w-100 fw-semibold">
+              <i class="bi bi-send-fill me-2"></i>Submit to Admin
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {# Own leave history #}
+    <div class="col-lg-8">
+      {% if own_leaves %}
+      <div class="d-flex flex-column gap-3">
+        {% for lr in own_leaves %}
+        <div class="leave-card status-{{ lr.status }}">
+          <div class="d-flex align-items-start gap-3">
+            <div class="lc-type-icon lc-teacher">
+              <i class="bi bi-person-badge-fill"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="fw-semibold" style="font-size:14px">Teacher Leave</span>
+                <span class="badge bg-secondary-subtle text-secondary" style="font-size:10px">
+                  {{ lr.ref_number }}
+                </span>
+              </div>
+              <div class="d-flex gap-3 mt-1 flex-wrap" style="font-size:12px; color:#64748b">
+                <span><i class="bi bi-calendar3 me-1"></i>
+                  {{ lr.from_date.strftime('%d %b %Y') }}
+                  {% if lr.from_date != lr.to_date %} → {{ lr.to_date.strftime('%d %b %Y') }}{% endif %}
+                </span>
+                <span><i class="bi bi-clock me-1"></i>{{ lr.days }} day{% if lr.days != 1 %}s{% endif %}</span>
+                <span><i class="bi bi-send me-1"></i>{{ lr.created_at.strftime('%d %b %Y') }}</span>
+              </div>
+              <div class="mt-2 text-muted small">{{ lr.reason | truncate(120) }}</div>
+            </div>
+            <div class="text-end flex-shrink-0">
+              <span class="status-pill
+                {% if lr.status == 'approved' %}sp-approved
+                {% elif lr.status == 'rejected' %}sp-rejected
+                {% else %}sp-pending{% endif %}">
+                <i class="bi bi-{% if lr.status == 'approved' %}check-circle-fill{% elif lr.status == 'rejected' %}x-circle-fill{% else %}hourglass-split{% endif %} me-1"></i>
+                {{ lr.status.capitalize() }}
+              </span>
+            </div>
+          </div>
+
+          {% if lr.status != 'pending' and lr.remark %}
+          <div class="lc-remark mt-2">
+            <i class="bi bi-chat-left-text me-1"></i><em>{{ lr.remark }}</em>
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2 mt-3 pt-2 border-top">
+            <a href="{{ url_for('leave.view_letter', lid=lr.id) }}"
+               class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-file-earmark-text me-1"></i>View Letter
+            </a>
+            {% if lr.status == 'approved' %}
+            <a href="{{ url_for('leave.view_letter', lid=lr.id) }}" target="_blank"
+               class="btn btn-sm btn-outline-success">
+              <i class="bi bi-printer me-1"></i>Print Stamped Copy
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+          <i class="bi bi-calendar-x fs-1 d-block mb-3 opacity-25"></i>
+          <div class="fw-semibold">No leave applications submitted.</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.btn-xs { padding: 2px 8px; font-size: 11px; }
+
+/* Leave cards */
+.leave-card {
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 12px; padding: 18px 20px;
+  border-left: 4px solid #94a3b8; transition: box-shadow .18s;
+}
+.leave-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.leave-card.status-approved { border-left-color: #22c55e; }
+.leave-card.status-rejected { border-left-color: #ef4444; }
+.leave-card.status-pending  { border-left-color: #f59e0b; }
+
+.lc-type-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.lc-teacher { background: #ede9fe; color: #7c3aed; }
+
+.status-pill {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 700;
+}
+.sp-approved { background: #dcfce7; color: #15803d; }
+.sp-rejected { background: #fee2e2; color: #b91c1c; }
+.sp-pending  { background: #fef3c7; color: #92400e; }
+
+.lc-remark {
+  font-size: 12px; color: #64748b;
+  background: #f8fafc; border-radius: 6px; padding: 6px 12px;
+}
+.sr-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff; font-weight: 700; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.stu-req-row:hover { background: #f8fafc; }
+.reason-preview { font-size: 12px; color: #64748b; }
+</style>
+
+<script>
+// Tab switching via URL params
+document.querySelectorAll('#leaveTabs .nav-link').forEach(link => {
+  link.addEventListener('click', function(e) {
+    e.preventDefault();
+    const tab = new URLSearchParams(this.search).get('tab') || 'student';
+    history.replaceState(null, '', '?tab=' + tab);
+    document.getElementById('tabStudent').style.display = tab === 'student' ? '' : 'none';
+    document.getElementById('tabOwn').style.display     = tab === 'own'     ? '' : 'none';
+    document.querySelectorAll('#leaveTabs .nav-link').forEach(l => l.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// Char counter
+const ta = document.getElementById('tReasonTxt');
+const cc = document.getElementById('tCharCount');
+if (ta) ta.addEventListener('input', () => { cc.textContent = ta.value.length; });
+
+// Date sync
+const tfd = document.getElementById('tFromDate');
+const ttd = document.getElementById('tToDate');
+if (tfd) tfd.addEventListener('change', () => { ttd.min = tfd.value; if (ttd.value < tfd.value) ttd.value = tfd.value; });
+</script>
+{% endblock %}

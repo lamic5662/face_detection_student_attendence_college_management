@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Marksheet Signatures{% endblock %}
+{% block page_title %}<i class="bi bi-pen-fill me-2"></i>Marksheet Digital Signatures{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4 no-print">
+  <p class="text-muted mb-0 small">
+    Configure digital signatures that appear at the bottom of printed marksheets.
+    <strong>Principal</strong> is global · <strong>HoD</strong> is per-department.
+  </p>
+  <a href="{{ url_for('admin.marksheet_list') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-award-fill me-1"></i>View Marksheets
+  </a>
+</div>
+
+{# ── 1. Principal ── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 px-4 pt-4 pb-2">
+    <div class="d-flex align-items-center gap-2">
+      <span class="sig-role-icon bg-primary-subtle text-primary"><i class="bi bi-person-badge-fill"></i></span>
+      <div>
+        <h6 class="mb-0 fw-bold">Principal / Registrar</h6>
+        <div class="text-muted small">Global — appears on every marksheet</div>
+      </div>
+    </div>
+  </div>
+  <div class="card-body px-4 pb-4">
+    {% if principal %}
+    <div class="sig-existing-row mb-3">
+      <div class="sig-preview-box">
+        {% if principal.sign_path %}
+        <img src="{{ url_for('static', filename=principal.sign_path) }}" alt="signature">
+        {% else %}
+        <span class="text-muted small fst-italic">No image uploaded</span>
+        {% endif %}
+      </div>
+      <div>
+        <div class="fw-semibold">{{ principal.name }}</div>
+        {% if principal.designation %}<div class="text-muted small">{{ principal.designation }}</div>{% endif %}
+        <div class="text-muted small mt-1">Updated: {{ principal.updated_at.strftime('%d %b %Y') if principal.updated_at else '—' }}</div>
+      </div>
+      <div class="ms-auto d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary" onclick="openEdit('principal', null, null, {{ principal.id }})">
+          <i class="bi bi-pencil-fill me-1"></i>Edit
+        </button>
+        <form method="POST" action="{{ url_for('admin.delete_marksheet_signature', sig_id=principal.id) }}"
+              data-confirm="Remove the Principal signature?"
+              data-confirm-title="Remove Signature"
+              data-confirm-type="danger"
+              data-confirm-ok="Remove">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i></button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+    <button class="btn btn-primary btn-sm" onclick="openEdit('principal', null, null, null)">
+      <i class="bi bi-plus-circle-fill me-1"></i>Add Principal Signature
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{# ── 2. Head of Department ── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 px-4 pt-4 pb-2">
+    <div class="d-flex align-items-center gap-2">
+      <span class="sig-role-icon bg-success-subtle text-success"><i class="bi bi-person-workspace"></i></span>
+      <div>
+        <h6 class="mb-0 fw-bold">Head of Department (HoD)</h6>
+        <div class="text-muted small">Per department — matched automatically to each student's department</div>
+      </div>
+    </div>
+  </div>
+  <div class="card-body px-4 pb-4">
+    <div class="row g-3">
+      {% for dept in departments %}
+      {% set sig = hod_map.get(dept.id) %}
+      <div class="col-md-6 col-xl-4">
+        <div class="sig-dept-card {% if sig %}sig-dept-filled{% endif %}">
+          <div class="sig-dept-name">{{ dept.name }}</div>
+          {% if sig %}
+          <div class="d-flex align-items-center gap-3 mt-2">
+            <div class="sig-preview-sm">
+              {% if sig.sign_path %}
+              <img src="{{ url_for('static', filename=sig.sign_path) }}" alt="sig">
+              {% else %}
+              <i class="bi bi-pen text-muted"></i>
+              {% endif %}
+            </div>
+            <div class="flex-grow-1">
+              <div class="fw-semibold small">{{ sig.name }}</div>
+              {% if sig.designation %}<div class="text-muted" style="font-size:11px">{{ sig.designation }}</div>{% endif %}
+            </div>
+            <div class="d-flex flex-column gap-1">
+              <button class="btn btn-xs btn-outline-primary"
+                      onclick="openEdit('hod', {{ dept.id }}, null, {{ sig.id }})">
+                <i class="bi bi-pencil-fill"></i>
+              </button>
+              <form method="POST" action="{{ url_for('admin.delete_marksheet_signature', sig_id=sig.id) }}"
+                    data-confirm="Remove HoD signature for {{ dept.name }}?"
+                    data-confirm-title="Remove Signature" data-confirm-type="danger" data-confirm-ok="Remove">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-xs btn-outline-danger"><i class="bi bi-trash3"></i></button>
+              </form>
+            </div>
+          </div>
+          {% else %}
+          <button class="btn btn-sm btn-outline-secondary w-100 mt-2"
+                  onclick="openEdit('hod', {{ dept.id }}, null, null)">
+            <i class="bi bi-plus me-1"></i>Add HoD
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ── Edit / Add Modal ── #}
+<div class="modal fade" id="sigModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('admin.save_marksheet_signature') }}"
+            enctype="multipart/form-data" id="sigForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="role" id="modalRole">
+        <input type="hidden" name="department_id" id="modalDeptId">
+        <input type="hidden" name="semester" id="modalSemester">
+
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold" id="modalTitle">Add Signature</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body px-4">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" id="modalName" class="form-control"
+                   placeholder="e.g. Dr. Ram Sharma" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Designation</label>
+            <input type="text" name="designation" id="modalDesig" class="form-control"
+                   placeholder="e.g. Principal, M.Sc., Ph.D.">
+            <div class="form-text">Optional — shown under the name on the marksheet.</div>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Signature Image</label>
+            <div id="currentSigPreview" class="sig-preview-box mb-2 d-none">
+              <img id="currentSigImg" src="" alt="current signature">
+              <div class="text-muted small mt-1">Current signature</div>
+            </div>
+            <input type="file" name="sign_image" class="form-control" accept=".png,.jpg,.jpeg,.svg,.webp">
+            <div class="form-text">PNG with transparent background recommended. Leave blank to keep existing.</div>
+          </div>
+
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">
+            <i class="bi bi-check-lg me-1"></i>Save Signature
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+.sig-role-icon {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+
+/* Existing row (principal) */
+.sig-existing-row {
+  display: flex; align-items: center; gap: 20px;
+  padding: 14px 16px; background: #f8fafc;
+  border: 1px solid #e2e8f0; border-radius: 10px;
+}
+
+/* Signature preview boxes */
+.sig-preview-box {
+  width: 140px; height: 60px; border: 1px dashed #cbd5e1;
+  border-radius: 8px; background: #fff;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.sig-preview-box img { max-height: 54px; max-width: 130px; object-fit: contain; }
+
+.sig-preview-sm {
+  width: 56px; height: 40px; border: 1px dashed #cbd5e1;
+  border-radius: 6px; background: #fff;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;
+}
+.sig-preview-sm img { max-height: 36px; max-width: 52px; object-fit: contain; }
+
+/* Department cards */
+.sig-dept-card {
+  border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 14px; height: 100%;
+  transition: box-shadow .15s;
+}
+.sig-dept-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+.sig-dept-filled { border-color: #86efac; background: #f0fdf4; }
+.sig-dept-name { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 2px; }
+
+/* xs button */
+.btn-xs { padding: 2px 7px; font-size: 11px; }
+</style>
+
+<script>
+// Existing signature data for pre-filling the edit modal
+const sigData = {
+  {% for sig in ([] if not principal else [principal]) +
+               (hod_map.values() | list) %}
+  {{ sig.id }}: {
+    name:  {{ sig.name | tojson }},
+    desig: {{ (sig.designation or '') | tojson }},
+    path:  {{ (sig.sign_path or '') | tojson }}
+  },
+  {% endfor %}
+};
+
+function openEdit(role, deptId, semester, sigId) {
+  document.getElementById('modalRole').value     = role;
+  document.getElementById('modalDeptId').value   = deptId || '';
+  document.getElementById('modalSemester').value = semester || '';
+
+    const titles = {
+    principal: 'Principal / Registrar',
+    hod:       'Head of Department',
+  };
+  document.getElementById('modalTitle').textContent =
+    (sigId ? 'Edit' : 'Add') + ' — ' + titles[role];
+
+  const nameInput  = document.getElementById('modalName');
+  const desigInput = document.getElementById('modalDesig');
+  const preview    = document.getElementById('currentSigPreview');
+  const previewImg = document.getElementById('currentSigImg');
+
+  if (sigId && sigData[sigId]) {
+    const d = sigData[sigId];
+    nameInput.value  = d.name;
+    desigInput.value = d.desig;
+    if (d.path) {
+      previewImg.src = '/static/' + d.path;
+      preview.classList.remove('d-none');
+    } else {
+      preview.classList.add('d-none');
+    }
+  } else {
+    nameInput.value  = '';
+    desigInput.value = '';
+    preview.classList.add('d-none');
+  }
+
+  new bootstrap.Modal(document.getElementById('sigModal')).show();
+}
+</script>
+{% endblock %}

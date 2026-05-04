@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}<i class="bi bi-file-earmark-bar-graph-fill me-2"></i>Reports{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Filter -->
+  <div class="col-12">
+    <div class="card shadow-sm border-0">
+      <div class="card-body px-4 py-3">
+        <form method="GET" class="row g-3 align-items-end">
+          <div class="col-md-5">
+            <label class="form-label fw-semibold">Select Subject</label>
+            <select name="subject_id" class="form-select" onchange="this.form.submit()">
+              <option value="">All Subjects</option>
+              {% for sub in subjects %}
+              <option value="{{ sub.id }}" {% if selected_subject_id == sub.id %}selected{% endif %}>
+                {{ sub.name }} ({{ sub.code }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% if selected_subject_id %}
+          <div class="col-auto">
+            <a href="{{ url_for('teacher.download_subject_report', subject_id=selected_subject_id) }}"
+               class="btn btn-success">
+              <i class="bi bi-file-earmark-excel-fill me-2"></i>Full Subject Report (Excel)
+            </a>
+          </div>
+          <div class="col-auto">
+            <a href="{{ url_for('teacher.download_subject_report', subject_id=selected_subject_id, fmt='csv') }}"
+               class="btn btn-outline-secondary">
+              <i class="bi bi-filetype-csv me-2"></i>CSV
+            </a>
+          </div>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sessions Table -->
+  {% if sessions %}
+  <div class="col-12">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0">Session Reports ({{ sessions|length }})</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="px-4">Date</th>
+                <th>Subject</th>
+                <th>Start</th>
+                <th>Present</th>
+                <th>Absent</th>
+                <th>Rate</th>
+                <th>Download</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in sessions %}
+              <tr>
+                <td class="px-4 fw-semibold">{{ s.date.strftime('%d %b %Y') }}</td>
+                <td>{{ s.subject.name }}</td>
+                <td class="text-muted small">{{ s.start_time.strftime('%H:%M') }}</td>
+                <td class="text-success fw-semibold">{{ s.present_count }}</td>
+                <td class="text-danger fw-semibold">{{ s.absent_count }}</td>
+                <td>
+                  {% set rate = (s.present_count / s.total_students * 100) if s.total_students > 0 else 0 %}
+                  <span class="badge {% if rate >= 75 %}bg-success{% elif rate >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                    {{ "%.0f"|format(rate) }}%
+                  </span>
+                </td>
+                <td class="d-flex gap-1">
+                  <a href="{{ url_for('teacher.download_session_report', session_id=s.id) }}"
+                     class="btn btn-sm btn-outline-success" title="Excel">
+                    <i class="bi bi-file-earmark-excel-fill"></i>
+                  </a>
+                  <a href="{{ url_for('teacher.download_session_report', session_id=s.id, fmt='csv') }}"
+                     class="btn btn-sm btn-outline-secondary" title="CSV">
+                    <i class="bi bi-filetype-csv"></i>
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% elif selected_subject_id %}
+  <div class="col-12">
+    <div class="card shadow-sm border-0 text-center py-5 text-muted">
+      <i class="bi bi-inbox fs-1 mb-3"></i>
+      <p>No completed sessions for this subject yet.</p>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

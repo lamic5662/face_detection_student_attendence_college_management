@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ notice.title }}{% endblock %}
+{% block page_title %}<i class="bi bi-megaphone-fill me-2"></i>Notice{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a href="{{ url_for('notice.list_notices') }}" class="btn btn-light btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+<div class="card border-0 shadow-sm {% if notice.is_pinned %}border-start border-4 border-warning{% endif %}">
+  <div class="card-body px-4 py-4">
+    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+      {% if notice.is_pinned %}<i class="bi bi-pin-angle-fill text-warning fs-5"></i>{% endif %}
+      <span class="badge bg-{{ colors[notice.category] }} px-3 py-2">{{ notice.category.capitalize() }}</span>
+      {% if notice.target_role != 'all' %}
+      <span class="badge bg-secondary">{{ notice.target_role.capitalize() }}s only</span>
+      {% endif %}
+    </div>
+    <h4 class="fw-bold mb-1">{{ notice.title }}</h4>
+    <div class="text-muted small mb-4">
+      Posted by <strong>{{ notice.author.name }}</strong> &bull;
+      {{ notice.created_at.strftime('%d %b %Y %H:%M') }}
+      {% if notice.expires_at %}&bull; Expires {{ notice.expires_at.strftime('%d %b %Y') }}{% endif %}
+    </div>
+    <div class="notice-content" style="white-space:pre-wrap;line-height:1.8">{{ notice.content }}</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,702 @@
+{% extends "base.html" %}
+{% block title %}{{ student.user.name }} — Progress Report{% endblock %}
+{% block page_title %}<i class="bi bi-person-lines-fill me-2"></i>{{ student.user.name }}{% endblock %}
+
+{% if location and location.is_sharing and location.latitude %}
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+{% endif %}
+
+{% block content %}
+<!-- Back + Header -->
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{{ url_for('parent.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+  <span class="text-muted small">{{ relationship.title() }} of {{ student.user.name }} &bull;
+    {{ student.department.name }} &bull; Semester {{ student.semester }}</span>
+</div>
+
+<!-- Overall Banner -->
+<div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#0d6efd,#6610f2)">
+  <div class="card-body px-4 py-4 text-white d-flex flex-wrap gap-4 align-items-center">
+    <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center fw-bold fs-2"
+         style="width:60px;height:60px;flex-shrink:0">{{ student.user.name[0].upper() }}</div>
+    <div class="flex-grow-1">
+      <h4 class="mb-0 fw-bold">{{ student.user.name }}</h4>
+      <div class="opacity-75">{{ student.roll_number }} &bull; {{ student.user.email }}</div>
+    </div>
+    <div class="d-flex gap-4 text-center">
+      <div><div class="fw-bold fs-3">{{ overall_pct }}%</div><div class="opacity-75 small">Overall Attendance</div></div>
+      <div><div class="fw-bold fs-3">{{ att_summary | length }}</div><div class="opacity-75 small">Subjects</div></div>
+      <div><div class="fw-bold fs-3">{{ marks | length }}</div><div class="opacity-75 small">Exam Entries</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Nav Tabs -->
+<ul class="nav nav-tabs mb-4 border-bottom" id="childTabs">
+  <li class="nav-item"><a class="nav-link active fw-semibold" data-bs-toggle="tab" href="#attendance">Attendance</a></li>
+  <li class="nav-item"><a class="nav-link fw-semibold" data-bs-toggle="tab" href="#results">Exam Results</a></li>
+  <li class="nav-item"><a class="nav-link fw-semibold" data-bs-toggle="tab" href="#fees">Fees</a></li>
+  <li class="nav-item"><a class="nav-link fw-semibold" data-bs-toggle="tab" href="#today">Today's Classes</a></li>
+  <li class="nav-item">
+    <a class="nav-link fw-semibold" data-bs-toggle="tab" href="#location" id="locationTab">
+      <i class="bi bi-geo-alt-fill me-1
+        {% if location and location.is_sharing and location.latitude %}text-success{% else %}text-muted{% endif %}"></i>
+      Live Location
+      {% if location and location.is_sharing and location.latitude %}
+        <span class="badge bg-success ms-1" style="font-size:9px">LIVE</span>
+      {% endif %}
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ── Attendance Tab ───────────────────────────────────────────────── -->
+  <div class="tab-pane fade show active" id="attendance">
+    <div class="row g-3 mb-4">
+      {% for s in att_summary %}
+      <div class="col-md-4 col-6">
+        <div class="card border-0 shadow-sm h-100 {% if s.low %}border-start border-danger border-3{% endif %}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <div class="fw-semibold">{{ s.subject.name }}</div>
+                <div class="text-muted small">{{ s.subject.code }}</div>
+              </div>
+              <span class="badge fs-6 {% if s.percentage >= 75 %}bg-success{% elif s.percentage >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                {{ s.percentage }}%
+              </span>
+            </div>
+            <div class="progress mb-2" style="height:8px">
+              <div class="progress-bar {% if s.percentage >= 75 %}bg-success{% elif s.percentage >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+                   style="width:{{ s.percentage }}%"></div>
+            </div>
+            <div class="d-flex justify-content-between text-muted small">
+              <span><i class="bi bi-check-circle text-success me-1"></i>{{ s.present }}</span>
+              <span><i class="bi bi-x-circle text-danger me-1"></i>{{ s.absent }}</span>
+              <span>{{ s.total }} total</span>
+            </div>
+            {% if s.low %}
+            <div class="mt-2 text-danger small fw-semibold">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>Below 75% — action needed
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12 text-center text-muted py-4">No subjects assigned yet.</div>
+      {% endfor %}
+    </div>
+
+    <!-- Recent attendance log -->
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 pt-3 px-4">
+        <h6 class="fw-semibold mb-0">Recent Attendance Log</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th class="px-4">Subject</th><th>Date</th><th>Status</th><th>Liveness</th></tr>
+            </thead>
+            <tbody>
+              {% for r in recent_records %}
+              <tr>
+                <td class="px-4 fw-semibold">{{ r.session.subject.name }}</td>
+                <td class="text-muted small">{{ r.session.date.strftime('%d %b %Y') }}</td>
+                <td>
+                  <span class="badge {% if r.status == 'present' %}bg-success{% elif r.status == 'late' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                    {{ r.status.capitalize() }}
+                  </span>
+                </td>
+                <td>
+                  {% if r.liveness_verified %}
+                    <i class="bi bi-eye-fill text-success"></i>
+                  {% else %}
+                    <span class="text-muted small">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="text-center text-muted py-4">No attendance records yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Exam Results Tab ─────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="results">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="px-4">Exam</th><th>Subject</th><th>Type</th>
+                <th>Date</th><th>Total</th><th>Obtained</th><th>%</th><th>Grade</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for m in marks %}
+              {% set pct = m.percentage %}
+              <tr>
+                <td class="px-4 fw-semibold">{{ m.exam.title }}</td>
+                <td class="text-muted small">{{ m.exam.subject.name }}</td>
+                <td><span class="badge bg-info-subtle text-info">{{ m.exam.exam_type.replace('_',' ').title() }}</span></td>
+                <td class="text-muted small">{{ m.exam.exam_date.strftime('%d %b %Y') }}</td>
+                <td>{{ m.exam.total_marks }}</td>
+                <td>
+                  {% if m.is_absent %}<span class="badge bg-secondary">Absent</span>
+                  {% elif m.marks_obtained is not none %}<strong>{{ m.marks_obtained }}</strong>
+                  {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td>
+                  {% if pct is not none and not m.is_absent %}
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-grow-1" style="height:5px;min-width:50px">
+                      <div class="progress-bar {% if pct>=75 %}bg-success{% elif pct>=50 %}bg-warning{% else %}bg-danger{% endif %}"
+                           style="width:{{ pct }}%"></div>
+                    </div>
+                    <small>{{ pct }}%</small>
+                  </div>
+                  {% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if m.is_absent %}<span class="badge bg-secondary">AB</span>
+                  {% elif m.grade %}
+                    <span class="badge {% if m.grade in ['A+','A','B+','B'] %}bg-success{% elif m.grade in ['C+','C','D'] %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                      {{ m.grade }}
+                    </span>
+                  {% else %}—{% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="text-center text-muted py-5">No exam records yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Fee Tab ──────────────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="fees">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th class="px-4">Fee Title</th><th>Year</th><th>Amount</th>
+                <th>Paid</th><th>Balance</th><th>Status</th><th>Receipt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in fee_data %}
+              {% set fs = item.structure %}
+              {% set p = item.payment %}
+              <tr>
+                <td class="px-4 fw-semibold">{{ fs.title }}</td>
+                <td><span class="badge bg-secondary-subtle text-secondary">{{ fs.academic_year }}</span></td>
+                <td>Rs. {{ '{:,.0f}'.format(fs.amount) }}</td>
+                <td>
+                  {% if item.paid > 0 %}<span class="text-success fw-semibold">Rs. {{ '{:,.0f}'.format(item.paid) }}</span>
+                  {% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td>
+                  {% if item.due > 0 %}<span class="text-danger fw-semibold">Rs. {{ '{:,.0f}'.format(item.due) }}</span>
+                  {% else %}<span class="text-success">—</span>{% endif %}
+                </td>
+                <td>
+                  {% if not p %}<span class="badge bg-danger">Unpaid</span>
+                  {% elif p.status == 'paid' %}<span class="badge bg-success">Paid</span>
+                  {% elif p.status == 'partial' %}<span class="badge bg-warning text-dark">Partial</span>
+                  {% else %}<span class="badge bg-info text-dark">Waived</span>{% endif %}
+                </td>
+                <td class="font-monospace small text-muted">{{ p.receipt_no if p else '—' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7" class="text-center text-muted py-5">No fee records.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Today's Classes Tab ─────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="today">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 pt-3 px-4">
+        <h6 class="fw-semibold mb-0">
+          <i class="bi bi-calendar-day text-primary me-2"></i>
+          Today — {{ today.strftime('%A, %d %B %Y') }}
+        </h6>
+      </div>
+      <div class="card-body p-0">
+        {% if slot_statuses %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr><th class="px-4">Time</th><th>Subject</th><th>Teacher</th><th>Teacher Status</th><th>Class Status</th></tr>
+            </thead>
+            <tbody>
+              {% for item in slot_statuses %}
+              {% set slot = item.slot %}
+              <tr>
+                <td class="px-4 text-muted small fw-semibold">
+                  {{ slot.start_time.strftime('%H:%M') }} – {{ slot.end_time.strftime('%H:%M') }}
+                </td>
+                <td class="fw-semibold">
+                  {% if slot.subject %}{{ slot.subject.name }}
+                  {% elif slot.slot_type == 'break' %}<span class="text-muted">Break</span>
+                  {% else %}<span class="text-muted">Free</span>{% endif %}
+                </td>
+                <td class="text-muted small">
+                  {{ slot.subject.teacher.user.name if slot.subject and slot.subject.teacher else '—' }}
+                </td>
+                <td>
+                  {% if item.teacher_status %}
+                  <span class="badge bg-{{ item.teacher_status.badge_color }}">
+                    {{ item.teacher_status.label }}
+                  </span>
+                  {% if item.teacher_status.note %}
+                  <div class="text-muted" style="font-size:11px">{{ item.teacher_status.note }}</div>
+                  {% endif %}
+                  {% else %}
+                  <span class="text-muted small">No status set</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if item.session_started %}
+                    {% if item.session_started.status == 'active' %}
+                      <span class="badge bg-success"><i class="bi bi-record-circle-fill me-1"></i>In Progress</span>
+                    {% else %}
+                      <span class="badge bg-primary">Completed</span>
+                    {% endif %}
+                  {% elif slot.slot_type in ['break','free'] %}
+                    <span class="text-muted small">—</span>
+                  {% else %}
+                    {% set now = today %}
+                    <span class="badge bg-secondary">Not Started</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-calendar-x fs-1 d-block mb-2 opacity-25"></i>
+          No classes scheduled for today.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Live Location Tab ───────────────────────────────────────────────── -->
+  <div class="tab-pane fade" id="location" style="position:relative">
+    {% if not location or not location.is_sharing %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center py-5">
+        <div class="rounded-circle bg-secondary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-4"
+             style="width:72px;height:72px">
+          <i class="bi bi-geo-alt-slash-fill text-secondary fs-2"></i>
+        </div>
+        <h5 class="fw-bold mb-1">Location Sharing is Off</h5>
+        <p class="text-muted small mb-0">
+          <strong>{{ student.user.name }}</strong> has not enabled location sharing.<br>
+          Ask them to turn it on from their student dashboard.
+        </p>
+        <div class="mt-3 px-3 py-2 rounded bg-light d-inline-block text-muted" style="font-size:12px">
+          <i class="bi bi-info-circle me-1"></i>
+          Student opens their app → Dashboard → <strong>Share Location</strong> button
+        </div>
+      </div>
+    </div>
+    {% elif not location.latitude %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center py-5">
+
+        <!-- Animated ping rings -->
+        <div class="position-relative d-inline-flex align-items-center justify-content-center mb-4" style="width:90px;height:90px">
+          <span class="position-absolute rounded-circle" id="ping1"
+            style="width:90px;height:90px;background:rgba(13,110,253,.12);animation:pingRing 1.8s ease-out infinite"></span>
+          <span class="position-absolute rounded-circle" id="ping2"
+            style="width:65px;height:65px;background:rgba(13,110,253,.18);animation:pingRing 1.8s ease-out .6s infinite"></span>
+          <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center"
+               style="width:46px;height:46px;z-index:1">
+            <i class="bi bi-geo-alt-fill text-white fs-5"></i>
+          </div>
+        </div>
+
+        <h5 class="fw-bold mb-1">Waiting for location…</h5>
+        <p class="text-muted small mb-4">
+          Sharing is <span class="text-success fw-semibold">enabled</span> by
+          <strong>{{ student.user.name }}</strong>.<br>
+          Location will appear the moment they open their app.
+        </p>
+
+        <!-- Auto-check countdown bar -->
+        <div class="mx-auto mb-3" style="max-width:280px">
+          <div class="d-flex justify-content-between text-muted mb-1" style="font-size:11px">
+            <span>Checking automatically…</span>
+            <span id="countdown-text">10s</span>
+          </div>
+          <div class="progress" style="height:4px;border-radius:2px">
+            <div id="countdown-bar" class="progress-bar bg-primary"
+                 style="width:100%;transition:width 1s linear"></div>
+          </div>
+        </div>
+
+        <button onclick="checkNow()" class="btn btn-outline-primary btn-sm px-4">
+          <i class="bi bi-arrow-clockwise me-1"></i>Check Now
+        </button>
+      </div>
+    </div>
+
+    <style>
+      @keyframes pingRing {
+        0%   { transform: scale(.6); opacity:.9; }
+        100% { transform: scale(1.6); opacity:0; }
+      }
+    </style>
+    <script>
+    const POLL_URL = "{{ url_for('parent.child_location', student_id=student.id) }}";
+    let secondsLeft = 10;
+    const bar  = document.getElementById('countdown-bar');
+    const ctxt = document.getElementById('countdown-text');
+
+    function checkNow() {
+      fetch(POLL_URL, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.sharing && data.lat) {
+            location.reload();   // coordinates arrived — reload to show the map
+          }
+        })
+        .catch(() => {});
+      secondsLeft = 10;
+      if (bar) bar.style.width = '100%';
+    }
+
+    const timer = setInterval(() => {
+      secondsLeft--;
+      if (ctxt) ctxt.textContent = secondsLeft + 's';
+      if (bar)  bar.style.width = (secondsLeft / 10 * 100) + '%';
+      if (secondsLeft <= 0) {
+        checkNow();
+      }
+    }, 1000);
+    </script>
+    {% else %}
+    <!-- Live tracking UI -->
+    <style>
+      /* Zomato-style pulsing dot */
+      .live-marker-wrap { position:relative; width:44px; height:44px; }
+      .live-pulse {
+        position:absolute; inset:0; border-radius:50%;
+        background:rgba(25,135,84,.25);
+        animation: livePulse 1.6s ease-out infinite;
+      }
+      .live-pulse-2 {
+        position:absolute; inset:6px; border-radius:50%;
+        background:rgba(25,135,84,.35);
+        animation: livePulse 1.6s ease-out .5s infinite;
+      }
+      .live-dot {
+        position:absolute; inset:12px; border-radius:50%;
+        background:#198754; border:3px solid #fff;
+        box-shadow:0 2px 8px rgba(0,0,0,.35);
+        z-index:1;
+      }
+      @keyframes livePulse {
+        0%   { transform:scale(.5); opacity:.9; }
+        100% { transform:scale(1.8); opacity:0; }
+      }
+      #live-map { height:480px; width:100%; border-radius:0 0 .5rem .5rem; }
+      .map-fab {
+        position:absolute; z-index:999; right:12px;
+        background:#fff; border:1px solid #dee2e6;
+        border-radius:8px; padding:6px 12px;
+        font-size:12px; font-weight:600; cursor:pointer;
+        box-shadow:0 2px 8px rgba(0,0,0,.12);
+        display:flex; align-items:center; gap:5px;
+      }
+      .map-fab:hover { background:#f8f9fa; }
+    </style>
+
+    <!-- Status bar above map -->
+    <div class="d-flex flex-wrap gap-3 mb-3 align-items-center">
+      <div class="card border-0 shadow-sm flex-grow-1">
+        <div class="card-body px-3 py-2 d-flex align-items-center gap-3">
+          <div class="rounded-circle bg-success d-flex align-items-center justify-content-center"
+               style="width:36px;height:36px;flex-shrink:0">
+            <i class="bi bi-broadcast text-white" style="font-size:14px"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div id="loc-status" class="fw-semibold small text-success">
+              <span class="live-blink" style="display:inline-block;width:8px;height:8px;background:#198754;border-radius:50%;margin-right:5px;animation:livePulse 1.6s infinite"></span>
+              Live Tracking Active
+            </div>
+            <div class="text-muted" style="font-size:11px">
+              Updated: <span id="loc-time">{{ location.updated_at.strftime('%H:%M:%S') if location.updated_at else '—' }}</span>
+              &nbsp;·&nbsp; Accuracy: <span id="loc-accuracy">{{ '±%d m'|format(location.accuracy|int) if location.accuracy else '—' }}</span>
+            </div>
+          </div>
+          <div class="text-end">
+            <div id="loc-dist" class="fw-bold fs-5 text-danger">…</div>
+            <div class="text-muted small">from {{ college_name }}</div>
+          </div>
+        </div>
+      </div>
+      <a id="loc-gmaps"
+         href="https://maps.google.com/?q={{ location.latitude }},{{ location.longitude }}"
+         target="_blank" class="btn btn-outline-primary btn-sm fw-semibold">
+        <i class="bi bi-map-fill me-1"></i>Google Maps
+      </a>
+    </div>
+
+    <!-- Map card -->
+    <div class="card border-0 shadow-sm" style="position:relative;overflow:hidden">
+      <!-- Floating buttons inside map -->
+      <div class="map-fab" id="follow-btn" style="top:12px" onclick="toggleFollow()">
+        <i class="bi bi-crosshair" id="follow-icon"></i>
+        <span id="follow-label">Follow</span>
+      </div>
+      <div class="map-fab" id="fit-btn" style="top:56px" onclick="fitAll()">
+        <i class="bi bi-fullscreen"></i>
+        <span>Fit All</span>
+      </div>
+      <div id="live-map"></div>
+      <div class="card-footer bg-transparent border-0 py-2 px-3 d-flex justify-content-between align-items-center">
+        <span class="text-muted" style="font-size:11px">
+          <i class="bi bi-circle-fill text-success me-1" style="font-size:8px"></i>
+          Updates every 4 seconds &nbsp;·&nbsp; 🎓 {{ student.user.name }} &nbsp;·&nbsp; 🏫 {{ college_name }}
+        </span>
+        <span class="text-muted font-monospace" id="loc-coords" style="font-size:10px">
+          {{ '%.5f'|format(location.latitude) }}, {{ '%.5f'|format(location.longitude) }}
+        </span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% if location and location.is_sharing and location.latitude %}
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  const POLL_URL     = "{{ url_for('parent.child_location', student_id=student.id) }}";
+  const COLLEGE      = [{{ college_lat }}, {{ college_lng }}];
+  const STUDENT_POS  = [{{ location.latitude }}, {{ location.longitude }}];
+  const STUDENT_NAME = "{{ student.user.name }}";
+  const COLLEGE_NAME = "{{ college_name }}";
+
+  let followMode = true;
+  let pollTimer  = null;
+  let trail      = [];          // last 10 positions
+  let trailLayers = [];
+
+  // ── Haversine ──────────────────────────────────────────────────────────────
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371, r = Math.PI/180;
+    const dLat = (lat2-lat1)*r, dLng = (lng2-lng1)*r;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // ── Marker icons ───────────────────────────────────────────────────────────
+  const studentIcon = L.divIcon({
+    html: `<div class="live-marker-wrap">
+             <div class="live-pulse"></div>
+             <div class="live-pulse-2"></div>
+             <div class="live-dot"></div>
+           </div>`,
+    iconSize: [44,44], iconAnchor: [22,22], className: ''
+  });
+
+  const collegeIcon = L.divIcon({
+    html: `<div style="background:#0d6efd;color:#fff;border-radius:50% 50% 50% 0;
+                      transform:rotate(-45deg);width:38px;height:38px;
+                      display:flex;align-items:center;justify-content:center;
+                      box-shadow:0 3px 10px rgba(0,0,0,.3)">
+             <span style="transform:rotate(45deg);font-size:18px">🏫</span>
+           </div>`,
+    iconSize: [38,38], iconAnchor: [19,38], className: ''
+  });
+
+  // ── Map ────────────────────────────────────────────────────────────────────
+  const map = L.map('live-map', { zoomControl: true }).setView(STUDENT_POS, 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+  }).addTo(map);
+
+  // College pin
+  L.marker(COLLEGE, { icon: collegeIcon })
+   .addTo(map)
+   .bindPopup(`<strong>🏫 ${COLLEGE_NAME}</strong>`);
+
+  // Student marker with pulsing dot
+  const studentMarker = L.marker(STUDENT_POS, { icon: studentIcon, zIndexOffset: 1000 })
+    .addTo(map)
+    .bindPopup(`<strong>🎓 ${STUDENT_NAME}</strong><br><small id="popup-updated"></small>`);
+
+  // Accuracy circle
+  let accCircle = L.circle(STUDENT_POS, {
+    radius: {{ location.accuracy or 30 }},
+    color: '#198754', fillColor: '#198754', fillOpacity: 0.08, weight: 1
+  }).addTo(map);
+
+  map.fitBounds([COLLEGE, STUDENT_POS], { padding: [50, 50] });
+
+  // ── Smooth animated movement ───────────────────────────────────────────────
+  function animateTo(marker, from, to, ms) {
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min((now - start) / ms, 1);
+      const ease = t < .5 ? 2*t*t : -1+(4-2*t)*t;  // ease-in-out
+      marker.setLatLng([
+        from[0] + (to[0]-from[0]) * ease,
+        from[1] + (to[1]-from[1]) * ease
+      ]);
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ── Trail dots ─────────────────────────────────────────────────────────────
+  function addTrailDot(lat, lng) {
+    trail.push([lat, lng]);
+    if (trail.length > 10) trail.shift();
+    // Remove old trail layers
+    trailLayers.forEach(l => map.removeLayer(l));
+    trailLayers = [];
+    trail.forEach((pos, i) => {
+      const opacity = 0.15 + (i / trail.length) * 0.4;
+      const r = 3 + i;
+      const dot = L.circleMarker(pos, {
+        radius: r, color: '#198754', fillColor: '#198754',
+        fillOpacity: opacity, weight: 0
+      }).addTo(map);
+      trailLayers.push(dot);
+    });
+  }
+
+  // ── Distance UI ────────────────────────────────────────────────────────────
+  function updateDist(lat, lng) {
+    const km = haversine(lat, lng, COLLEGE[0], COLLEGE[1]);
+    const el = document.getElementById('loc-dist');
+    if (km < 0.05) {
+      el.textContent = 'At college ✓'; el.className = 'fw-bold fs-5 text-success';
+    } else if (km < 0.5) {
+      el.textContent = `${Math.round(km*1000)} m away`; el.className = 'fw-bold fs-5 text-warning';
+    } else {
+      el.textContent = `${km.toFixed(2)} km away`; el.className = 'fw-bold fs-5 text-danger';
+    }
+  }
+
+  // ── Main update ────────────────────────────────────────────────────────────
+  let prevPos = STUDENT_POS;
+  updateDist(STUDENT_POS[0], STUDENT_POS[1]);
+  addTrailDot(STUDENT_POS[0], STUDENT_POS[1]);
+
+  function handleUpdate(data) {
+    if (!data.sharing) {
+      document.getElementById('loc-status').innerHTML =
+        '<i class="bi bi-geo-alt-slash text-muted me-1"></i><span class="text-muted">Student stopped sharing</span>';
+      stopPolling(); return;
+    }
+
+    const newPos = [data.lat, data.lng];
+    const moved  = Math.abs(newPos[0]-prevPos[0]) > 0.000005 || Math.abs(newPos[1]-prevPos[1]) > 0.000005;
+
+    // Animate marker smoothly over 2s
+    animateTo(studentMarker, prevPos, newPos, 2000);
+    accCircle.setLatLng(newPos);
+    if (data.accuracy) accCircle.setRadius(Math.max(data.accuracy, 10));
+
+    if (moved) addTrailDot(newPos[0], newPos[1]);
+    if (followMode && moved) map.panTo(newPos, { animate: true, duration: 1 });
+
+    prevPos = newPos;
+    updateDist(newPos[0], newPos[1]);
+
+    // Status bar
+    const age = data.age_seconds || 0;
+    const statusEl = document.getElementById('loc-status');
+    if (age < 15) {
+      statusEl.innerHTML = '<span style="display:inline-block;width:8px;height:8px;background:#198754;border-radius:50%;margin-right:5px;animation:livePulse 1.6s infinite"></span><span class="text-success fw-semibold">Live Tracking Active</span>';
+    } else {
+      statusEl.innerHTML = `<i class="bi bi-clock text-warning me-1"></i><span class="text-warning">Last seen ${Math.round(age/60)} min ago</span>`;
+    }
+    document.getElementById('loc-time').textContent = data.updated_at || '—';
+    document.getElementById('loc-accuracy').textContent = data.accuracy ? `±${Math.round(data.accuracy)} m` : '—';
+    document.getElementById('loc-coords').textContent = `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`;
+    document.getElementById('loc-gmaps').href = `https://maps.google.com/?q=${data.lat},${data.lng}`;
+
+    // Update popup
+    const pu = document.getElementById('popup-updated');
+    if (pu) pu.textContent = 'Updated ' + (data.updated_at || '');
+  }
+
+  // ── Polling ────────────────────────────────────────────────────────────────
+  function poll() {
+    fetch(POLL_URL, { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(handleUpdate)
+      .catch(() => {});
+  }
+
+  function startPolling() {
+    if (pollTimer) return;
+    pollTimer = setInterval(poll, 4000);
+  }
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  // Start polling when tab is shown
+  document.getElementById('locationTab').addEventListener('shown.bs.tab', () => {
+    map.invalidateSize();
+    poll();
+    startPolling();
+  });
+  document.getElementById('locationTab').addEventListener('hide.bs.tab', stopPolling);
+
+  // ── Follow toggle ──────────────────────────────────────────────────────────
+  window.toggleFollow = function () {
+    followMode = !followMode;
+    document.getElementById('follow-icon').className = followMode ? 'bi bi-crosshair text-primary' : 'bi bi-crosshair';
+    document.getElementById('follow-label').textContent = followMode ? 'Following' : 'Follow';
+    document.getElementById('follow-btn').style.borderColor = followMode ? '#0d6efd' : '#dee2e6';
+    if (followMode) map.panTo(prevPos, { animate: true });
+  };
+
+  window.fitAll = function () {
+    map.fitBounds([COLLEGE, prevPos], { padding: [50, 50], animate: true });
+  };
+
+  // If tab is already active on page load, start immediately
+  if (document.getElementById('location').classList.contains('active')) {
+    startPolling();
+    map.invalidateSize();
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

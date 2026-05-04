@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Smart Attendance{% endblock %} | College Management System</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <i class="bi bi-mortarboard-fill fs-3 text-primary"></i>
+    <span class="ms-2 fw-bold">SmartAttend</span>
+  </div>
+  <hr class="sidebar-divider">
+
+  {% if current_user.role == 'admin' %}
+  <ul class="sidebar-nav">
+    <li><a href="{{ url_for('admin.dashboard') }}" class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+      <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.students') }}" class="{% if request.endpoint == 'admin.students' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Students">
+      <i class="bi bi-people-fill"></i><span>Students</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.teachers') }}" class="{% if request.endpoint == 'admin.teachers' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Teachers">
+      <i class="bi bi-person-badge-fill"></i><span>Teachers</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.subjects') }}" class="{% if request.endpoint == 'admin.subjects' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Subjects">
+      <i class="bi bi-journal-bookmark-fill"></i><span>Subjects</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.departments') }}" class="{% if request.endpoint == 'admin.departments' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Departments">
+      <i class="bi bi-building-fill"></i><span>Departments</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.users') }}" class="{% if request.endpoint == 'admin.users' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="All Users">
+      <i class="bi bi-person-gear"></i><span>All Users</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.sessions') }}" class="{% if request.endpoint == 'admin.sessions' or request.endpoint == 'admin.cancel_session' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Sessions">
+      <i class="bi bi-camera-video-fill"></i><span>Sessions</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.analytics') }}" class="{% if request.endpoint == 'admin.analytics' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Analytics">
+      <i class="bi bi-bar-chart-fill"></i><span>Analytics</span>
+    </a></li>
+    <li><a href="{{ url_for('leave.admin_leaves') }}" class="{% if 'leave' in (request.endpoint or '') and current_user.role == 'admin' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Leave Management">
+      <i class="bi bi-calendar-x-fill"></i><span>Leave Management</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.file_manager') }}" class="{% if request.endpoint == 'admin.file_manager' or request.endpoint == 'admin.delete_file' or request.endpoint == 'admin.bulk_delete_files' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="File Manager">
+      <i class="bi bi-folder2-open"></i><span>File Manager</span>
+    </a></li>
+    <hr class="sidebar-divider my-1">
+    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
+      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
+    </a></li>
+    <li><a href="{{ url_for('timetable.view') }}" class="{% if 'timetable' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Timetable">
+      <i class="bi bi-calendar3"></i><span>Timetable</span>
+    </a></li>
+    <li><a href="{{ url_for('exam.admin_exams') }}" class="{% if request.endpoint == 'exam.admin_exams' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exams">
+      <i class="bi bi-journals"></i><span>Exams</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.marksheet_list') }}" class="{% if request.endpoint in ('admin.marksheet_list','admin.admin_marksheet') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Marksheets">
+      <i class="bi bi-award-fill"></i><span>Marksheets</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.marksheet_signatures') }}" class="{% if 'marksheet_signature' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Signatures">
+      <i class="bi bi-pen-fill"></i><span>Signatures</span>
+    </a></li>
+    <li><a href="{{ url_for('fee.admin_fees') }}" class="{% if 'fee' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Fees">
+      <i class="bi bi-cash-stack"></i><span>Fees</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.parents') }}" class="{% if request.endpoint and 'parent' in request.endpoint %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Parent Accounts">
+      <i class="bi bi-house-heart-fill"></i><span>Parents</span>
+    </a></li>
+    <hr class="sidebar-divider my-1">
+    <li><a href="{{ url_for('admin.settings') }}" class="{% if request.endpoint == 'admin.settings' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="College Settings">
+      <i class="bi bi-gear-fill"></i><span>Settings</span>
+    </a></li>
+    <li><a href="{{ url_for('admin.id_card_template') }}" class="{% if 'id_card' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Digital ID Cards">
+      <i class="bi bi-person-badge-fill"></i><span>Digital ID Cards</span>
+      {% set pending_ids = namespace(count=0) %}
+      {% for _ in range(1) %}{% set pending_ids.count = pending_id_count or 0 %}{% endfor %}
+    </a></li>
+    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
+      <i class="bi bi-book-fill"></i><span>User Guide</span>
+    </a></li>
+  </ul>
+
+  {% elif current_user.role == 'teacher' %}
+  <ul class="sidebar-nav">
+    <li><a href="{{ url_for('teacher.dashboard') }}" class="{% if request.endpoint == 'teacher.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+      <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+    </a></li>
+    <li><a href="{{ url_for('teacher.sessions') }}" class="{% if 'session' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Attendance Sessions">
+      <i class="bi bi-camera-video-fill"></i><span>Attendance Sessions</span>
+    </a></li>
+    <li><a href="{{ url_for('leave.teacher_leaves') }}" class="{% if 'leave' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Leave Management">
+      <i class="bi bi-calendar-x-fill"></i><span>Leave Management</span>
+      {% set pending_count = current_user.teacher_profile.subjects | map(attribute='leave_requests') | sum(start=[]) | selectattr('status','eq','pending') | selectattr('leave_type','eq','student_subject') | list | length %}
+      {% if pending_count > 0 %}<span class="badge bg-danger ms-auto nav-badge">{{ pending_count }}</span>{% endif %}
+    </a></li>
+    <li><a href="{{ url_for('teacher.reports') }}" class="{% if request.endpoint == 'teacher.reports' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Reports">
+      <i class="bi bi-file-earmark-bar-graph-fill"></i><span>Reports</span>
+    </a></li>
+    <hr class="sidebar-divider my-1">
+    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
+      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
+    </a></li>
+    <li><a href="{{ url_for('timetable.view') }}" class="{% if 'timetable' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Timetable">
+      <i class="bi bi-calendar3"></i><span>Timetable</span>
+    </a></li>
+    <li><a href="{{ url_for('exam.teacher_exams') }}" class="{% if 'exam' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exams & Marks">
+      <i class="bi bi-journals"></i><span>Exams &amp; Marks</span>
+    </a></li>
+    <li><a href="{{ url_for('teacher.content_list') }}" class="{% if 'content' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Content Manager">
+      <i class="bi bi-collection-fill"></i><span>Content Manager</span>
+    </a></li>
+    <hr class="sidebar-divider my-1">
+    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
+      <i class="bi bi-book-fill"></i><span>User Guide</span>
+    </a></li>
+  </ul>
+
+  {% elif current_user.role == 'student' %}
+  <ul class="sidebar-nav">
+    <li><a href="{{ url_for('student.dashboard') }}" class="{% if request.endpoint == 'student.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+      <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+    </a></li>
+    <li><a href="{{ url_for('student.profile') }}" class="{% if request.endpoint == 'student.profile' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Profile">
+      <i class="bi bi-person-circle"></i><span>My Profile</span>
+    </a></li>
+    <li><a href="{{ url_for('student.my_attendance') }}" class="{% if request.endpoint == 'student.my_attendance' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Attendance">
+      <i class="bi bi-calendar-check-fill"></i><span>My Attendance</span>
+    </a></li>
+    <li><a href="{{ url_for('leave.student_leaves') }}" class="{% if request.endpoint == 'leave.student_leaves' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Leave Applications">
+      <i class="bi bi-calendar-x-fill"></i><span>Leave Applications</span>
+    </a></li>
+    <li><a href="{{ url_for('student.enroll') }}" class="{% if request.endpoint == 'student.enroll' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Face Enrollment">
+      <i class="bi bi-person-bounding-box"></i><span>Face Enrollment</span>
+    </a></li>
+    <hr class="sidebar-divider my-1">
+    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
+      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
+    </a></li>
+    <li><a href="{{ url_for('timetable.view') }}" class="{% if 'timetable' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Timetable">
+      <i class="bi bi-calendar3"></i><span>Timetable</span>
+    </a></li>
+    <li><a href="{{ url_for('exam.student_results') }}" class="{% if request.endpoint == 'exam.student_results' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Results">
+      <i class="bi bi-award-fill"></i><span>My Results</span>
+    </a></li>
+    <li><a href="{{ url_for('exam.student_marksheet') }}" class="{% if request.endpoint == 'exam.student_marksheet' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Marksheet">
+      <i class="bi bi-file-earmark-text-fill"></i><span>Marksheet</span>
+    </a></li>
+    <li><a href="{{ url_for('fee.student_fees') }}" class="{% if 'fee' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Fees">
+      <i class="bi bi-cash-stack"></i><span>My Fees</span>
+    </a></li>
+    <li><a href="{{ url_for('student.id_card') }}" class="{% if request.endpoint == 'student.id_card' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My ID Card">
+      <i class="bi bi-person-badge-fill"></i><span>My ID Card</span>
+    </a></li>
+    <li><a href="{{ url_for('student.student_content') }}" class="{% if 'content' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Study Materials">
+      <i class="bi bi-collection-fill"></i><span>Study Materials</span>
+    </a></li>
+    <hr class="sidebar-divider my-1">
+    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
+      <i class="bi bi-book-fill"></i><span>User Guide</span>
+    </a></li>
+  </ul>
+
+  {% elif current_user.role == 'parent' %}
+  <ul class="sidebar-nav">
+    <li><a href="{{ url_for('parent.dashboard') }}" class="{% if request.endpoint == 'parent.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+      <i class="bi bi-house-heart-fill"></i><span>Dashboard</span>
+    </a></li>
+    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
+      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
+    </a></li>
+    <hr class="sidebar-divider my-1">
+    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
+      <i class="bi bi-book-fill"></i><span>User Guide</span>
+    </a></li>
+  </ul>
+  {% endif %}
+
+  <div class="sidebar-footer">
+    <div class="user-info">
+      <div class="user-avatar" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ current_user.name }}">{{ current_user.name[0].upper() }}</div>
+      <div class="ms-2 sidebar-user-text">
+        <div class="fw-semibold text-truncate" style="max-width:140px">{{ current_user.name }}</div>
+        <small class="text-muted text-capitalize">{{ current_user.role }}</small>
+      </div>
+    </div>
+    <div class="sidebar-footer-btns mt-2">
+      <a href="{{ url_for('auth.change_password') }}"
+         class="btn btn-sm btn-outline-secondary sidebar-footer-btn w-100"
+         data-bs-toggle="tooltip" data-bs-placement="right" title="Change Password">
+        <i class="bi bi-key-fill"></i><span> Change Password</span>
+      </a>
+      <a href="{{ url_for('auth.logout') }}"
+         class="btn btn-sm btn-outline-danger sidebar-footer-btn w-100 mt-1"
+         data-bs-toggle="tooltip" data-bs-placement="right" title="Logout">
+        <i class="bi bi-box-arrow-right"></i><span> Logout</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Topbar -->
+<div class="main-content" id="main-content">
+  <nav class="topbar">
+    <button class="btn btn-link sidebar-toggle" id="sidebarToggle">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+    <div class="topbar-title">{% block page_title %}{% endblock %}</div>
+    <div class="ms-auto d-flex align-items-center gap-3">
+      <span class="badge bg-primary-subtle text-primary text-capitalize px-3 py-2">
+        <i class="bi bi-circle-fill text-success me-1" style="font-size:8px"></i>
+        {{ current_user.role }}
+      </span>
+    </div>
+  </nav>
+
+  <div class="content-area">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-4">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              <i class="bi bi-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-triangle{% elif category == 'warning' %}exclamation-circle{% else %}info-circle{% endif %}-fill me-2"></i>
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebar = document.getElementById('sidebar');
+  const mainContent = document.getElementById('main-content');
+
+  // Create mobile overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'sidebarOverlay';
+  overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;';
+  document.body.appendChild(overlay);
+
+  function isMobile() { return window.innerWidth < 769; }
+
+  function closeMobileSidebar() {
+    sidebar?.classList.remove('mobile-open');
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      if (isMobile()) {
+        const isOpen = sidebar?.classList.toggle('mobile-open');
+        overlay.style.display = isOpen ? 'block' : 'none';
+        document.body.style.overflow = isOpen ? 'hidden' : '';
+      } else {
+        sidebar?.classList.toggle('collapsed');
+        mainContent?.classList.toggle('expanded');
+      }
+    });
+  }
+
+  overlay.addEventListener('click', closeMobileSidebar);
+
+  window.addEventListener('resize', () => {
+    if (!isMobile()) closeMobileSidebar();
+  });
+</script>
+{% block scripts %}{% endblock %}
+
+{# ── Global Confirmation Modal ───────────────────────────────────────────── #}
+<div class="modal fade" id="saConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered sa-confirm-dialog">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+
+      <div class="sa-confirm-header" id="saConfirmHeader">
+        <div class="sa-confirm-icon-wrap" id="saConfirmIconWrap">
+          <i id="saConfirmIcon" class="bi"></i>
+        </div>
+      </div>
+
+      <div class="modal-body px-4 pt-3 pb-2 text-center">
+        <h6 class="fw-bold mb-1" id="saConfirmTitle" style="font-size:16px"></h6>
+        <p class="text-muted mb-0 small" id="saConfirmMsg" style="line-height:1.6"></p>
+      </div>
+
+      <div class="modal-footer border-0 px-4 pb-4 pt-2 gap-2 justify-content-center">
+        <button type="button" class="btn btn-light sa-confirm-cancel-btn" data-bs-dismiss="modal">
+          <i class="bi bi-x-lg me-1"></i>Cancel
+        </button>
+        <button type="button" class="btn sa-confirm-ok-btn fw-semibold" id="saConfirmOk">
+          <i class="bi" id="saConfirmOkIcon"></i>
+          <span id="saConfirmOkText"></span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+.sa-confirm-dialog { max-width: 400px; }
+.sa-confirm-header {
+  height: 80px; display: flex; align-items: center; justify-content: center;
+}
+.sa-confirm-header.type-danger  { background: linear-gradient(135deg,#fef2f2,#fee2e2); }
+.sa-confirm-header.type-warning { background: linear-gradient(135deg,#fffbeb,#fef3c7); }
+.sa-confirm-header.type-info    { background: linear-gradient(135deg,#eff6ff,#dbeafe); }
+.sa-confirm-header.type-success { background: linear-gradient(135deg,#f0fdf4,#dcfce7); }
+
+.sa-confirm-icon-wrap {
+  width: 52px; height: 52px; border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.sa-confirm-header.type-danger  .sa-confirm-icon-wrap { background:#fee2e2; color:#b91c1c; }
+.sa-confirm-header.type-warning .sa-confirm-icon-wrap { background:#fef3c7; color:#92400e; }
+.sa-confirm-header.type-info    .sa-confirm-icon-wrap { background:#dbeafe; color:#1d4ed8; }
+.sa-confirm-header.type-success .sa-confirm-icon-wrap { background:#dcfce7; color:#15803d; }
+
+.sa-confirm-cancel-btn { min-width: 110px; }
+.sa-confirm-ok-btn     { min-width: 130px; }
+</style>
+
+<script>
+// ── SmartAttend global confirm system ─────────────────────────────────────
+const SA = (() => {
+  let _bsModal = null;
+  let _resolve  = null;
+
+  const _cfg = {
+    danger:  { icon: 'bi-trash3-fill',                 okClass: 'btn-danger',   okText: 'Delete',   okIcon: 'bi-trash3-fill' },
+    warning: { icon: 'bi-exclamation-triangle-fill',   okClass: 'btn-warning',  okText: 'Proceed',  okIcon: 'bi-check-lg' },
+    info:    { icon: 'bi-info-circle-fill',            okClass: 'btn-primary',  okText: 'Confirm',  okIcon: 'bi-check-lg' },
+    success: { icon: 'bi-check-circle-fill',           okClass: 'btn-success',  okText: 'Yes',      okIcon: 'bi-check-lg' },
+  };
+
+  function _getModal() {
+    if (!_bsModal) _bsModal = new bootstrap.Modal(document.getElementById('saConfirmModal'));
+    return _bsModal;
+  }
+
+  function confirm(opts) {
+    if (typeof opts === 'string') opts = { message: opts };
+    const type = opts.type || 'danger';
+    const c    = _cfg[type] || _cfg.danger;
+
+    document.getElementById('saConfirmHeader').className = `sa-confirm-header type-${type}`;
+    document.getElementById('saConfirmIcon').className   = `bi ${c.icon}`;
+    document.getElementById('saConfirmTitle').textContent = opts.title || (type === 'danger' ? 'Confirm Delete' : 'Confirm Action');
+    document.getElementById('saConfirmMsg').textContent   = opts.message || 'Are you sure you want to proceed?';
+
+    const okBtn   = document.getElementById('saConfirmOk');
+    const okIcon  = document.getElementById('saConfirmOkIcon');
+    const okText  = document.getElementById('saConfirmOkText');
+    okBtn.className  = `btn sa-confirm-ok-btn fw-semibold ${c.okClass}`;
+    okIcon.className = `bi ${opts.okIcon  || c.okIcon} me-1`;
+    okText.textContent = opts.okText || c.okText;
+
+    return new Promise(res => {
+      _resolve = res;
+      _getModal().show();
+    });
+  }
+
+  // Wire OK button
+  document.getElementById('saConfirmOk').addEventListener('click', () => {
+    _getModal().hide();
+    if (_resolve) { const r = _resolve; _resolve = null; r(true); }
+  });
+
+  // Wire modal hide (Cancel / backdrop / ESC)
+  document.getElementById('saConfirmModal').addEventListener('hidden.bs.modal', () => {
+    if (_resolve) { const r = _resolve; _resolve = null; r(false); }
+  });
+
+  return { confirm };
+})();
+
+// ── Auto-intercept forms with data-confirm ────────────────────────────────
+document.addEventListener('submit', async function(e) {
+  const form = e.target.closest('form[data-confirm]');
+  if (!form) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const ok = await SA.confirm({
+    message: form.dataset.confirm,
+    title:   form.dataset.confirmTitle || undefined,
+    type:    form.dataset.confirmType  || 'danger',
+    okText:  form.dataset.confirmOk    || undefined,
+    okIcon:  form.dataset.confirmIcon  || undefined,
+  });
+  if (ok) { form.removeAttribute('data-confirm'); form.submit(); }
+}, true);
+</script>
+</body>
+</html>

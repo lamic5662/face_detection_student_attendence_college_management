@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Subjects{% endblock %}
+{% block page_title %}<i class="bi bi-journal-bookmark-fill me-2"></i>Subjects{% endblock %}
+
+{% block content %}
+
+<!-- Filter bar -->
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body px-4 py-3">
+    <form method="GET" action="{{ url_for('admin.subjects') }}" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold small mb-1">Faculty</label>
+        <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Faculties</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if selected_dept == d.id %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small mb-1">Semester</label>
+        <select name="semester" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Semesters</option>
+          {% for i in range(1,9) %}
+          <option value="{{ i }}" {% if selected_sem == i %}selected{% endif %}>Semester {{ i }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        {% if selected_dept or selected_sem %}
+        <a href="{{ url_for('admin.subjects') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-x-circle me-1"></i>Clear
+        </a>
+        {% endif %}
+      </div>
+      <div class="col-auto ms-auto">
+        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+          <i class="bi bi-plus-circle-fill me-2"></i>Add Subject
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="d-flex align-items-center mb-3">
+  <span class="badge bg-primary-subtle text-primary px-3 py-2">{{ subjects|length }} subject(s)</span>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Code</th>
+            <th>Name</th>
+            <th>Department</th>
+            <th>Semester</th>
+            <th>Teacher</th>
+            <th>Credits</th>
+            <th>Sessions</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in subjects %}
+          <tr>
+            <td class="px-4"><span class="badge bg-info-subtle text-info">{{ s.code }}</span></td>
+            <td class="fw-semibold">{{ s.name }}</td>
+            <td><span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span></td>
+            <td><span class="badge bg-secondary-subtle text-secondary">Sem {{ s.semester }}</span></td>
+            <td>
+              <div class="d-flex align-items-center gap-1">
+                <i class="bi bi-person-fill text-success small"></i>
+                <span>{{ s.teacher.user.name }}</span>
+                <small class="text-muted">({{ s.teacher.employee_id }})</small>
+              </div>
+            </td>
+            <td>{{ s.credit_hours }}</td>
+            <td>{{ s.sessions|length }}</td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-primary"
+                        data-bs-toggle="modal" data-bs-target="#editSubjectModal{{ s.id }}" title="Edit">
+                  <i class="bi bi-pencil-fill"></i>
+                </button>
+                <form method="POST" action="{{ url_for('admin.delete_subject', sid=s.id) }}"
+                      data-confirm="Delete subject '{{ s.name }}'? This cannot be undone." data-confirm-title="Delete Subject">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash3"></i></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Edit Subject Modal -->
+          <div class="modal fade" id="editSubjectModal{{ s.id }}" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <div class="modal-header border-0">
+                  <h6 class="modal-title fw-semibold"><i class="bi bi-pencil me-2 text-primary"></i>Edit — {{ s.code }}</h6>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{{ url_for('admin.edit_subject', sid=s.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="modal-body">
+                    <div class="row g-3">
+                      <div class="col-md-8">
+                        <label class="form-label fw-semibold">Subject Name</label>
+                        <input type="text" name="name" class="form-control" value="{{ s.name }}" required>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label fw-semibold">Code</label>
+                        <input type="text" name="code" class="form-control" value="{{ s.code }}" required>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-semibold">Department</label>
+                        <select name="department_id" class="form-select"
+                                onchange="populateTeachers(this.value, 'edit-teacher-{{ s.id }}')">
+                          {% for d in departments %}
+                          <option value="{{ d.id }}" {% if d.id == s.department_id %}selected{% endif %}>{{ d.name }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-semibold">Semester</label>
+                        <select name="semester" class="form-select">
+                          {% for i in range(1, 9) %}
+                          <option value="{{ i }}" {% if i == s.semester %}selected{% endif %}>Semester {{ i }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label fw-semibold">Assign Teacher</label>
+                        <select name="teacher_id" class="form-select" id="edit-teacher-{{ s.id }}" required>
+                          <!-- populated by JS on modal open -->
+                        </select>
+                        <div class="form-text text-muted small">Shows teachers in the selected department.</div>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label fw-semibold">Credit Hours</label>
+                        <input type="number" name="credit_hours" class="form-control" value="{{ s.credit_hours }}" min="1" max="6">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold"><i class="bi bi-save me-2"></i>Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- pre-populate teacher select when edit modal opens -->
+          <script>
+          document.getElementById('editSubjectModal{{ s.id }}').addEventListener('show.bs.modal', function () {
+            populateTeachers('{{ s.department_id }}', 'edit-teacher-{{ s.id }}', '{{ s.teacher_id }}');
+          });
+          </script>
+
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted py-5">No subjects found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Subject Modal -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-semibold"><i class="bi bi-journal-plus me-2 text-primary"></i>Add Subject</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin.subjects') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Subject Name</label>
+              <input type="text" name="name" class="form-control" placeholder="e.g. Data Structures" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Code</label>
+              <input type="text" name="code" class="form-control" placeholder="e.g. CS301" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Department</label>
+              <select name="department_id" id="add-dept-select" class="form-select" required
+                      onchange="populateTeachers(this.value, 'add-teacher-select')">
+                <option value="">Select Department</option>
+                {% for d in departments %}
+                <option value="{{ d.id }}">{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Semester</label>
+              <select name="semester" class="form-select" required>
+                <option value="">Select Semester</option>
+                {% for i in range(1, 9) %}
+                <option value="{{ i }}">Semester {{ i }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Assign Teacher</label>
+              <select name="teacher_id" id="add-teacher-select" class="form-select" required>
+                <option value="">— Select a department first —</option>
+              </select>
+              <div class="form-text text-muted small">Shows teachers in the selected department.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Credit Hours</label>
+              <input type="number" name="credit_hours" class="form-control" value="3" min="1" max="6">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">
+            <i class="bi bi-save me-2"></i>Save Subject
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// All teachers keyed by department_id, built from server data
+const TEACHERS_BY_DEPT = {};
+{% for t in teachers %}
+(TEACHERS_BY_DEPT['{{ t.department_id }}'] = TEACHERS_BY_DEPT['{{ t.department_id }}'] || []).push({
+  id: {{ t.id }},
+  name: {{ t.user.name | tojson }},
+  emp:  {{ t.employee_id | tojson }}
+});
+{% endfor %}
+
+function populateTeachers(deptId, selectId, selectedId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '';
+
+  const teachers = TEACHERS_BY_DEPT[String(deptId)] || [];
+  if (!deptId || !teachers.length) {
+    sel.innerHTML = '<option value="">— No teachers in this department —</option>';
+    return;
+  }
+
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = '— Select teacher —';
+  sel.appendChild(placeholder);
+
+  teachers.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = `${t.name} (${t.emp})`;
+    if (selectedId && String(t.id) === String(selectedId)) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+// Reset add modal teacher select when add modal closes
+document.getElementById('addSubjectModal').addEventListener('hidden.bs.modal', function () {
+  document.getElementById('add-dept-select').value = '';
+  document.getElementById('add-teacher-select').innerHTML =
+    '<option value="">— Select a department first —</option>';
+});
+</script>
+{% endblock %}

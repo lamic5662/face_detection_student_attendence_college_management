@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}My Fees{% endblock %}
+{% block page_title %}<i class="bi bi-cash-stack me-2"></i>My Fees{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100" style="background:linear-gradient(135deg,#0d6efd,#0dcaf0)">
+      <div class="card-body text-white d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-white bg-opacity-25 p-3">
+          <i class="bi bi-cash-coin fs-4"></i>
+        </div>
+        <div>
+          <div class="small opacity-75">Total Paid</div>
+          <div class="fw-bold fs-4">Rs. {{ '{:,.0f}'.format(total_paid) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100" style="background:linear-gradient(135deg,#dc3545,#fd7e14)">
+      <div class="card-body text-white d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-white bg-opacity-25 p-3">
+          <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+        </div>
+        <div>
+          <div class="small opacity-75">Total Due</div>
+          <div class="fw-bold fs-4">Rs. {{ '{:,.0f}'.format(total_due) }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100" style="background:linear-gradient(135deg,#198754,#20c997)">
+      <div class="card-body text-white d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-white bg-opacity-25 p-3">
+          <i class="bi bi-receipt fs-4"></i>
+        </div>
+        <div>
+          <div class="small opacity-75">Fee Entries</div>
+          <div class="fw-bold fs-4">{{ fee_data | length }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if fee_data %}
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Fee Title</th>
+            <th>Academic Year</th>
+            <th>Due Date</th>
+            <th>Fee Amount</th>
+            <th>Paid</th>
+            <th>Balance</th>
+            <th>Status</th>
+            <th>Receipt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in fee_data %}
+          {% set fs = item.structure %}
+          {% set p = item.payment %}
+          <tr>
+            <td class="px-4">
+              <div class="fw-semibold">{{ fs.title }}</div>
+              {% if fs.description %}
+              <div class="text-muted small">{{ fs.description | truncate(60) }}</div>
+              {% endif %}
+            </td>
+            <td><span class="badge bg-secondary-subtle text-secondary">{{ fs.academic_year }}</span></td>
+            <td class="small">
+              {% if fs.due_date %}
+                {% if item.due > 0 and fs.due_date < today %}
+                  <span class="text-danger fw-semibold">
+                    <i class="bi bi-exclamation-circle-fill me-1"></i>{{ fs.due_date.strftime('%d %b %Y') }}
+                  </span>
+                {% else %}
+                  <span class="text-muted">{{ fs.due_date.strftime('%d %b %Y') }}</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="fw-semibold">Rs. {{ '{:,.0f}'.format(fs.amount) }}</td>
+            <td>
+              {% if item.paid > 0 %}
+                <span class="text-success fw-semibold">Rs. {{ '{:,.0f}'.format(item.paid) }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.due > 0 %}
+                <span class="text-danger fw-semibold">Rs. {{ '{:,.0f}'.format(item.due) }}</span>
+              {% else %}
+                <span class="text-success">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if not p %}
+                <span class="badge bg-danger">Unpaid</span>
+              {% elif p.status == 'paid' %}
+                <span class="badge bg-success">Paid</span>
+              {% elif p.status == 'partial' %}
+                <div>
+                  <span class="badge bg-warning text-dark">Partial</span>
+                  <div class="progress mt-1" style="height:4px;min-width:60px">
+                    <div class="progress-bar bg-warning"
+                         style="width:{{ (item.paid / fs.amount * 100) | int }}%"></div>
+                  </div>
+                </div>
+              {% elif p.status == 'waived' %}
+                <span class="badge bg-info text-dark">Waived</span>
+              {% endif %}
+            </td>
+            <td class="font-monospace small text-muted">
+              {{ p.receipt_no if p else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if total_due > 0 %}
+<div class="alert alert-warning border-0 shadow-sm mt-4 d-flex align-items-center gap-3">
+  <i class="bi bi-exclamation-triangle-fill fs-4 text-warning"></i>
+  <div>
+    <strong>Outstanding Balance: Rs. {{ '{:,.0f}'.format(total_due) }}</strong>
+    <div class="small">Please contact the accounts office to clear pending fees.</div>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="card border-0 shadow-sm text-center py-5 text-muted">
+  <i class="bi bi-cash-stack fs-1 mb-3 d-block opacity-25"></i>
+  <p>No fee structures assigned to you yet.</p>
+</div>
+{% endif %}
+{% endblock %}

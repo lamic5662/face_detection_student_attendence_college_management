@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}{{ action }} Content{% endblock %}
+{% block page_title %}
+  <i class="bi bi-{% if action == 'Edit' %}pencil-square{% else %}plus-circle-fill{% endif %} me-2"></i>
+  {{ action }} Content
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-8 col-lg-10">
+
+    {# Breadcrumb #}
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb mb-0 small">
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('teacher.content_list') }}" class="text-decoration-none">Content Manager</a>
+        </li>
+        <li class="breadcrumb-item active">{{ action }}</li>
+      </ol>
+    </nav>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-4">
+
+        <form method="POST" enctype="multipart/form-data" id="contentForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          {# ── Content Type selector ── #}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Content Type <span class="text-danger">*</span></label>
+            <div class="d-flex gap-2 flex-wrap" id="typeButtons">
+              {% for slug, label, icon, color in [
+                ('note',       'Note',       'bi-journal-text',        'primary'),
+                ('assignment', 'Assignment', 'bi-clipboard-check',     'purple'),
+                ('lab',        'Lab Work',   'bi-flask',               'orange'),
+                ('question',   'Question',   'bi-patch-question-fill', 'teal'),
+              ] %}
+              <label class="type-btn type-btn-{{ color }} {% if (item and item.content_type == slug) or (not item and slug == 'note') %}active{% endif %}">
+                <input type="radio" name="content_type" value="{{ slug }}"
+                       {% if (item and item.content_type == slug) or (not item and slug == 'note') %}checked{% endif %}
+                       class="d-none" onchange="onTypeChange('{{ slug }}')">
+                <i class="bi {{ icon }} me-1"></i>{{ label }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          {# ── Title ── #}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Title <span class="text-danger">*</span></label>
+            <input type="text" name="title" class="form-control"
+                   placeholder="Enter a descriptive title…"
+                   value="{{ item.title if item else '' }}"
+                   required maxlength="200" autofocus>
+          </div>
+
+          {# ── Subject + Semester row ── #}
+          <div class="row g-3 mb-3">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Subject</label>
+              <select name="subject_id" class="form-select">
+                <option value="">— No specific subject —</option>
+                {% for s in subjects %}
+                <option value="{{ s.id }}"
+                  {% if item and item.subject_id == s.id %}selected{% endif %}>
+                  {{ s.name }} ({{ s.code }}) — Sem {{ s.semester }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Semester <span class="text-danger">*</span></label>
+              <select name="semester" class="form-select" required>
+                {% for n in range(1, 9) %}
+                <option value="{{ n }}"
+                  {% if item and item.semester == n %}selected
+                  {% elif not item and n == 1 %}selected{% endif %}>
+                  Semester {{ n }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          {# ── Due Date + Marks (shown for assignment/lab/question) ── #}
+          <div class="row g-3 mb-3" id="dueMksRow"
+               style="{{ '' if not item or item.content_type != 'note' else 'display:none' }}">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Due Date</label>
+              <input type="date" name="due_date" class="form-control"
+                     value="{{ item.due_date.strftime('%Y-%m-%d') if item and item.due_date else '' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Total Marks</label>
+              <input type="number" name="marks" class="form-control"
+                     min="1" max="1000" placeholder="e.g. 20"
+                     value="{{ item.marks if item and item.marks else '' }}">
+            </div>
+          </div>
+
+          {# ── Body / Description ── #}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Description / Instructions</label>
+            <textarea name="body" class="form-control" rows="6"
+                      placeholder="Write the content body, instructions, or details here…">{{ item.body if item and item.body else '' }}</textarea>
+          </div>
+
+          {# ── File Attachment ── #}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Attachment</label>
+            {% if item and item.file_path %}
+            <div class="mb-2">
+              <a href="{{ url_for('teacher.content_file', cid=item.id) }}" target="_blank"
+                 class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-paperclip me-1"></i>Current file
+              </a>
+              <span class="text-muted small ms-2">Upload a new file to replace it.</span>
+            </div>
+            {% endif %}
+            <input type="file" name="attachment" class="form-control"
+                   accept=".pdf,.doc,.docx,.pptx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp">
+            <div class="form-text">PDF, Office files, text, spreadsheets, and safe images. Max 10 MB.</div>
+          </div>
+
+          {# ── Publish toggle ── #}
+          <div class="mb-4 p-3 rounded-3 bg-light">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" name="is_published"
+                     id="isPublished" role="switch"
+                     {% if item and item.is_published %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="isPublished">
+                Publish immediately
+              </label>
+            </div>
+            <div class="form-text ms-5 mt-1">
+              Students can only see <strong>published</strong> content.
+              Leave unchecked to save as draft.
+            </div>
+          </div>
+
+          {# ── Submit ── #}
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('teacher.content_list') }}" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-primary fw-semibold">
+              <i class="bi bi-{% if action == 'Edit' %}floppy-fill{% else %}plus-circle-fill{% endif %} me-1"></i>
+              {{ action }} Content
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+.type-btn {
+  display: inline-flex; align-items: center;
+  padding: 7px 18px; border-radius: 20px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 2px solid transparent;
+  transition: all .15s;
+  user-select: none;
+}
+.type-btn-primary  { background: #dbeafe; color: #1d4ed8; }
+.type-btn-purple   { background: #ede9fe; color: #6d28d9; }
+.type-btn-orange   { background: #ffedd5; color: #c2410c; }
+.type-btn-teal     { background: #ccfbf1; color: #0f766e; }
+.type-btn-primary.active,  .type-btn-primary:hover  { background: #3b82f6; color: #fff; }
+.type-btn-purple.active,   .type-btn-purple:hover   { background: #8b5cf6; color: #fff; }
+.type-btn-orange.active,   .type-btn-orange:hover   { background: #f97316; color: #fff; }
+.type-btn-teal.active,     .type-btn-teal:hover     { background: #14b8a6; color: #fff; }
+</style>
+
+<script>
+function onTypeChange(slug) {
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  const checked = document.querySelector('input[name="content_type"]:checked');
+  if (checked) checked.closest('.type-btn').classList.add('active');
+
+  const dueMks = document.getElementById('dueMksRow');
+  dueMks.style.display = (slug === 'note') ? 'none' : '';
+}
+
+// init on load
+(function() {
+  const checked = document.querySelector('input[name="content_type"]:checked');
+  if (checked) {
+    checked.closest('.type-btn').classList.add('active');
+    const dueMks = document.getElementById('dueMksRow');
+    dueMks.style.display = (checked.value === 'note') ? 'none' : '';
+  }
+})();
+</script>
+{% endblock %}

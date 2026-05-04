@@ -1,0 +1,669 @@
+{% extends "base.html" %}
+{% block title %}User Guide{% endblock %}
+{% block page_title %}<i class="bi bi-book-fill me-2"></i>User Guide{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+/* ── Guide layout ─────────────────────────────────────────── */
+.guide-cover{background:linear-gradient(135deg,#0d6efd,#6610f2);border-radius:.75rem;color:#fff;padding:2.5rem 2rem}
+.guide-cover.teacher{background:linear-gradient(135deg,#198754,#0dcaf0)}
+.guide-cover.student {background:linear-gradient(135deg,#0dcaf0,#0d6efd)}
+.guide-cover.parent  {background:linear-gradient(135deg,#fd7e14,#dc3545)}
+
+.section-num{display:inline-flex;align-items:center;justify-content:center;
+  width:32px;height:32px;border-radius:50%;background:#0d6efd;color:#fff;
+  font-weight:700;font-size:14px;flex-shrink:0}
+.step-row{display:flex;gap:.75rem;align-items:flex-start;margin-bottom:.75rem}
+.step-badge{display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:50%;background:#e7f3ff;
+  color:#0d6efd;font-weight:700;font-size:12px;flex-shrink:0;margin-top:1px}
+.tip-box{background:#fff8e1;border-left:4px solid #ffc107;border-radius:.375rem;padding:.75rem 1rem;font-size:.875rem}
+.warn-box{background:#fff3cd;border-left:4px solid #fd7e14;border-radius:.375rem;padding:.75rem 1rem;font-size:.875rem}
+.info-box{background:#e7f3ff;border-left:4px solid #0d6efd;border-radius:.375rem;padding:.75rem 1rem;font-size:.875rem}
+
+/* ── UI Mockup ───────────────────────────────────────────── */
+.ui-mock{border:1px solid #dee2e6;border-radius:.5rem;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);background:#fff;max-width:520px}
+.mock-bar{background:#f0f2f5;border-bottom:1px solid #dee2e6;padding:6px 12px;display:flex;align-items:center;gap:6px}
+.mock-dot{width:10px;height:10px;border-radius:50%}
+.mock-url{background:#fff;border-radius:20px;padding:1px 10px;font-size:9px;color:#666;flex:1;max-width:200px;border:1px solid #ddd}
+.mock-body{padding:12px;font-size:10px}
+.mock-stat{border-radius:6px;padding:8px 10px}
+.mock-row{display:flex;gap:8px;margin-bottom:8px}
+.mock-sidebar{background:#1e2a3a;border-radius:6px;padding:8px;color:#fff;font-size:9px;width:90px;flex-shrink:0}
+.mock-content{flex:1}
+.mock-nav-item{padding:4px 8px;border-radius:4px;color:rgba(255,255,255,.7);margin-bottom:2px}
+.mock-nav-item.active{background:#0d6efd;color:#fff}
+.mock-card{background:#f8f9fa;border-radius:6px;padding:8px;border:1px solid #e9ecef;margin-bottom:6px}
+.mock-btn{display:inline-block;padding:3px 8px;border-radius:4px;font-size:9px;font-weight:600}
+.mock-badge{display:inline-block;padding:2px 6px;border-radius:10px;font-size:8px;font-weight:600}
+.mock-table{width:100%;border-collapse:collapse;font-size:9px}
+.mock-table th{background:#f8f9fa;padding:4px 6px;border-bottom:1px solid #dee2e6;font-weight:600;text-align:left}
+.mock-table td{padding:4px 6px;border-bottom:1px solid #f0f0f0}
+.mock-progress{background:#e9ecef;border-radius:4px;height:5px;overflow:hidden}
+.mock-progress-bar{height:100%;border-radius:4px}
+
+/* ── Print / PDF ─────────────────────────────────────────── */
+@media print {
+  .no-print{display:none!important}
+  .sidebar,.topbar,nav{display:none!important}
+  .main-content{margin:0!important;width:100%!important}
+  .content-area{padding:0!important}
+  .guide-section{page-break-inside:avoid}
+  .page-break{page-break-before:always}
+  .ui-mock{box-shadow:none;border:1px solid #ccc}
+  body{font-size:10pt}
+  a{color:#000!important;text-decoration:none!important}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="no-print mb-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <p class="text-muted mb-0 small"><i class="bi bi-info-circle me-1"></i>This guide explains how to use every feature. Click <strong>Download as PDF</strong> to save a copy.</p>
+  <button class="btn btn-primary fw-semibold" onclick="window.print()">
+    <i class="bi bi-file-pdf-fill me-2"></i>Download as PDF
+  </button>
+</div>
+
+{% if roles | length > 1 %}
+<!-- Admin: tab switcher -->
+<ul class="nav nav-tabs mb-4 no-print" id="guideTabs">
+  {% for r in roles %}
+  <li class="nav-item">
+    <a class="nav-link {% if r == active_role %}active{% endif %} fw-semibold"
+       href="{{ url_for('help.guide_role', role_name=r) }}">
+      <i class="bi {{ meta[r].icon }} me-1"></i>{{ meta[r].label }}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% set r = active_role %}
+
+<!-- ═══════════════════════════════════════════════════════
+     COVER PAGE
+════════════════════════════════════════════════════════ -->
+<div class="guide-cover {{ r }} mb-4">
+  <div class="d-flex align-items-center gap-4 flex-wrap">
+    <div class="rounded-circle bg-white bg-opacity-20 d-flex align-items-center justify-content-center"
+         style="width:80px;height:80px;flex-shrink:0">
+      <i class="bi {{ meta[r].icon }} text-white" style="font-size:2.2rem"></i>
+    </div>
+    <div>
+      <div class="opacity-75 small mb-1 text-uppercase fw-semibold tracking-wider">SmartAttend — User Guide</div>
+      <h2 class="fw-bold mb-1">{{ meta[r].label }} Manual</h2>
+      <p class="opacity-75 mb-0">Complete step-by-step guide for all features available to {{ meta[r].label|lower }}s.</p>
+    </div>
+    <div class="ms-auto text-end no-print">
+      <div class="opacity-60 small">Version 1.0</div>
+      <div class="opacity-60 small">{{ college_name }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ADMIN GUIDE
+════════════════════════════════════════════════════════ -->
+{% if r == 'admin' %}
+
+<!-- TOC -->
+<div class="card border-0 shadow-sm mb-4 no-print">
+  <div class="card-body px-4 py-3">
+    <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-primary"></i>Table of Contents</h6>
+    <div class="row g-2">
+      {% for num, title in [('1','Dashboard Overview'),('2','Managing Students'),('3','Managing Teachers'),('4','Parent Accounts'),('5','Attendance Sessions'),('6','Subjects & Departments'),('7','Fee Management'),('8','Exams & Marks'),('9','Notice Board'),('10','Timetable'),('11','College Settings'),('12','Reports & Analytics')] %}
+      <div class="col-md-6">
+        <a href="#admin-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
+          <span class="badge bg-primary-subtle text-primary fw-semibold" style="min-width:28px">{{ num }}</span>
+          <span class="small">{{ title }}</span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- S1: Dashboard -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s1">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3">
+      <span class="section-num">1</span>Dashboard Overview
+    </h5>
+    <p class="text-muted small">The admin dashboard gives a real-time snapshot of the entire college in one view.</p>
+    <div class="ui-mock mb-3">
+      <div class="mock-bar"><div class="mock-dot" style="background:#ff5f56"></div><div class="mock-dot" style="background:#ffbd2e"></div><div class="mock-dot" style="background:#27c93f"></div><div class="mock-url">smartattend / admin / dashboard</div></div>
+      <div class="mock-body">
+        <div class="mock-row">
+          <div class="mock-sidebar">
+            <div style="font-weight:700;margin-bottom:8px;font-size:10px">SmartAttend</div>
+            <div class="mock-nav-item active">Dashboard</div>
+            <div class="mock-nav-item">Students</div>
+            <div class="mock-nav-item">Teachers</div>
+            <div class="mock-nav-item">Subjects</div>
+          </div>
+          <div class="mock-content">
+            <div class="mock-row">
+              <div class="mock-stat flex-fill" style="background:#e7f3ff;border:1px solid #b3d4f5"><div style="color:#888;font-size:8px">Students</div><div style="font-size:18px;font-weight:700;color:#0d6efd">248</div></div>
+              <div class="mock-stat flex-fill" style="background:#e8f5e9;border:1px solid #a5d6a7"><div style="color:#888;font-size:8px">Present</div><div style="font-size:18px;font-weight:700;color:#198754">186</div></div>
+              <div class="mock-stat flex-fill" style="background:#fff3e0;border:1px solid #ffcc80"><div style="color:#888;font-size:8px">Teachers</div><div style="font-size:18px;font-weight:700;color:#fd7e14">32</div></div>
+            </div>
+            <div class="mock-card">
+              <div style="font-weight:600;margin-bottom:4px">Attendance Trend</div>
+              <div style="display:flex;align-items:flex-end;gap:3px;height:30px">
+                {% for h in [60,70,65,80,75,85,78] %}<div style="flex:1;background:#0d6efd;border-radius:2px 2px 0 0;height:{{ h }}%"></div>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step-row"><span class="step-badge">1</span><div>Log in with your admin credentials. You are taken to the dashboard automatically.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>The top stat cards show <strong>Total Students, Present Today, Total Teachers, Active Sessions</strong>, and <strong>Fee Collections</strong> at a glance.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>The <strong>Attendance Trend chart</strong> shows daily attendance % for the last 7 days.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>The <strong>Recent Sessions</strong> table lists the latest attendance sessions with status badges (Active / Completed).</div></div>
+    <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i><strong>Tip:</strong> The dashboard refreshes live data every time you load it — bookmark it for a quick daily check-in.</div>
+  </div>
+</div>
+
+<!-- S2: Students -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s2">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">2</span>Managing Students</h5>
+    <p class="text-muted small">Create, edit, view and export student records. Navigate to <strong>Sidebar → Students</strong>.</p>
+    <div class="ui-mock mb-3">
+      <div class="mock-bar"><div class="mock-dot" style="background:#ff5f56"></div><div class="mock-dot" style="background:#ffbd2e"></div><div class="mock-dot" style="background:#27c93f"></div><div class="mock-url">smartattend / admin / students</div></div>
+      <div class="mock-body">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:700">Students <span style="background:#e7f3ff;color:#0d6efd;padding:1px 6px;border-radius:10px;font-size:9px">248</span></div>
+          <div><span class="mock-btn" style="background:#0d6efd;color:#fff">+ Add Student</span></div>
+        </div>
+        <table class="mock-table"><thead><tr><th>Name</th><th>Roll No</th><th>Dept</th><th>Sem</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Ram Sharma</td><td>BCA-001</td><td>BCA</td><td>3</td><td><span class="mock-badge" style="background:#d1e7dd;color:#0f5132">Active</span></td></tr>
+          <tr><td>Sita Thapa</td><td>BCA-002</td><td>BCA</td><td>3</td><td><span class="mock-badge" style="background:#d1e7dd;color:#0f5132">Active</span></td></tr>
+        </tbody></table>
+      </div>
+    </div>
+    <div class="step-row"><span class="step-badge">1</span><div>Click <strong>+ Add Student</strong> → fill in Name, Email, Roll Number, Department, Semester → click <strong>Save</strong>. A password is auto-generated and emailed.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Click the <strong>edit (✏) icon</strong> in any row to update a student's details.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Use the <strong>Department / Semester filter</strong> dropdowns at the top to narrow the list.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Click <strong>Export CSV</strong> to download the full student list as a spreadsheet.</div></div>
+    <div class="warn-box mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i><strong>Note:</strong> Deactivating a student (toggle Active) prevents them from logging in but keeps their attendance history intact.</div>
+  </div>
+</div>
+
+<!-- S3: Teachers -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s3">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">3</span>Managing Teachers</h5>
+    <p class="text-muted small">Add teachers and assign them to subjects. Navigate to <strong>Sidebar → Teachers</strong>.</p>
+    <div class="step-row"><span class="step-badge">1</span><div>Click <strong>+ Add Teacher</strong> → enter Name, Email, Employee ID → <strong>Save</strong>.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Go to <strong>Subjects</strong> and assign each subject to a teacher using the Teacher dropdown when creating/editing a subject.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Use <strong>All Users</strong> in the sidebar to reset any teacher's password or deactivate their account.</div></div>
+    <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Each teacher can see only the subjects assigned to them and can take attendance only for those subjects.</div>
+  </div>
+</div>
+
+<!-- S4: Parents -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s4">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">4</span>Parent Accounts</h5>
+    <p class="text-muted small">Create parent login accounts and link them to their children. Navigate to <strong>Sidebar → Parents</strong>.</p>
+    <div class="step-row"><span class="step-badge">1</span><div>Click <strong>+ Add Parent</strong> → enter the parent's Name and Email → click <strong>Create Account</strong>. Login credentials are emailed automatically.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>In the parent's row, click <strong>Link Child</strong> → select the student and specify the relationship (Father / Mother / Guardian) → <strong>Link</strong>.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>One parent can be linked to multiple children. Click <strong>Unlink</strong> to remove a connection.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Parents will immediately see their linked child's attendance, location, fees and exam results on their dashboard.</div></div>
+    <div class="info-box mt-3"><i class="bi bi-info-circle-fill text-primary me-2"></i>When the student enables location sharing and enters the college campus (within 300 m), the parent receives an <strong>automatic email notification</strong>.</div>
+  </div>
+</div>
+
+<!-- S5: Attendance -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s5">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">5</span>Attendance Sessions</h5>
+    <p class="text-muted small">Monitor all attendance sessions across subjects from <strong>Sidebar → Sessions</strong>.</p>
+    <div class="step-row"><span class="step-badge">1</span><div>The Sessions page lists all sessions with Subject, Teacher, Date, Status and total Present/Absent counts.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Click <strong>Cancel Session</strong> (×) next to an <em>active</em> session to forcefully stop it (use when a teacher forgets to close it).</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Go to <strong>Analytics</strong> for department-wise and subject-wise attendance breakdowns with charts.</div></div>
+    <div class="warn-box mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Attendance can only be marked via face recognition — students must have their face enrolled first.</div>
+  </div>
+</div>
+
+<!-- S6: Subjects & Departments -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s6">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">6</span>Subjects &amp; Departments</h5>
+    <div class="step-row"><span class="step-badge">1</span><div><strong>Departments:</strong> Go to Sidebar → Departments → Add Department (name + code). All students and subjects are grouped by department.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div><strong>Subjects:</strong> Go to Sidebar → Subjects → Add Subject. Set the Name, Code, Department, Semester and assign a Teacher.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Subjects appear automatically for students in the matching Department + Semester combination.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Create all departments and subjects before adding students — students are assigned subjects automatically based on their department and semester.</div>
+  </div>
+</div>
+
+<!-- S7: Fees -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s7">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">7</span>Fee Management</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Fees</strong> → click <strong>+ New Fee Structure</strong> → set Title, Academic Year, Amount, and optionally restrict to a Department/Semester.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>To record a payment, click the <strong>Record Payment</strong> button next to any student's due amount and enter the amount paid.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Students with outstanding balances will see a <strong>red fee alert</strong> on their dashboard. Parents also see the due amount on their dashboard.</div></div>
+  </div>
+</div>
+
+<!-- S8: Exams -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s8">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">8</span>Exams &amp; Marks</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Exams</strong> → click <strong>+ Schedule Exam</strong> → set Title, Subject, Date, Max Marks.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>After the exam, the assigned teacher enters marks via their dashboard. Admins can also enter marks from the Exams page.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Students can view their marks in <strong>My Results</strong>. Parents can see results in the child's full report.</div></div>
+  </div>
+</div>
+
+<!-- S9: Notices -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s9">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">9</span>Notice Board</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Click <strong>Sidebar → Notice Board</strong> → <strong>Post Notice</strong>. Enter Title, Content, Category (General / Exam / Holiday / Event / Fee / Urgent) and target audience.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Check <strong>Pin to top</strong> for important notices — pinned notices always appear first with a 📌 icon.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Set an <strong>Expiry Date</strong> for temporary notices — they disappear automatically after the date.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Use the <strong>category filter buttons</strong> (General, Exam, Holiday…) at the top to browse by type.</div></div>
+  </div>
+</div>
+
+<!-- S10: Timetable -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s10">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">10</span>Timetable</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Timetable</strong>. Filter by Department and Semester to see the weekly schedule grid.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>As admin, click <strong>Edit Timetable</strong> to add, move or remove slots. Each slot needs a Day, Period number, Subject and optional Room.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Parents can see today's timetable on their child's detail page including teacher availability status.</div></div>
+  </div>
+</div>
+
+<!-- S11: Settings -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s11">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">11</span>College Settings</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Settings</strong>. Enter your college's official name and address.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div><strong>Set College Location:</strong> Type your college name in the search box → the map flies to it and places a red pin. Or click directly on the map. Drag the pin to fine-tune.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Click <strong>Save Settings</strong>. The college name and location are used on parent maps and arrival notifications.</div></div>
+    <div class="info-box mt-3"><i class="bi bi-geo-alt-fill text-primary me-2"></i>The college GPS location is the reference point for the <strong>student arrival notification</strong> — students within 300 m trigger an email to parents.</div>
+  </div>
+</div>
+
+<!-- S12: Reports -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s12">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">12</span>Reports &amp; Analytics</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Analytics</strong> for visual charts: overall attendance trend, department-wise breakdown, and subject-wise comparison.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Each student has a <strong>Download Report (PDF/Excel)</strong> button on their profile page with full subject-wise attendance and marks.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>The student list has an <strong>Export CSV</strong> button to download all student data including attendance percentages.</div></div>
+  </div>
+</div>
+
+{% endif %}
+{# ═══ END ADMIN ═════════════════════════════════════════════ #}
+
+
+{# ═══════════════════════════════════════════════════════════
+   TEACHER GUIDE
+════════════════════════════════════════════════════════════ #}
+{% if r == 'teacher' %}
+
+<div class="card border-0 shadow-sm mb-4 no-print">
+  <div class="card-body px-4 py-3">
+    <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-success"></i>Table of Contents</h6>
+    <div class="row g-2">
+      {% for num, title in [('1','Dashboard & Status'),('2','Starting Attendance'),('3','Managing Sessions'),('4','Exam Marks'),('5','Leave Requests'),('6','Reports')] %}
+      <div class="col-md-6">
+        <a href="#teacher-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
+          <span class="badge bg-success-subtle text-success fw-semibold" style="min-width:28px">{{ num }}</span>
+          <span class="small">{{ title }}</span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- T1: Dashboard -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s1">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">1</span>Dashboard &amp; Status Widget</h5>
+    <p class="text-muted small">After login you land on your Teacher Dashboard showing your assigned subjects and today's sessions.</p>
+    <div class="ui-mock mb-3">
+      <div class="mock-bar"><div class="mock-dot" style="background:#ff5f56"></div><div class="mock-dot" style="background:#ffbd2e"></div><div class="mock-dot" style="background:#27c93f"></div><div class="mock-url">smartattend / teacher / dashboard</div></div>
+      <div class="mock-body">
+        <div class="mock-card" style="border-left:4px solid #198754">
+          <div style="font-weight:600;margin-bottom:4px">My Status</div>
+          <div style="display:flex;gap:6px">
+            <span class="mock-btn" style="background:#198754;color:#fff">🟢 On Campus</span>
+            <span class="mock-btn" style="background:#f8f9fa;color:#333;border:1px solid #ddd">In Class</span>
+            <span class="mock-btn" style="background:#f8f9fa;color:#333;border:1px solid #ddd">Unavailable</span>
+          </div>
+        </div>
+        <div class="mock-row" style="margin-top:8px">
+          <div class="mock-card flex-fill">
+            <div style="font-size:8px;color:#888">My Subjects</div>
+            <div style="font-size:16px;font-weight:700;color:#198754">4</div>
+          </div>
+          <div class="mock-card flex-fill">
+            <div style="font-size:8px;color:#888">Sessions Today</div>
+            <div style="font-size:16px;font-weight:700;color:#0d6efd">2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>On the dashboard, find the <strong>My Status</strong> card. Click your current status: <em>On Campus, In Class, Unavailable</em> or <em>Off Campus</em>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Optionally add a <strong>note</strong> (e.g., "Teaching BCA Sem 3") so parents can see why a class may be delayed.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">3</span><div>Your status is visible to parents on their child's timetable view in real-time.</div></div>
+    <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Update your status at the start of each day so parents have accurate information about class schedules.</div>
+  </div>
+</div>
+
+<!-- T2: Starting Attendance -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s2">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">2</span>Starting an Attendance Session</h5>
+    <p class="text-muted small">Attendance is marked using <strong>face recognition</strong>. Students must be face-enrolled before this works.</p>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Go to <strong>Sidebar → Attendance Sessions</strong> → click <strong>Start New Session</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Select the <strong>Subject</strong> from the dropdown. The date auto-fills to today.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">3</span><div>Click <strong>Start Session</strong>. The camera activates. Students walk in front of the camera — the system recognises their face and marks them <strong>Present</strong> automatically.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">4</span><div>The session screen shows a live counter of students marked present. Students who are not recognised remain <strong>Absent</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">5</span><div>When all students have been scanned, click <strong>Close Session</strong>. This finalises the attendance record.</div></div>
+    <div class="warn-box mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i><strong>Important:</strong> Do not close the browser tab while a session is active. If you must leave, use the Admin panel to cancel the session.</div>
+  </div>
+</div>
+
+<!-- T3: Sessions -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s3">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">3</span>Managing Past Sessions</h5>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>In <strong>Attendance Sessions</strong>, click any completed session row to see the full attendance list — who was present, absent or late.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>You can <strong>manually override</strong> individual student statuses (e.g., mark someone Present who was misidentified) by clicking their status badge.</div></div>
+  </div>
+</div>
+
+<!-- T4: Marks -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s4">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">4</span>Entering Exam Marks</h5>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Go to <strong>Sidebar → Exams &amp; Marks</strong>. You see all exams for your subjects.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Click <strong>Enter Marks</strong> next to an exam. A list of students appears with input boxes for marks obtained.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">3</span><div>Fill in all marks and click <strong>Save Marks</strong>. Students can view their results immediately.</div></div>
+  </div>
+</div>
+
+<!-- T5: Leave -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s5">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">5</span>Leave Requests</h5>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Go to <strong>Sidebar → Leave Requests</strong> to see student leave applications for your subjects.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Click <strong>Approve</strong> or <strong>Reject</strong> with an optional comment. Approved leaves are counted separately from regular absences.</div></div>
+  </div>
+</div>
+
+<!-- T6: Reports -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s6">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">6</span>Attendance Reports</h5>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Go to <strong>Sidebar → Reports</strong> → select a subject and date range → click <strong>Generate</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Download as <strong>Excel</strong> or <strong>PDF</strong> for record-keeping or sharing with the admin.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Students below 75% attendance are highlighted in red in all reports — share these with students as early warnings.</div>
+  </div>
+</div>
+
+{% endif %}
+{# ═══ END TEACHER ═══════════════════════════════════════════ #}
+
+
+{# ═══════════════════════════════════════════════════════════
+   STUDENT GUIDE
+════════════════════════════════════════════════════════════ #}
+{% if r == 'student' %}
+
+<div class="card border-0 shadow-sm mb-4 no-print">
+  <div class="card-body px-4 py-3">
+    <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-info"></i>Table of Contents</h6>
+    <div class="row g-2">
+      {% for num, title in [('1','Dashboard Overview'),('2','Face Enrollment'),('3','Location Sharing'),('4','Leave Applications'),('5','Attendance History'),('6','Exam Results & Fees')] %}
+      <div class="col-md-6">
+        <a href="#student-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
+          <span class="badge bg-info-subtle text-info fw-semibold" style="min-width:28px">{{ num }}</span>
+          <span class="small">{{ title }}</span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- St1: Dashboard -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s1">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">1</span>Dashboard Overview</h5>
+    <p class="text-muted small">Your dashboard is the home screen showing your overall attendance, subject cards, upcoming exams and notices.</p>
+    <div class="ui-mock mb-3">
+      <div class="mock-bar"><div class="mock-dot" style="background:#ff5f56"></div><div class="mock-dot" style="background:#ffbd2e"></div><div class="mock-dot" style="background:#27c93f"></div><div class="mock-url">smartattend / student / dashboard</div></div>
+      <div class="mock-body">
+        <div class="mock-card" style="background:linear-gradient(135deg,#0d6efd,#0dcaf0);color:#fff;border:none">
+          <div style="font-weight:700;font-size:11px">Ram Sharma</div>
+          <div style="font-size:8px;opacity:.75">BCA-001 • BCA • Semester 3</div>
+          <div style="font-size:20px;font-weight:700;margin-top:4px">82% <span style="font-size:9px;font-weight:400">Attendance</span></div>
+        </div>
+        <div class="mock-row" style="margin-top:6px">
+          <div class="mock-card flex-fill">
+            <div style="font-size:8px;color:#888">Mathematics</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="mock-badge" style="background:#d1e7dd;color:#0f5132">85%</span>
+              <span style="font-size:8px;color:#888">17/20</span>
+            </div>
+            <div class="mock-progress mt-1"><div class="mock-progress-bar" style="width:85%;background:#198754"></div></div>
+          </div>
+          <div class="mock-card flex-fill">
+            <div style="font-size:8px;color:#888">Physics</div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="mock-badge" style="background:#fff3cd;color:#664d03">68%</span>
+              <span style="font-size:8px;color:#888">14/20</span>
+            </div>
+            <div class="mock-progress mt-1"><div class="mock-progress-bar" style="width:68%;background:#ffc107"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>The <strong>profile banner</strong> at the top shows your name, roll number and overall attendance percentage.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div><strong>Subject cards</strong> show each subject's attendance % with a colour bar: 🟢 ≥75% Good, 🟡 60–74% Warning, 🔴 &lt;60% Critical.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>A <strong>red alert banner</strong> appears at the top if any subject is below the minimum requirement — act quickly to avoid academic consequences.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div>Upcoming exams (within 7 days) are highlighted in the <strong>exam banner</strong>.</div></div>
+  </div>
+</div>
+
+<!-- St2: Face Enrollment -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s2">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">2</span>Face Enrollment</h5>
+    <p class="text-muted small"><strong>You must complete face enrollment before attendance can be marked for you.</strong> Do this once when you first log in.</p>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>Click the orange <strong>Enroll Face</strong> button on your dashboard (or go to <strong>Sidebar → Face Enrollment</strong>).</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>Allow the browser to access your camera when prompted.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>The system captures <strong>5 photos</strong> of your face from slightly different angles automatically. Look directly at the camera and stay still.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div>Once all 5 captures are complete, click <strong>Save Enrollment</strong>. A green <em>"Face Enrolled ✓"</em> badge replaces the button on your dashboard.</div></div>
+    <div class="warn-box mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Ensure good lighting and remove glasses/hats for best recognition accuracy. You can re-enroll at any time from the Face Enrollment page.</div>
+  </div>
+</div>
+
+<!-- St3: Location -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s3">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">3</span>Location Sharing</h5>
+    <p class="text-muted small">Share your live GPS location with your parents so they can see you are safe and know when you arrive at college.</p>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>On the dashboard, find the <strong>Live Location Sharing</strong> card. Click the green <strong>Share Location</strong> button.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>An explanation screen appears. Click <strong>Allow &amp; Enable Sharing</strong> — your browser will ask for GPS permission. Click <strong>Allow</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>The widget changes to show <strong>Active 🟢</strong>. Your location is now being sent to your parent's map every few seconds.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div>When you arrive within 300 m of the college, your parent <strong>automatically receives an email</strong> notification.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">5</span><div>To stop sharing, click <strong>Stop Sharing</strong> — your location is immediately cleared from the parent's view.</div></div>
+    <div class="info-box mt-3"><i class="bi bi-shield-check-fill text-primary me-2"></i>Location data is only visible to parents linked to your account by the admin. It is not stored permanently.</div>
+  </div>
+</div>
+
+<!-- St4: Leave -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s4">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">4</span>Leave Applications</h5>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>Go to <strong>Sidebar → Leave Applications</strong> → click <strong>Apply for Leave</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>Select the <strong>Subject</strong>, <strong>Date</strong>, and write a <strong>reason</strong>. Attach a medical certificate if applicable.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>Submit the form. The teacher reviews and approves/rejects. You will see the status update on the same page.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Approved leaves do not count as absences in attendance calculations — apply as early as possible.</div>
+  </div>
+</div>
+
+<!-- St5: Attendance History -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s5">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">5</span>Attendance History</h5>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>Go to <strong>Sidebar → My Attendance</strong> for a full date-wise list of all sessions — Present, Absent or Late.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>Filter by subject or month to see specific periods.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>A <strong>liveness verified ✓</strong> icon indicates the session used face recognition (not manual override).</div></div>
+  </div>
+</div>
+
+<!-- St6: Results & Fees -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s6">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">6</span>Exam Results &amp; Fees</h5>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div><strong>Results:</strong> Go to <strong>Sidebar → My Results</strong> to see all exam marks organised by subject and date.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div><strong>Fees:</strong> Go to <strong>Sidebar → My Fees</strong> to see a list of fee structures, what you have paid, and any outstanding balance.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>A red <strong>Fee Due</strong> alert on your dashboard means you have an outstanding balance — visit the Fees page for details.</div></div>
+  </div>
+</div>
+
+{% endif %}
+{# ═══ END STUDENT ════════════════════════════════════════════ #}
+
+
+{# ═══════════════════════════════════════════════════════════
+   PARENT GUIDE
+════════════════════════════════════════════════════════════ #}
+{% if r == 'parent' %}
+
+<div class="card border-0 shadow-sm mb-4 no-print">
+  <div class="card-body px-4 py-3">
+    <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-warning"></i>Table of Contents</h6>
+    <div class="row g-2">
+      {% for num, title in [('1','Dashboard Overview'),('2','Live Location Tracking'),('3','Attendance & Progress'),('4','Fees & Exams'),('5','Notices & Timetable')] %}
+      <div class="col-md-6">
+        <a href="#parent-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
+          <span class="badge bg-warning-subtle text-warning fw-semibold" style="min-width:28px">{{ num }}</span>
+          <span class="small">{{ title }}</span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- P1: Dashboard -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="parent-s1">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#fd7e14">1</span>Parent Dashboard</h5>
+    <p class="text-muted small">After logging in you see a card for each child linked to your account with a full snapshot of their status.</p>
+    <div class="ui-mock mb-3">
+      <div class="mock-bar"><div class="mock-dot" style="background:#ff5f56"></div><div class="mock-dot" style="background:#ffbd2e"></div><div class="mock-dot" style="background:#27c93f"></div><div class="mock-url">smartattend / parent / dashboard</div></div>
+      <div class="mock-body">
+        <div class="mock-card" style="border:none;background:linear-gradient(135deg,#0d6efd,#6610f2);color:#fff">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:700">R</div>
+            <div>
+              <div style="font-weight:700;font-size:11px">Ram Sharma</div>
+              <div style="font-size:8px;opacity:.75">Son • BCA-001 • BCA • Sem 3</div>
+            </div>
+            <div style="margin-left:auto;text-align:center">
+              <div style="font-size:18px;font-weight:700">82%</div>
+              <div style="font-size:7px;opacity:.75">Attendance</div>
+            </div>
+          </div>
+        </div>
+        <div class="mock-row" style="margin-top:6px">
+          <div class="mock-card flex-fill" style="border-left:3px solid #dc3545">
+            <div style="font-size:8px;color:#dc3545;font-weight:600">⚠ Low Attendance</div>
+            <div style="font-size:8px;margin-top:2px">Physics — 68%</div>
+          </div>
+          <div class="mock-card flex-fill" style="border-left:3px solid #0d6efd">
+            <div style="font-size:8px;color:#0d6efd;font-weight:600">📍 Live Location</div>
+            <div style="font-size:8px;margin-top:2px;color:#198754">🟢 LIVE</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">1</span><div>Your dashboard shows <strong>one card per child</strong>. The card header displays their name, overall attendance %, and any fee due.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">2</span><div>A <strong>red alert banner</strong> in the card shows subjects where attendance is below 75%.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>A <strong>mini live map</strong> at the bottom of each card shows your child's current GPS location (if they have sharing enabled).</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">4</span><div>Click <strong>Full Report</strong> on any card to open the detailed view for that child.</div></div>
+    <div class="info-box mt-3"><i class="bi bi-envelope-fill text-primary me-2"></i>If you are not linked to any child, contact the college admin to link your account. You will see a "No Children Linked" message until this is done.</div>
+  </div>
+</div>
+
+<!-- P2: Live Location -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="parent-s2">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#fd7e14">2</span>Live Location Tracking</h5>
+    <p class="text-muted small">Track your child's real-time location on an interactive map — similar to delivery tracking.</p>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">1</span><div>On the dashboard, the <strong>mini map</strong> updates every 5 seconds when your child has location sharing enabled.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">2</span><div>Click <strong>Full Report → Location tab</strong> to open the large interactive map with full controls.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>The large map shows:
+      <ul class="mt-1 mb-0">
+        <li><strong>Green pulsing dot</strong> = your child's live position</li>
+        <li><strong>🏫 School icon</strong> = college location</li>
+        <li><strong>Green trail</strong> = recent movement path</li>
+      </ul>
+    </div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">4</span><div>Use <strong>Follow Mode</strong> to keep the map centred on your child as they move.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">5</span><div><strong>Arrival email:</strong> When your child enters the college campus (within 300 m), you automatically receive an email with the exact arrival time. This happens <em>once per day</em>.</div></div>
+    <div class="warn-box mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Location sharing must be <strong>enabled by the student</strong> from their dashboard. You cannot force-enable it. If the map shows "Location sharing is off", ask your child to enable it.</div>
+  </div>
+</div>
+
+<!-- P3: Attendance -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="parent-s3">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#fd7e14">3</span>Attendance &amp; Academic Progress</h5>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">1</span><div>Click <strong>Full Report</strong> on your child's card. The <strong>Attendance tab</strong> shows subject-wise attendance with progress bars and colour coding.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">2</span><div>The <strong>Recent Activity</strong> section shows the last 20 attendance records — date, subject, and Present/Absent status.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>The <strong>Today's Timetable</strong> section shows each period, the teacher's availability status, and whether the session has started.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Check the timetable's teacher status — if a teacher shows "Unavailable", a class may be cancelled for that period.</div>
+  </div>
+</div>
+
+<!-- P4: Fees & Exams -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="parent-s4">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#fd7e14">4</span>Fees &amp; Exam Results</h5>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">1</span><div><strong>Fees:</strong> In Full Report → <strong>Fees tab</strong>. Each fee structure is listed with the amount due and any payments made. A green "✓ Fees Clear" badge means no outstanding balance.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">2</span><div><strong>Exam Results:</strong> In Full Report → <strong>Results tab</strong>. All exam marks are shown with the exam title, subject and marks obtained vs maximum.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>The dashboard card shows a <strong>yellow "Rs. X Due"</strong> badge if fees are outstanding — click Full Report to see the breakdown.</div></div>
+  </div>
+</div>
+
+<!-- P5: Notices -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="parent-s5">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#fd7e14">5</span>Notices &amp; Timetable</h5>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">1</span><div>College notices appear at the bottom of your dashboard. Click any notice title to read the full content.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">2</span><div>Click <strong>View All</strong> to open the full notice board. Filter by category (Exam, Holiday, Fee, etc.) using the coloured buttons.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>Pinned notices (📌) are important announcements from the college — always read these first.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">4</span><div>The <strong>Timetable</strong> link in the sidebar shows your child's weekly class schedule.</div></div>
+  </div>
+</div>
+
+{% endif %}
+{# ═══ END PARENT ════════════════════════════════════════════ #}
+
+<!-- Footer (visible in PDF) -->
+<div class="text-center text-muted small mt-5 pt-4 border-top">
+  <strong>{{ college_name }}</strong> &bull; SmartAttend College Management System &bull; User Guide v1.0<br>
+  <span class="no-print">To save this guide as PDF: click <strong>Download as PDF</strong> above or press <kbd>Ctrl+P</kbd> → Save as PDF.</span>
+</div>
+
+{% endblock %}

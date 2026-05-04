@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+{% block title %}ID Card Requests{% endblock %}
+{% block page_title %}<i class="bi bi-person-badge me-2"></i>ID Card Requests{% endblock %}
+
+{% block content %}
+
+{# ── Status tabs ─────────────────────────────────────── #}
+<div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+  <div class="d-flex gap-2 flex-wrap">
+    {% set kw = {'dept': dept_filter, 'sem': sem_filter, 'q': q} %}
+    <a href="{{ url_for('admin.id_cards', **kw) }}"
+       class="btn btn-sm {% if not status_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      All <span class="badge bg-white text-dark ms-1">{{ counts.all }}</span>
+    </a>
+    <a href="{{ url_for('admin.id_cards', status='pending', **kw) }}"
+       class="btn btn-sm {% if status_filter=='pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+      <i class="bi bi-hourglass-split me-1"></i>Pending
+      <span class="badge bg-white text-dark ms-1">{{ counts.pending }}</span>
+    </a>
+    <a href="{{ url_for('admin.id_cards', status='approved', **kw) }}"
+       class="btn btn-sm {% if status_filter=='approved' %}btn-success{% else %}btn-outline-success{% endif %}">
+      <i class="bi bi-patch-check-fill me-1"></i>Approved
+      <span class="badge bg-white text-dark ms-1">{{ counts.approved }}</span>
+    </a>
+    <a href="{{ url_for('admin.id_cards', status='rejected', **kw) }}"
+       class="btn btn-sm {% if status_filter=='rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+      <i class="bi bi-x-circle-fill me-1"></i>Rejected
+      <span class="badge bg-white text-dark ms-1">{{ counts.rejected }}</span>
+    </a>
+  </div>
+  <a href="{{ url_for('admin.id_card_template') }}" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-sliders me-1"></i>Edit Template
+  </a>
+</div>
+
+{# ── Search & filter bar ──────────────────────────────── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body px-4 py-3">
+    <form method="GET" action="{{ url_for('admin.id_cards') }}" id="filterForm">
+      <input type="hidden" name="status" value="{{ status_filter }}">
+      <div class="row g-2 align-items-end">
+
+        <div class="col-lg-5 col-md-12">
+          <label class="form-label small fw-semibold mb-1">
+            <i class="bi bi-search me-1"></i>Search
+          </label>
+          <div class="input-group input-group-sm">
+            <input type="text" name="q" id="searchInput" class="form-control"
+                   placeholder="Student name or roll number…" value="{{ q }}"
+                   autocomplete="off">
+            {% if q %}
+            <a href="{{ url_for('admin.id_cards', status=status_filter, dept=dept_filter, sem=sem_filter) }}"
+               class="btn btn-outline-secondary" title="Clear search">
+              <i class="bi bi-x-lg"></i>
+            </a>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+          <label class="form-label small fw-semibold mb-1">
+            <i class="bi bi-building me-1"></i>Faculty / Department
+          </label>
+          <select name="dept" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All Faculties</option>
+            {% for dept in departments %}
+            <option value="{{ dept.id }}"
+              {% if dept_filter == dept.id|string %}selected{% endif %}>
+              {{ dept.name }} ({{ dept.code }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-lg-2 col-md-4">
+          <label class="form-label small fw-semibold mb-1">
+            <i class="bi bi-layers me-1"></i>Semester
+          </label>
+          <select name="sem" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All Semesters</option>
+            {% for s in range(1, 9) %}
+            {% set sfx = 'st' if s==1 else ('nd' if s==2 else ('rd' if s==3 else 'th')) %}
+            <option value="{{ s }}" {% if sem_filter == s|string %}selected{% endif %}>
+              {{ s }}{{ sfx }} Semester
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-lg-1 col-md-3">
+          <label class="form-label small fw-semibold mb-1">Per page</label>
+          <select name="per_page" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for n in [10, 20, 50] %}
+            <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-lg-1 col-md-2">
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-funnel-fill"></i>
+          </button>
+        </div>
+      </div>
+
+      {# Active filter chips #}
+      {% if q or dept_filter or sem_filter %}
+      <div class="mt-2 pt-2 border-top d-flex flex-wrap gap-2 align-items-center">
+        <small class="text-muted fw-semibold">Active:</small>
+        {% if q %}
+        <span class="badge bg-primary-subtle text-primary">
+          <i class="bi bi-search me-1"></i>"{{ q }}"
+        </span>
+        {% endif %}
+        {% if dept_filter %}
+          {% for d in departments %}{% if d.id|string == dept_filter %}
+          <span class="badge bg-info-subtle text-info">
+            <i class="bi bi-building me-1"></i>{{ d.name }}
+          </span>
+          {% endif %}{% endfor %}
+        {% endif %}
+        {% if sem_filter %}
+        <span class="badge bg-secondary-subtle text-secondary">
+          <i class="bi bi-layers me-1"></i>Semester {{ sem_filter }}
+        </span>
+        {% endif %}
+        <a href="{{ url_for('admin.id_cards', status=status_filter) }}"
+           class="badge bg-danger-subtle text-danger text-decoration-none">
+          <i class="bi bi-x me-1"></i>Clear all filters
+        </a>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{# ── Result summary ──────────────────────────────────── #}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <div class="text-muted small">
+    {% if pagination.total %}
+    {% set start = (pagination.page - 1) * per_page + 1 %}
+    {% set end   = [pagination.page * per_page, pagination.total] | min %}
+    Showing <strong>{{ start }}–{{ end }}</strong> of
+    <strong>{{ pagination.total }}</strong> request{{ 's' if pagination.total != 1 }}
+    {% if status_filter %} · <span class="text-capitalize">{{ status_filter }}</span>{% endif %}
+    {% if dept_filter %}{% for d in departments %}{% if d.id|string == dept_filter %} · {{ d.name }}{% endif %}{% endfor %}{% endif %}
+    {% if sem_filter %} · Sem {{ sem_filter }}{% endif %}
+    {% if q %} · "{{ q }}"{% endif %}
+    {% else %}
+    No results
+    {% endif %}
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="text-muted small">
+    Page {{ pagination.page }} of {{ pagination.pages }}
+  </div>
+  {% endif %}
+</div>
+
+{# ── No results ──────────────────────────────────────── #}
+{% if not cards %}
+<div class="card border-0 shadow-sm text-center py-5 text-muted">
+  <i class="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
+  <p class="mb-1 fw-semibold">No requests found</p>
+  <p class="small">Try adjusting your filters or search term.</p>
+  {% if q or dept_filter or sem_filter %}
+  <a href="{{ url_for('admin.id_cards', status=status_filter) }}"
+     class="btn btn-sm btn-outline-primary mt-2">
+    <i class="bi bi-x-circle me-1"></i>Clear filters
+  </a>
+  {% endif %}
+</div>
+
+{% else %}
+
+{# ══ Grouped by Faculty → Semester ══════════════════════ #}
+{% for dept_name, dept_group in cards | groupby('student.department.name') %}
+
+{# Department counts #}
+{% set dept_list = dept_group | list %}
+{% set d_pend = dept_list | selectattr('status','eq','pending')  | list | length %}
+{% set d_appr = dept_list | selectattr('status','eq','approved') | list | length %}
+{% set d_rejc = dept_list | selectattr('status','eq','rejected') | list | length %}
+
+<div class="dept-block mb-4">
+
+  {# Department header band #}
+  <div class="dept-band d-flex align-items-center justify-content-between px-4 py-3 mb-0 rounded-top-3">
+    <div class="d-flex align-items-center gap-3">
+      <div class="dept-icon-wrap">
+        <i class="bi bi-mortarboard-fill"></i>
+      </div>
+      <div>
+        <div class="fw-bold text-white fs-6">{{ dept_name }}</div>
+        {% for d in departments %}{% if d.name == dept_name %}
+        <div class="text-white opacity-60 small">{{ d.code }}</div>
+        {% endif %}{% endfor %}
+      </div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      {% if d_pend  %}<span class="badge bg-warning  text-dark">{{ d_pend }} pending</span>{% endif %}
+      {% if d_appr  %}<span class="badge bg-success">{{ d_appr }} approved</span>{% endif %}
+      {% if d_rejc  %}<span class="badge bg-danger">{{ d_rejc }} rejected</span>{% endif %}
+      <span class="badge bg-white text-dark">{{ dept_list | length }} total</span>
+    </div>
+  </div>
+
+  {# ── Semester sub-sections ── #}
+  <div class="dept-body border border-top-0 rounded-bottom-3 p-3">
+    {% for sem, sem_group in dept_list | groupby('student.semester') %}
+    {% set sem_list = sem_group | list %}
+    {% set s_pend = sem_list | selectattr('status','eq','pending')  | list | length %}
+    {% set s_appr = sem_list | selectattr('status','eq','approved') | list | length %}
+    {% set s_rejc = sem_list | selectattr('status','eq','rejected') | list | length %}
+    {% set sfx = 'st' if sem==1 else ('nd' if sem==2 else ('rd' if sem==3 else 'th')) %}
+
+    <div class="sem-section {% if not loop.last %}mb-4{% endif %}">
+
+      {# Semester sub-header #}
+      <div class="sem-header d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+        <span class="sem-pill">{{ sem }}{{ sfx }} Semester</span>
+        {% if s_pend  %}<span class="badge bg-warning-subtle  text-warning  border border-warning-subtle">{{ s_pend }} pending</span>{% endif %}
+        {% if s_appr  %}<span class="badge bg-success-subtle  text-success  border border-success-subtle">{{ s_appr }} approved</span>{% endif %}
+        {% if s_rejc  %}<span class="badge bg-danger-subtle   text-danger   border border-danger-subtle">{{ s_rejc }} rejected</span>{% endif %}
+        <span class="ms-auto text-muted small">{{ sem_list | length }} student{{ 's' if sem_list|length != 1 }}</span>
+      </div>
+
+      {# Cards grid #}
+      <div class="row g-3">
+        {% for card in sem_list %}
+        {% set student = card.student %}
+        {% set valid_until = (student.admission_year + tpl.valid_years) if student.admission_year else none %}
+
+        <div class="col-xl-6">
+          <div class="card border-0 shadow-sm h-100
+            {% if card.status == 'pending' %}border-start border-warning border-3
+            {% elif card.status == 'approved' %}border-start border-success border-3
+            {% else %}border-start border-danger border-3{% endif %}">
+
+            {# Card header #}
+            <div class="card-header bg-transparent border-0 pt-3 px-3 pb-0
+                         d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <div class="fw-semibold" style="font-size:13px">{{ student.user.name }}</div>
+                <div class="text-muted small">{{ student.roll_number }}</div>
+              </div>
+              <div class="d-flex flex-column align-items-end gap-1">
+                {% if card.status == 'pending' %}
+                <span class="badge bg-warning text-dark">
+                  <i class="bi bi-hourglass-split me-1"></i>Pending
+                </span>
+                {% elif card.status == 'approved' %}
+                <span class="badge bg-success">
+                  <i class="bi bi-patch-check-fill me-1"></i>Approved
+                </span>
+                {% else %}
+                <span class="badge bg-danger">
+                  <i class="bi bi-x-circle-fill me-1"></i>Rejected
+                </span>
+                {% endif %}
+                <small class="text-muted" style="font-size:10px">
+                  {{ card.submitted_at.strftime('%d %b %Y') }}
+                </small>
+              </div>
+            </div>
+
+            {# Card body #}
+            <div class="card-body px-3 pt-2 pb-2 d-flex gap-3">
+
+              {# Mini photo + student info #}
+              <div class="d-flex flex-column align-items-center gap-1" style="flex-shrink:0">
+                <div class="mini-photo">
+                  {% if card.photo_path %}
+                  <img src="{{ url_for('static', filename=card.photo_path) }}" alt="">
+                  {% else %}
+                  <i class="bi bi-person-fill text-muted" style="font-size:22px"></i>
+                  {% endif %}
+                </div>
+                {% if card.photo_path %}
+                <span class="badge bg-success-subtle text-success" style="font-size:9px">
+                  <i class="bi bi-check-circle-fill"></i> Photo
+                </span>
+                {% else %}
+                <span class="badge bg-warning-subtle text-warning" style="font-size:9px">
+                  <i class="bi bi-exclamation-circle"></i> No photo
+                </span>
+                {% endif %}
+              </div>
+
+              {# Details #}
+              <div class="flex-grow-1" style="min-width:0">
+                <table class="table table-sm table-borderless mb-0" style="font-size:11.5px">
+                  <tr>
+                    <td class="text-muted fw-semibold py-0 pe-2" style="width:70px">Blood</td>
+                    <td class="py-0 fw-semibold {% if student.blood_group %}text-danger{% endif %}">
+                      {{ student.blood_group or '—' }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted fw-semibold py-0 pe-2">DOB</td>
+                    <td class="py-0">{{ student.dob.strftime('%d %b %Y') if student.dob else '—' }}</td>
+                  </tr>
+                  <tr>
+                    <td class="text-muted fw-semibold py-0 pe-2">Phone</td>
+                    <td class="py-0">{{ student.phone or '—' }}</td>
+                  </tr>
+                  {% if valid_until %}
+                  <tr>
+                    <td class="text-muted fw-semibold py-0 pe-2">Valid</td>
+                    <td class="py-0 text-success fw-semibold">{{ valid_until }}</td>
+                  </tr>
+                  {% endif %}
+                  {% if card.rejection_note %}
+                  <tr>
+                    <td class="text-muted fw-semibold py-0 pe-2">Note</td>
+                    <td class="py-0 text-danger small">{{ card.rejection_note }}</td>
+                  </tr>
+                  {% endif %}
+                </table>
+              </div>
+            </div>
+
+            {# Card footer actions #}
+            <div class="card-footer bg-transparent border-0 px-3 pb-3 d-flex gap-2">
+              <a href="{{ url_for('admin.view_id_card', cid=card.id) }}"
+                 class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-eye me-1"></i>View
+              </a>
+              {% if card.status == 'pending' %}
+              <form method="POST" action="{{ url_for('admin.approve_id_card', cid=card.id) }}"
+                    class="flex-grow-1"
+                    data-confirm="Approve ID card for {{ student.user.name }}?"
+                    data-confirm-title="Approve ID Card"
+                    data-confirm-type="success"
+                    data-confirm-ok="Approve"
+                    data-confirm-icon="bi-check-circle-fill">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-success btn-sm w-100 fw-semibold">
+                  <i class="bi bi-check-circle-fill me-1"></i>Approve
+                </button>
+              </form>
+              <button class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#rejectModal{{ card.id }}">
+                <i class="bi bi-x-circle me-1"></i>Reject
+              </button>
+              {% elif card.status == 'approved' %}
+              <form method="POST" action="{{ url_for('admin.reject_id_card', cid=card.id) }}"
+                    class="flex-grow-1"
+                    data-confirm="Revoke approval for {{ student.user.name }}?"
+                    data-confirm-title="Revoke Approval"
+                    data-confirm-type="warning"
+                    data-confirm-ok="Revoke"
+                    data-confirm-icon="bi-x-circle-fill">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="rejection_note" value="">
+                <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+                  <i class="bi bi-x-circle me-1"></i>Revoke
+                </button>
+              </form>
+              {% elif card.status == 'rejected' %}
+              <button class="btn btn-sm btn-outline-warning flex-grow-1"
+                      data-bs-toggle="modal"
+                      data-bs-target="#rejectModal{{ card.id }}">
+                <i class="bi bi-pencil me-1"></i>Update Note
+              </button>
+              <form method="POST" action="{{ url_for('admin.approve_id_card', cid=card.id) }}"
+                    data-confirm="Approve ID card for {{ student.user.name }}?"
+                    data-confirm-title="Approve ID Card"
+                    data-confirm-type="success"
+                    data-confirm-ok="Approve"
+                    data-confirm-icon="bi-check-circle-fill">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-success btn-sm">
+                  <i class="bi bi-check-circle-fill me-1"></i>Approve
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        {# Reject / note modal #}
+        {% if card.status in ('pending', 'rejected') %}
+        <div class="modal fade" id="rejectModal{{ card.id }}" tabindex="-1">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header border-0">
+                <h6 class="modal-title fw-semibold">
+                  <i class="bi bi-x-circle me-2 text-danger"></i>Reject ID Card
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <form method="POST" action="{{ url_for('admin.reject_id_card', cid=card.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                  <p class="text-muted small mb-3">
+                    Rejecting ID card for <strong>{{ student.user.name }}</strong>
+                    ({{ student.roll_number }}). The student can see this note and resubmit.
+                  </p>
+                  <label class="form-label fw-semibold">Reason for Rejection</label>
+                  <textarea name="rejection_note" class="form-control" rows="3"
+                    placeholder="e.g. Photo is blurry, please reupload a clear passport-size photo."
+                  >{{ card.rejection_note or '' }}</textarea>
+                </div>
+                <div class="modal-footer border-0">
+                  <button type="button" class="btn btn-light"
+                          data-bs-dismiss="modal">Cancel</button>
+                  <button type="submit" class="btn btn-danger fw-semibold">
+                    <i class="bi bi-x-circle me-1"></i>Reject
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% endfor %} {# end sem_list #}
+      </div> {# end cards grid #}
+    </div> {# end sem-section #}
+    {% endfor %} {# end semester groupby #}
+  </div> {# end dept-body #}
+</div> {# end dept-block #}
+{% endfor %} {# end dept groupby #}
+
+{# ── Pagination ─────────────────────────────────────── #}
+{% if pagination.pages > 1 %}
+{% set pk = {'status': status_filter, 'dept': dept_filter, 'sem': sem_filter, 'q': q, 'per_page': per_page} %}
+<nav class="mt-4 d-flex justify-content-center" aria-label="Page navigation">
+  <ul class="pagination pagination-sm mb-0">
+
+    {# Previous #}
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link"
+         href="{{ url_for('admin.id_cards', page=pagination.prev_num, **pk) if pagination.has_prev else '#' }}">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+    </li>
+
+    {# Page numbers with ellipsis #}
+    {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+    {% if p %}
+    <li class="page-item {% if p == pagination.page %}active{% endif %}">
+      <a class="page-link" href="{{ url_for('admin.id_cards', page=p, **pk) }}">{{ p }}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">…</span></li>
+    {% endif %}
+    {% endfor %}
+
+    {# Next #}
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link"
+         href="{{ url_for('admin.id_cards', page=pagination.next_num, **pk) if pagination.has_next else '#' }}">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+    </li>
+
+  </ul>
+</nav>
+
+{# Jump-to-page #}
+<div class="d-flex justify-content-center mt-2">
+  <form method="GET" action="{{ url_for('admin.id_cards') }}"
+        class="d-flex align-items-center gap-2" style="font-size:13px"
+        onsubmit="clampPage(this)">
+    {% for k, v in pk.items() %}
+    <input type="hidden" name="{{ k }}" value="{{ v }}">
+    {% endfor %}
+    <span class="text-muted">Go to page</span>
+    <input type="number" name="page" class="form-control form-control-sm"
+           style="width:64px" min="1" max="{{ pagination.pages }}"
+           value="{{ pagination.page }}">
+    <button type="submit" class="btn btn-outline-secondary btn-sm">Go</button>
+    <span class="text-muted">of {{ pagination.pages }}</span>
+  </form>
+</div>
+{% endif %}
+
+{% endif %} {# end if cards #}
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* ── Department band ── */
+.dept-band {
+  background: linear-gradient(135deg, #1e3a5f 0%, #2d5282 100%);
+}
+.dept-icon-wrap {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: rgba(255,255,255,.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: #fff;
+  flex-shrink: 0;
+}
+.text-white.opacity-60 { opacity: .6; }
+
+/* ── Dept body border matches band colour ── */
+.dept-body {
+  border-color: #2d5282 !important;
+  background: #f8fafc;
+}
+
+/* ── Semester pill ── */
+.sem-pill {
+  display: inline-flex; align-items: center;
+  background: #1e3a5f; color: #fff;
+  font-size: 11px; font-weight: 700;
+  padding: 3px 12px; border-radius: 20px;
+}
+
+/* ── Student mini photo ── */
+.mini-photo {
+  width: 52px; height: 64px; border-radius: 8px;
+  background: #f1f5f9; border: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
+}
+.mini-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Left border variant colours ── */
+.border-3 { border-width: 3px !important; }
+
+/* ── Card hover lift ── */
+.card { transition: box-shadow .18s ease; }
+.card:hover { box-shadow: 0 6px 24px rgba(0,0,0,.13) !important; }
+</style>
+
+<script>
+document.getElementById('searchInput')?.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.target.closest('form').submit(); }
+});
+
+function clampPage(form) {
+  const inp = form.querySelector('input[name="page"]');
+  const max = parseInt(inp.max, 10);
+  let v = parseInt(inp.value, 10);
+  if (isNaN(v) || v < 1) v = 1;
+  if (v > max) v = max;
+  inp.value = v;
+}
+</script>
+{% endblock %}

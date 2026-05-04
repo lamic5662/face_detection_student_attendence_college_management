@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+{% block page_title %}<i class="bi bi-speedometer2 me-2"></i>Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row g-4 mb-4">
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-blue">
+      <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+      <div class="stat-value">{{ stats.total_students }}</div>
+      <div class="stat-label">Students</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-green">
+      <div class="stat-icon"><i class="bi bi-person-badge-fill"></i></div>
+      <div class="stat-value">{{ stats.total_teachers }}</div>
+      <div class="stat-label">Teachers</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-purple">
+      <div class="stat-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
+      <div class="stat-value">{{ stats.total_subjects }}</div>
+      <div class="stat-label">Subjects</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-orange">
+      <div class="stat-icon"><i class="bi bi-building-fill"></i></div>
+      <div class="stat-value">{{ stats.departments }}</div>
+      <div class="stat-label">Departments</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-teal">
+      <div class="stat-icon"><i class="bi bi-camera-video-fill"></i></div>
+      <div class="stat-value">{{ stats.total_sessions }}</div>
+      <div class="stat-label">Total Sessions</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-red">
+      <div class="stat-icon"><i class="bi bi-record-circle-fill"></i></div>
+      <div class="stat-value">{{ stats.active_sessions }}</div>
+      <div class="stat-label">Live Now</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- 7-Day Trend -->
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-graph-up text-primary me-2"></i>7-Day Attendance Trend</h6>
+      </div>
+      <div class="card-body px-4">
+        <canvas id="trendChart" height="100"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Department Stats -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-building text-primary me-2"></i>Department Attendance</h6>
+      </div>
+      <div class="card-body px-4">
+        {% for dept in dept_stats %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-semibold small">{{ dept.name }}</span>
+            <span class="badge {% if dept.avg_rate >= 75 %}bg-success{% elif dept.avg_rate >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+              {{ dept.avg_rate }}%
+            </span>
+          </div>
+          <div class="progress" style="height:6px">
+            <div class="progress-bar {% if dept.avg_rate >= 75 %}bg-success{% elif dept.avg_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
+                 style="width:{{ dept.avg_rate }}%"></div>
+          </div>
+          <small class="text-muted">{{ dept.student_count }} students</small>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-4">No attendance data yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- College Management Row -->
+<div class="row g-4 mb-4">
+  <!-- Recent Notices -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-megaphone-fill text-warning me-2"></i>Recent Notices</h6>
+        <a href="{{ url_for('notice.list_notices') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="card-body px-4 py-2">
+        {% for n in recent_notices %}
+        <div class="py-2 {% if not loop.last %}border-bottom{% endif %}">
+          <div class="d-flex align-items-center gap-2">
+            {% if n.is_pinned %}<i class="bi bi-pin-fill text-warning" title="Pinned"></i>{% endif %}
+            <a href="{{ url_for('notice.detail', nid=n.id) }}" class="fw-semibold small text-decoration-none text-truncate" style="max-width:180px">{{ n.title }}</a>
+            <span class="badge bg-{{ {'general':'primary','exam':'warning','holiday':'success','event':'info','fee':'danger','urgent':'danger'}[n.category] }}-subtle text-{{ {'general':'primary','exam':'warning','holiday':'success','event':'info','fee':'danger','urgent':'danger'}[n.category] }} ms-auto">{{ n.category }}</span>
+          </div>
+          <div class="text-muted" style="font-size:11px">{{ n.created_at.strftime('%d %b') }}</div>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-3 small">No active notices.</p>
+        {% endfor %}
+      </div>
+      <div class="card-footer bg-transparent border-0 pb-3 px-4">
+        <a href="{{ url_for('notice.create') }}" class="btn btn-sm btn-warning w-100">
+          <i class="bi bi-plus-circle me-1"></i>Post Notice
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming Exams -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-journals text-info me-2"></i>Upcoming Exams</h6>
+        <a href="{{ url_for('exam.admin_exams') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+      </div>
+      <div class="card-body px-4 py-2">
+        {% for e in upcoming_exams %}
+        <div class="py-2 {% if not loop.last %}border-bottom{% endif %} d-flex justify-content-between align-items-center">
+          <div>
+            <div class="fw-semibold small">{{ e.title }}</div>
+            <div class="text-muted" style="font-size:11px">{{ e.subject.name }}</div>
+          </div>
+          <div class="text-end">
+            <div class="badge bg-info-subtle text-info">{{ e.exam_date.strftime('%d %b') }}</div>
+            <div style="font-size:10px" class="text-muted">{{ e.exam_type.replace('_',' ').title() }}</div>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-muted text-center py-3 small">No exams in the next 7 days.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Fee Collection -->
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-cash-stack text-success me-2"></i>Fee Collection</h6>
+        <a href="{{ url_for('fee.admin_fees') }}" class="btn btn-sm btn-outline-secondary">Manage</a>
+      </div>
+      <div class="card-body px-4">
+        {% set pct = (total_fee_collected / total_fee_expected * 100) if total_fee_expected > 0 else 0 %}
+        <div class="text-center mb-3">
+          <div class="fw-bold fs-3 text-success">Rs. {{ '{:,.0f}'.format(total_fee_collected) }}</div>
+          <div class="text-muted small">of Rs. {{ '{:,.0f}'.format(total_fee_expected) }} expected</div>
+        </div>
+        <div class="progress mb-2" style="height:10px">
+          <div class="progress-bar bg-success" style="width:{{ [pct, 100] | min }}%"></div>
+        </div>
+        <div class="d-flex justify-content-between small text-muted">
+          <span>{{ '%.1f' | format(pct) }}% collected</span>
+          <span>Rs. {{ '{:,.0f}'.format(total_fee_expected - total_fee_collected) }} outstanding</span>
+        </div>
+        {% if pending_leaves > 0 %}
+        <div class="alert alert-warning border-0 py-2 px-3 mt-3 small mb-0">
+          <i class="bi bi-calendar-x-fill me-1"></i>
+          <strong>{{ pending_leaves }}</strong> pending leave requests
+          <a href="{{ url_for('leave.teacher_leaves') if current_user.role == 'teacher' else '#' }}" class="ms-1">Review</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Sessions -->
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent Sessions</h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Subject</th>
+            <th>Teacher</th>
+            <th>Date</th>
+            <th>Present</th>
+            <th>Total</th>
+            <th>Rate</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in recent_sessions %}
+          <tr>
+            <td class="px-4 fw-semibold">{{ s.subject.name }}</td>
+            <td>{{ s.teacher.user.name }}</td>
+            <td>{{ s.date.strftime('%d %b %Y') }}</td>
+            <td class="text-success fw-semibold">{{ s.present_count }}</td>
+            <td>{{ s.total_students }}</td>
+            <td>
+              {% set rate = (s.present_count / s.total_students * 100) if s.total_students > 0 else 0 %}
+              <span class="badge {% if rate >= 75 %}bg-success{% elif rate >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                {{ "%.0f"|format(rate) }}%
+              </span>
+            </td>
+            <td>
+              <span class="badge {% if s.status == 'active' %}bg-success{% elif s.status == 'completed' %}bg-primary{% else %}bg-secondary{% endif %}">
+                {{ s.status.capitalize() }}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-4">No sessions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const trendData = {{ trend | tojson }};
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: trendData.map(d => d.date),
+    datasets: [{
+      label: 'Attendance Rate (%)',
+      data: trendData.map(d => d.rate),
+      borderColor: '#0d6efd',
+      backgroundColor: 'rgba(13,110,253,0.08)',
+      borderWidth: 2.5,
+      pointBackgroundColor: '#0d6efd',
+      pointRadius: 4,
+      tension: 0.4,
+      fill: true,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f0f0f0' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+</script>
+{% endblock %}

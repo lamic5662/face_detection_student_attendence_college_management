@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Timetable{% endblock %}
+{% block page_title %}<i class="bi bi-calendar3 me-2"></i>
+  {% if current_user.role == 'student' %}My Timetable
+  {% elif current_user.role == 'teacher' %}Timetable
+  {% else %}View Timetable{% endif %}
+{% endblock %}
+
+{% block head %}
+<style>
+  .tt-table th, .tt-table td { white-space: nowrap; min-width: 120px; }
+  .tt-cell { border-radius: 8px; padding: 6px 10px; font-size: 12px; }
+  .tt-lecture { background: #eef2ff; color: #3730a3; border-left: 3px solid #6366f1; }
+  .tt-lab     { background: #f0fdf4; color: #166534; border-left: 3px solid #22c55e; }
+  .tt-break   { background: #fef9c3; color: #713f12; border-left: 3px solid #eab308; }
+  .tt-free    { background: #f8fafc; color: #94a3b8; border-left: 3px solid #cbd5e1; }
+  .tt-today th { background: #eef2ff !important; }
+  .tt-teacher { font-size: 10px; opacity: .75; margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if current_user.role == 'admin' %}
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body px-4 py-3">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold small mb-1">Faculty</label>
+        <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Select Faculty</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if selected_dept == d.id %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small mb-1">Semester</label>
+        <select name="semester" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Select Semester</option>
+          {% for i in range(1,9) %}
+          <option value="{{ i }}" {% if selected_sem == i %}selected{% endif %}>Semester {{ i }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <a href="{{ url_for('timetable.manage', department_id=selected_dept, semester=selected_sem) }}"
+           class="btn btn-primary btn-sm">
+          <i class="bi bi-pencil-square me-1"></i>Edit Timetable
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% elif current_user.role == 'teacher' %}
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body px-4 py-3">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold small mb-1">Faculty</label>
+        <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Select Faculty</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if selected_dept == d.id %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small mb-1">Semester</label>
+        <select name="semester" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Select Semester</option>
+          {% for i in range(1,9) %}
+          <option value="{{ i }}" {% if selected_sem == i %}selected{% endif %}>Semester {{ i }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if selected_dept and selected_sem and periods %}
+{% set today_idx = [0,0,1,2,3,4,5][now_dow] if now_dow is defined else -1 %}
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-transparent border-0 pt-3 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0">
+      {% for d in departments %}{% if d.id == selected_dept %}{{ d.name }}{% endif %}{% endfor %}
+      — Semester {{ selected_sem }}
+    </h6>
+    <div class="d-flex gap-2">
+      <span class="badge bg-primary-subtle text-primary">Lecture</span>
+      <span class="badge bg-success-subtle text-success">Lab</span>
+      <span class="badge bg-warning-subtle text-warning">Break</span>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-bordered mb-0 tt-table">
+        <thead class="table-light">
+          <tr>
+            <th class="px-3">Period</th>
+            {% for day in days %}
+            <th class="text-center">{{ day }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in periods %}
+          <tr>
+            <td class="fw-semibold text-center px-3">P{{ p }}</td>
+            {% for di in range(7) %}
+            {% set slot = grid[di].get(p) %}
+            <td>
+              {% if slot %}
+              <div class="tt-cell tt-{{ slot.slot_type }}">
+                {% if slot.slot_type == 'break' %}
+                  <div class="fw-semibold">Break</div>
+                {% elif slot.slot_type == 'free' %}
+                  <div class="fw-semibold text-muted">Free</div>
+                {% elif slot.subject %}
+                  <div class="fw-semibold">{{ slot.subject.code }}</div>
+                  <div class="small">{{ slot.subject.name }}</div>
+                  {% set display_teacher = slot.teacher or slot.subject.teacher %}
+                  {% if display_teacher %}
+                  <div class="tt-teacher"><i class="bi bi-person-fill me-1"></i>{{ display_teacher.user.name }}</div>
+                  {% endif %}
+                  {% if slot.room %}<div style="font-size:10px" class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ slot.room }}</div>{% endif %}
+                  {% if slot.start_time %}<div style="font-size:10px" class="text-muted">{{ slot.start_time.strftime('%H:%M') }}–{{ slot.end_time.strftime('%H:%M') if slot.end_time else '' }}</div>{% endif %}
+                {% endif %}
+              </div>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% elif selected_dept and selected_sem %}
+<div class="card border-0 shadow-sm text-center py-5 text-muted">
+  <i class="bi bi-calendar-x fs-1 mb-3 d-block opacity-25"></i>
+  <p>No timetable configured for this semester yet.</p>
+  {% if current_user.role == 'admin' %}
+  <a href="{{ url_for('timetable.manage', department_id=selected_dept, semester=selected_sem) }}"
+     class="btn btn-primary">Create Timetable</a>
+  {% endif %}
+</div>
+{% else %}
+<div class="card border-0 shadow-sm text-center py-5 text-muted">
+  <i class="bi bi-calendar3 fs-1 mb-3 d-block opacity-25"></i>
+  <p>Select a faculty and semester to view the timetable.</p>
+</div>
+{% endif %}
+{% endblock %}

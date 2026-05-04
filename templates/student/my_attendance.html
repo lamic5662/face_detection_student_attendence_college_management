@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}My Attendance{% endblock %}
+{% block page_title %}<i class="bi bi-calendar-check-fill me-2"></i>My Attendance{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body px-4 py-3">
+    <form method="GET" class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label fw-semibold">Filter by Subject</label>
+        <select name="subject_id" class="form-select" onchange="this.form.submit()">
+          <option value="">All Subjects</option>
+          {% for sub in subjects %}
+          <option value="{{ sub.id }}" {% if selected_subject_id == sub.id %}selected{% endif %}>
+            {{ sub.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2 ms-auto">
+        <a href="{{ url_for('student.download_attendance', subject_id=selected_subject_id or '', fmt='excel') }}"
+           class="btn btn-outline-success btn-sm" title="Download Excel">
+          <i class="bi bi-file-earmark-excel-fill me-1"></i>Excel
+        </a>
+        <a href="{{ url_for('student.download_attendance', subject_id=selected_subject_id or '', fmt='csv') }}"
+           class="btn btn-outline-secondary btn-sm" title="Download CSV">
+          <i class="bi bi-filetype-csv me-1"></i>CSV
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if records %}
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Date</th>
+            <th>Subject</th>
+            <th>Teacher</th>
+            <th>Status</th>
+            <th>Liveness</th>
+            <th>Time Marked</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          <tr>
+            <td class="px-4 fw-semibold">{{ r.session.date.strftime('%d %b %Y') }}</td>
+            <td>{{ r.session.subject.name }}</td>
+            <td class="text-muted small">{{ r.session.teacher.user.name }}</td>
+            <td>
+              <span class="badge {% if r.status == 'present' %}bg-success{% elif r.status == 'late' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                {% if r.status == 'present' %}<i class="bi bi-check-circle me-1"></i>{% else %}<i class="bi bi-x-circle me-1"></i>{% endif %}
+                {{ r.status.capitalize() }}
+              </span>
+            </td>
+            <td>
+              {% if r.liveness_verified %}
+              <span class="badge bg-info-subtle text-info"><i class="bi bi-eye-fill me-1"></i>Verified</span>
+              {% else %}
+              <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+            <td class="text-muted small">
+              {{ r.marked_at.strftime('%H:%M:%S') if r.marked_at else '—' }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% elif selected_subject_id %}
+<div class="card shadow-sm border-0 text-center py-5 text-muted">
+  <i class="bi bi-calendar-x fs-1 mb-3"></i>
+  <p>No records found for this subject.</p>
+</div>
+{% else %}
+<div class="card shadow-sm border-0 text-center py-5 text-muted">
+  <i class="bi bi-filter-circle fs-1 mb-3"></i>
+  <p>Select a subject above to view your attendance records.</p>
+</div>
+{% endif %}
+{% endblock %}

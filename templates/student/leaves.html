@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}Leave Applications{% endblock %}
+{% block page_title %}<i class="bi bi-calendar-x-fill me-2"></i>Leave Applications{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  {# ─── Apply Panel ─── #}
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 sticky-top" style="top:80px">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0">
+          <i class="bi bi-plus-circle-fill text-primary me-2"></i>New Leave Application
+        </h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <form method="POST" action="{{ url_for('leave.apply_leave') }}" id="leaveForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          {# Leave scope selector #}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Leave Type</label>
+            <div class="d-flex gap-2">
+              <label class="scope-btn active" id="btnSubject">
+                <input type="radio" name="scope" value="subject" class="d-none"
+                       checked onchange="setScope('subject')">
+                <i class="bi bi-book-fill me-1"></i>Subject Leave
+              </label>
+              <label class="scope-btn" id="btnFullday">
+                <input type="radio" name="scope" value="fullday" class="d-none"
+                       onchange="setScope('fullday')">
+                <i class="bi bi-calendar2-x-fill me-1"></i>Full-Day Leave
+              </label>
+            </div>
+            <div id="scopeHint" class="form-text mt-1">
+              Reviewed by your <strong>subject teacher</strong>.
+            </div>
+          </div>
+
+          {# Subject (shown for subject leave) #}
+          <div class="mb-3" id="subjectRow">
+            <label class="form-label fw-semibold">Subject</label>
+            <select name="subject_id" class="form-select" id="subjectSel">
+              <option value="">Select subject…</option>
+              {% for sub in subjects %}
+              <option value="{{ sub.id }}">{{ sub.name }} ({{ sub.code }})</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          {# Dates #}
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold">From</label>
+              <input type="date" name="from_date" class="form-control"
+                     required min="{{ today }}" value="{{ today }}" id="fromDate">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold">To</label>
+              <input type="date" name="to_date" class="form-control"
+                     required min="{{ today }}" value="{{ today }}" id="toDate">
+            </div>
+          </div>
+
+          {# Reason #}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Reason</label>
+            <textarea name="reason" class="form-control" rows="4"
+                      placeholder="Describe your reason in detail. This will appear in the formal leave letter."
+                      required maxlength="500" id="reasonTxt"></textarea>
+            <div class="form-text">
+              <span id="charCount">0</span>/500 characters
+            </div>
+          </div>
+
+          {# Preview hint #}
+          <div class="alert alert-info py-2 px-3 small mb-3 border-0">
+            <i class="bi bi-info-circle me-1"></i>
+            A formal leave application letter will be auto-generated from your input.
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 fw-semibold">
+            <i class="bi bi-send-fill me-2"></i>Submit Application
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# ─── Leave History ─── #}
+  <div class="col-lg-8">
+
+    {# Summary badges #}
+    {% set pending_cnt  = leaves | selectattr('status','eq','pending')  | list | length %}
+    {% set approved_cnt = leaves | selectattr('status','eq','approved') | list | length %}
+    {% set rejected_cnt = leaves | selectattr('status','eq','rejected') | list | length %}
+    <div class="d-flex gap-2 flex-wrap mb-3">
+      <span class="badge bg-warning text-dark px-3 py-2">
+        <i class="bi bi-hourglass-split me-1"></i>{{ pending_cnt }} Pending
+      </span>
+      <span class="badge bg-success px-3 py-2">
+        <i class="bi bi-check-circle me-1"></i>{{ approved_cnt }} Approved
+      </span>
+      <span class="badge bg-danger px-3 py-2">
+        <i class="bi bi-x-circle me-1"></i>{{ rejected_cnt }} Rejected
+      </span>
+    </div>
+
+    {% if leaves %}
+    <div class="d-flex flex-column gap-3">
+      {% for lr in leaves %}
+      <div class="leave-card status-{{ lr.status }}">
+
+        {# Top row #}
+        <div class="d-flex align-items-start gap-3">
+          <div class="lc-type-icon
+            {% if lr.leave_type == 'student_subject' %}lc-subject
+            {% else %}lc-fullday{% endif %}">
+            <i class="bi bi-{% if lr.leave_type == 'student_subject' %}book-fill{% else %}calendar2-x-fill{% endif %}"></i>
+          </div>
+
+          <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="fw-semibold" style="font-size:14px">
+                {% if lr.leave_type == 'student_subject' and lr.subject %}
+                  {{ lr.subject.name }}
+                {% else %}
+                  Full-Day Leave
+                {% endif %}
+              </span>
+              <span class="badge bg-secondary-subtle text-secondary" style="font-size:10px">
+                {{ lr.ref_number }}
+              </span>
+              <span class="lc-type-pill {% if lr.leave_type == 'student_subject' %}pill-subject{% else %}pill-fullday{% endif %}">
+                {% if lr.leave_type == 'student_subject' %}Subject{% else %}Full Day{% endif %}
+              </span>
+            </div>
+
+            <div class="d-flex gap-3 mt-1 flex-wrap" style="font-size:12px; color:#64748b">
+              <span><i class="bi bi-calendar3 me-1"></i>
+                {{ lr.from_date.strftime('%d %b %Y') }}
+                {% if lr.from_date != lr.to_date %} → {{ lr.to_date.strftime('%d %b %Y') }}{% endif %}
+              </span>
+              <span><i class="bi bi-clock me-1"></i>{{ lr.days }} day{% if lr.days != 1 %}s{% endif %}</span>
+              <span><i class="bi bi-send me-1"></i>{{ lr.created_at.strftime('%d %b %Y') }}</span>
+            </div>
+
+            <div class="mt-2 text-muted small reason-preview" style="font-size:12px">
+              {{ lr.reason | truncate(120) }}
+            </div>
+          </div>
+
+          {# Status badge #}
+          <div class="text-end flex-shrink-0">
+            <span class="status-pill
+              {% if lr.status == 'approved' %}sp-approved
+              {% elif lr.status == 'rejected' %}sp-rejected
+              {% else %}sp-pending{% endif %}">
+              <i class="bi bi-{% if lr.status == 'approved' %}check-circle-fill{% elif lr.status == 'rejected' %}x-circle-fill{% else %}hourglass-split{% endif %} me-1"></i>
+              {{ lr.status.capitalize() }}
+            </span>
+          </div>
+        </div>
+
+        {# Remark if reviewed #}
+        {% if lr.status != 'pending' and lr.remark %}
+        <div class="lc-remark mt-2">
+          <i class="bi bi-chat-left-text me-1"></i>
+          <em>{{ lr.remark }}</em>
+        </div>
+        {% endif %}
+
+        {# Actions #}
+        <div class="d-flex gap-2 mt-3 pt-2 border-top">
+          <a href="{{ url_for('leave.view_letter', lid=lr.id) }}"
+             class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-file-earmark-text me-1"></i>View Letter
+          </a>
+          {% if lr.status == 'pending' %}
+          <form method="POST" action="{{ url_for('leave.cancel_leave', lid=lr.id) }}"
+                data-confirm="Cancel this leave application? This action cannot be undone." data-confirm-title="Cancel Application" data-confirm-type="warning" data-confirm-ok="Yes, Cancel" data-confirm-icon="bi-x-circle-fill">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-x-circle me-1"></i>Cancel
+            </button>
+          </form>
+          {% endif %}
+          {% if lr.status == 'approved' %}
+          <a href="{{ url_for('leave.view_letter', lid=lr.id) }}"
+             onclick="event.preventDefault(); printLetter('{{ url_for('leave.view_letter', lid=lr.id) }}')"
+             class="btn btn-sm btn-outline-success">
+            <i class="bi bi-printer me-1"></i>Print Stamped Copy
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-calendar-x fs-1 d-block mb-3 opacity-25"></i>
+        <div class="fw-semibold">No leave applications yet.</div>
+        <div class="small mt-1">Use the form on the left to submit one.</div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* Scope buttons */
+.scope-btn {
+  display: inline-flex; align-items: center;
+  padding: 6px 16px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  background: #f1f5f9; color: #64748b; border: 2px solid transparent;
+  transition: all .15s; user-select: none;
+}
+.scope-btn.active { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+
+/* Leave cards */
+.leave-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px 20px;
+  border-left: 4px solid #94a3b8;
+  transition: box-shadow .18s;
+}
+.leave-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.leave-card.status-approved { border-left-color: #22c55e; }
+.leave-card.status-rejected { border-left-color: #ef4444; }
+.leave-card.status-pending  { border-left-color: #f59e0b; }
+
+/* Type icon */
+.lc-type-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.lc-subject { background: #dbeafe; color: #3b82f6; }
+.lc-fullday { background: #fce7f3; color: #db2777; }
+
+/* Pills */
+.lc-type-pill {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+}
+.pill-subject { background: #dbeafe; color: #1d4ed8; }
+.pill-fullday { background: #fce7f3; color: #db2777; }
+
+/* Status pills */
+.status-pill {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 700;
+}
+.sp-approved { background: #dcfce7; color: #15803d; }
+.sp-rejected { background: #fee2e2; color: #b91c1c; }
+.sp-pending  { background: #fef3c7; color: #92400e; }
+
+/* Remark */
+.lc-remark {
+  font-size: 12px; color: #64748b;
+  background: #f8fafc;
+  border-radius: 6px; padding: 6px 12px;
+}
+</style>
+
+<script>
+function setScope(s) {
+  const btnS = document.getElementById('btnSubject');
+  const btnF = document.getElementById('btnFullday');
+  const subRow = document.getElementById('subjectRow');
+  const hint   = document.getElementById('scopeHint');
+  const subSel = document.getElementById('subjectSel');
+
+  if (s === 'subject') {
+    btnS.classList.add('active');
+    btnF.classList.remove('active');
+    subRow.style.display = '';
+    subSel.required = true;
+    hint.innerHTML = 'Reviewed by your <strong>subject teacher</strong>.';
+  } else {
+    btnF.classList.add('active');
+    btnS.classList.remove('active');
+    subRow.style.display = 'none';
+    subSel.required = false;
+    hint.innerHTML = 'Reviewed by the <strong>administration</strong>.';
+  }
+}
+
+// Char counter
+const ta = document.getElementById('reasonTxt');
+const cc = document.getElementById('charCount');
+if (ta) {
+  ta.addEventListener('input', () => { cc.textContent = ta.value.length; });
+}
+
+// Sync to-date min with from-date
+const fd = document.getElementById('fromDate');
+const td = document.getElementById('toDate');
+if (fd) fd.addEventListener('change', () => { td.min = fd.value; if (td.value < fd.value) td.value = fd.value; });
+
+function printLetter(url) {
+  window.open(url, '_blank');
+}
+</script>
+{% endblock %}

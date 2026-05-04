@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Child Marksheets{% endblock %}
+{% block page_title %}<i class="bi bi-award-fill me-2"></i>Child Marksheets{% endblock %}
+
+{% block content %}
+
+{% if students %}
+<div class="row g-4">
+  {% for s in students %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="child-avatar">{{ s.user.name[0].upper() }}</div>
+          <div>
+            <div class="fw-bold fs-6">{{ s.user.name }}</div>
+            <div class="text-muted small">Roll: {{ s.roll_number }}</div>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <span class="badge bg-primary-subtle text-primary">
+            <i class="bi bi-building me-1"></i>{{ s.department.name if s.department else '—' }}
+          </span>
+          <span class="badge bg-secondary-subtle text-secondary">
+            Semester {{ s.semester }}
+          </span>
+        </div>
+        <a href="{{ url_for('parent.parent_marksheet', student_id=s.id) }}"
+           class="btn btn-primary w-100 fw-semibold">
+          <i class="bi bi-award-fill me-2"></i>View Full Marksheet
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card border-0 shadow-sm text-center py-5 text-muted">
+  <i class="bi bi-people fs-1 d-block mb-3 opacity-25"></i>
+  <div class="fw-semibold">No linked children found.</div>
+  <div class="small mt-1">Contact admin to link your account to your child's profile.</div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.child-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: linear-gradient(135deg, #6610f2, #0d6efd);
+  color: #fff; font-size: 20px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+</style>
+{% endblock %}

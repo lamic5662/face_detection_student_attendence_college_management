@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Manage Timetable{% endblock %}
+{% block page_title %}<i class="bi bi-calendar-week me-2"></i>Manage Timetable{% endblock %}
+
+{% block head %}
+<style>
+  .tt-cell-edit { min-width:130px; cursor:pointer; border-radius:8px; padding:8px;
+                  transition:background 0.15s; background:#f8fafc; }
+  .tt-cell-edit:hover { background:#eef2ff; }
+  .tt-cell-edit.has-data { background:#eef2ff; border:1px solid #6366f1; }
+  .tt-cell-edit.is-break { background:#fef9c3; border:1px solid #eab308; }
+  .tt-teacher-badge { font-size:10px; color:#6366f1; margin-top:2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Selector -->
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body px-4 py-3">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold small mb-1">Faculty</label>
+        <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Select Faculty</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if selected_dept == d.id %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small mb-1">Semester</label>
+        <select name="semester" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Select Semester</option>
+          {% for i in range(1,9) %}
+          <option value="{{ i }}" {% if selected_sem == i %}selected{% endif %}>Semester {{ i }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if selected_dept and selected_sem %}
+      <div class="col-auto">
+        <a href="{{ url_for('timetable.view', department_id=selected_dept, semester=selected_sem) }}"
+           class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-eye me-1"></i>Preview
+        </a>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{% if selected_dept and selected_sem %}
+
+{% if not subjects %}
+<div class="alert alert-warning border-0 d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <span>No subjects found for this department and semester. <a href="{{ url_for('admin.subjects') }}">Add subjects first</a> so you can assign teachers to timetable slots.</span>
+</div>
+{% endif %}
+
+{% if not teachers %}
+<div class="alert alert-info border-0 d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-info-circle-fill fs-5"></i>
+  <span>No teachers are assigned to this department yet. <a href="{{ url_for('admin.teachers') }}">Add or reassign teachers</a> first.</span>
+</div>
+{% endif %}
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-transparent border-0 pt-3 px-4">
+    <h6 class="fw-semibold mb-0">
+      Click any cell to add/edit a period &mdash;
+      <span class="text-muted">{{ ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] | join(', ') }}</span>
+    </h6>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-bordered mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-3">Period</th>
+            {% for d in days %}<th class="text-center">{{ d }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in range(1, 10) %}
+          <tr>
+            <td class="fw-semibold text-center px-3">P{{ p }}</td>
+            {% for di in range(7) %}
+            {% set slot = grid.get(di, {}).get(p) %}
+            <td>
+              <div class="tt-cell-edit {% if slot %}{% if slot.slot_type == 'break' %}is-break{% else %}has-data{% endif %}{% endif %}"
+                   onclick="openSlotModal({{ di }}, {{ p }}, {{ slot.id if slot else 'null' }},
+                     '{{ slot.subject_id if slot and slot.subject_id else '' }}',
+                     '{{ slot.teacher_id if slot and slot.teacher_id else '' }}',
+                     '{{ slot.room if slot and slot.room else '' }}',
+                     '{{ slot.slot_type if slot else 'lecture' }}',
+                     '{{ slot.start_time.strftime('%H:%M') if slot and slot.start_time else '' }}',
+                     '{{ slot.end_time.strftime('%H:%M') if slot and slot.end_time else '' }}'
+                   )">
+                {% if slot %}
+                  {% if slot.slot_type == 'break' %}
+                    <div class="text-warning fw-semibold small">Break</div>
+                  {% elif slot.slot_type == 'free' %}
+                    <div class="text-muted small">Free</div>
+                  {% elif slot.subject %}
+                    <div class="fw-semibold small text-primary">{{ slot.subject.code }}</div>
+                    {% set display_teacher = slot.teacher or slot.subject.teacher %}
+                    {% if display_teacher %}
+                    <div class="tt-teacher-badge"><i class="bi bi-person-fill me-1"></i>{{ display_teacher.user.name }}</div>
+                    {% endif %}
+                    <div style="font-size:11px" class="text-muted">{{ slot.room or '' }}</div>
+                  {% endif %}
+                {% else %}
+                  <div class="text-muted small text-center"><i class="bi bi-plus"></i></div>
+                {% endif %}
+              </div>
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-info border-0">Select a faculty and semester above to start editing.</div>
+{% endif %}
+
+<!-- Slot Edit Modal -->
+<div class="modal fade" id="slotModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header border-0">
+        <h6 class="modal-title fw-semibold"><i class="bi bi-calendar-plus me-2 text-primary"></i>Edit Period</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="slotId">
+        <input type="hidden" id="slotDay">
+        <input type="hidden" id="slotPeriod">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Type</label>
+          <select id="slotType" class="form-select" onchange="toggleSubjectField()">
+            <option value="lecture">Lecture</option>
+            <option value="lab">Lab</option>
+            <option value="break">Break</option>
+            <option value="free">Free / No Class</option>
+          </select>
+        </div>
+        <div id="subjectField">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Subject</label>
+            <select id="slotSubject" class="form-select" onchange="onSubjectChange()">
+              <option value="">— None —</option>
+              {% for sub in subjects %}
+              <option value="{{ sub.id }}" data-teacher="{{ sub.teacher_id or '' }}">
+                {{ sub.name }} ({{ sub.code }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold d-flex align-items-center gap-2">
+              Teacher
+              <span class="badge bg-info-subtle text-info fw-normal" style="font-size:10px">
+                auto-filled from subject, can override
+              </span>
+            </label>
+            <select id="slotTeacher" class="form-select">
+              <option value="">— Not assigned —</option>
+              {% for t in teachers %}
+              <option value="{{ t.id }}">{{ t.user.name }} ({{ t.employee_id }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Room / Location</label>
+            <input type="text" id="slotRoom" class="form-control" placeholder="e.g. Room 301, Lab A">
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label fw-semibold">Start Time</label>
+            <input type="time" id="slotStart" class="form-control">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-semibold">End Time</label>
+            <input type="time" id="slotEnd" class="form-control">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-0 d-flex justify-content-between">
+        <button id="deleteSlotBtn" class="btn btn-outline-danger btn-sm" onclick="deleteSlot()" style="display:none">
+          <i class="bi bi-trash3 me-1"></i>Remove
+        </button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-primary fw-semibold" onclick="saveSlot()">
+            <i class="bi bi-save me-2"></i>Save
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DEPT_ID  = {{ selected_dept or 'null' }};
+const SEMESTER = {{ selected_sem or 'null' }};
+const SAVE_URL   = "{{ url_for('timetable.save_slot') }}";
+const DELETE_URL = (id) => `/timetable/slot/${id}/delete`;
+const modal = new bootstrap.Modal(document.getElementById('slotModal'));
+
+// subject_id → default teacher_id (from subject assignment)
+const SUBJECT_TEACHER_MAP = {{ subject_teacher_map | tojson }};
+
+function toggleSubjectField() {
+  const t = document.getElementById('slotType').value;
+  document.getElementById('subjectField').style.display =
+    (t === 'break' || t === 'free') ? 'none' : 'block';
+}
+
+function onSubjectChange() {
+  const subjectId = document.getElementById('slotSubject').value;
+  if (!subjectId) return;
+  const defaultTeacherId = SUBJECT_TEACHER_MAP[parseInt(subjectId)];
+  if (defaultTeacherId) {
+    document.getElementById('slotTeacher').value = String(defaultTeacherId);
+  }
+}
+
+function openSlotModal(day, period, slotId, subjectId, teacherId, room, type, start, end) {
+  document.getElementById('slotDay').value     = day;
+  document.getElementById('slotPeriod').value  = period;
+  document.getElementById('slotId').value      = slotId || '';
+  document.getElementById('slotType').value    = type || 'lecture';
+  document.getElementById('slotSubject').value = subjectId || '';
+  document.getElementById('slotTeacher').value = teacherId || '';
+  document.getElementById('slotRoom').value    = room || '';
+  document.getElementById('slotStart').value   = start || '';
+  document.getElementById('slotEnd').value     = end || '';
+  document.getElementById('deleteSlotBtn').style.display = slotId ? 'inline-block' : 'none';
+
+  // If no explicit teacher set on slot, auto-fill from subject's default teacher
+  if (!teacherId && subjectId) {
+    const defaultTeacherId = SUBJECT_TEACHER_MAP[parseInt(subjectId)];
+    if (defaultTeacherId) {
+      document.getElementById('slotTeacher').value = String(defaultTeacherId);
+    }
+  }
+
+  toggleSubjectField();
+  modal.show();
+}
+
+async function saveSlot() {
+  const resp = await fetch(SAVE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      department_id: DEPT_ID,
+      semester:      SEMESTER,
+      day_of_week:   parseInt(document.getElementById('slotDay').value),
+      period_no:     parseInt(document.getElementById('slotPeriod').value),
+      subject_id:    document.getElementById('slotSubject').value || null,
+      teacher_id:    document.getElementById('slotTeacher').value || null,
+      room:          document.getElementById('slotRoom').value,
+      slot_type:     document.getElementById('slotType').value,
+      start_time:    document.getElementById('slotStart').value,
+      end_time:      document.getElementById('slotEnd').value,
+    }),
+  });
+  if ((await resp.json()).success) location.reload();
+}
+
+async function deleteSlot() {
+  const id = document.getElementById('slotId').value;
+  if (!id) return;
+  const ok = await SA.confirm({
+    title: 'Remove Timetable Slot',
+    message: 'Remove this slot from the timetable?',
+    type: 'warning',
+    ok: 'Remove',
+    icon: 'bi-trash3-fill'
+  });
+  if (!ok) return;
+  const resp = await fetch(DELETE_URL(id), { method: 'POST' });
+  if ((await resp.json()).success) location.reload();
+}
+</script>
+{% endblock %}

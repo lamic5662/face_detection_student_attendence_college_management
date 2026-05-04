@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% from 'partials/pagination.html' import render_pagination %}
+{% block title %}Study Materials{% endblock %}
+{% block page_title %}<i class="bi bi-collection-fill me-2"></i>Study Materials{% endblock %}
+
+{% block content %}
+
+{# ── Stat / type filter tabs ── #}
+<div class="row g-3 mb-4">
+  {% set tabs = [
+    ('',           'All',         'bi-grid-fill',          'dark',     counts.all),
+    ('note',       'Notes',       'bi-journal-text',       'primary',  counts.note),
+    ('assignment', 'Assignments', 'bi-clipboard-check',    'purple',   counts.assignment),
+    ('lab',        'Lab Work',    'bi-flask',              'orange',   counts.lab),
+    ('question',   'Questions',   'bi-patch-question-fill','teal',     counts.question),
+  ] %}
+  {% for slug, label, icon, color, cnt in tabs %}
+  {% set kw = {'subject': subj_filter, 'q': q} %}
+  <div class="col-xl col-md-4 col-6">
+    <a href="{{ url_for('student.student_content', type=slug, **kw) }}"
+       class="text-decoration-none">
+      <div class="card border-0 shadow-sm sc-tab sc-tab-{{ color }} {% if type_filter == slug %}ring-active{% endif %}">
+        <div class="card-body d-flex align-items-center gap-3 py-3">
+          <div class="sc-icon-wrap">
+            <i class="bi {{ icon }}"></i>
+          </div>
+          <div>
+            <div class="sc-num">{{ cnt }}</div>
+            <div class="sc-lbl">{{ label }}</div>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Filter bar ── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body px-4 py-3">
+    <form method="GET" action="{{ url_for('student.student_content') }}"
+          class="row g-2 align-items-end">
+      <input type="hidden" name="type" value="{{ type_filter }}">
+
+      <div class="col-lg-5 col-md-12">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" class="form-control"
+                 placeholder="Search materials…" value="{{ q }}" autocomplete="off">
+          {% if q %}
+          <a href="{{ url_for('student.student_content', type=type_filter, subject=subj_filter) }}"
+             class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="col-lg-4 col-md-8">
+        <select name="subject" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="0">All Subjects</option>
+          {% for s in subjects %}
+          <option value="{{ s.id }}" {% if subj_filter == s.id %}selected{% endif %}>
+            {{ s.name }} ({{ s.code }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-lg-2 col-md-4">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel-fill me-1"></i>Filter
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ── Content cards ── #}
+{% if items %}
+<div class="row g-3" id="contentGrid">
+  {% for item in items %}
+  <div class="col-xl-4 col-md-6">
+    <div class="card border-0 shadow-sm h-100 content-card">
+      <div class="card-body d-flex flex-column">
+
+        {# type + published badge row #}
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="type-badge type-{{ item.content_type }}">
+            {% if item.content_type == 'note' %}<i class="bi bi-journal-text me-1"></i>Note
+            {% elif item.content_type == 'assignment' %}<i class="bi bi-clipboard-check me-1"></i>Assignment
+            {% elif item.content_type == 'lab' %}<i class="bi bi-flask me-1"></i>Lab Work
+            {% else %}<i class="bi bi-patch-question-fill me-1"></i>Question{% endif %}
+          </span>
+          {% if item.subject %}
+          <span class="badge bg-secondary-subtle text-secondary" style="font-size:10px">
+            {{ item.subject.code }}
+          </span>
+          {% endif %}
+        </div>
+
+        {# title #}
+        <h6 class="fw-semibold mb-1" style="font-size:14px; line-height:1.4">
+          {{ item.title }}
+        </h6>
+
+        {# body excerpt #}
+        {% if item.body %}
+        <p class="text-muted small mb-2 flex-grow-1" style="font-size:12px; line-height:1.5">
+          {{ item.body | truncate(120) }}
+        </p>
+        {% else %}
+        <div class="flex-grow-1"></div>
+        {% endif %}
+
+        {# meta row #}
+        <div class="d-flex flex-wrap gap-2 mb-3" style="font-size:11px; color:#64748b">
+          <span><i class="bi bi-person-fill me-1"></i>{{ item.teacher.user.name }}</span>
+          <span><i class="bi bi-calendar3 me-1"></i>{{ item.created_at.strftime('%d %b %Y') }}</span>
+          {% if item.due_date %}
+          <span class="text-danger"><i class="bi bi-calendar-event me-1"></i>Due {{ item.due_date.strftime('%d %b %Y') }}</span>
+          {% endif %}
+          {% if item.marks %}
+          <span><i class="bi bi-trophy me-1"></i>{{ item.marks }} marks</span>
+          {% endif %}
+        </div>
+
+        {# attachment buttons #}
+        <div class="d-flex gap-2 mt-auto">
+          <a href="{{ url_for('student.content_preview', cid=item.id) }}"
+             class="btn btn-sm btn-primary flex-fill">
+            <i class="bi bi-{% if item.content_type == 'note' %}journal-text{% else %}eye-fill{% endif %} me-1"></i>
+            {% if item.content_type == 'note' %}Read Note{% else %}View{% endif %}
+          </a>
+          {% if item.file_path %}
+          <a href="{{ url_for('student.content_file', cid=item.id) }}"
+             target="_blank"
+             class="btn btn-sm btn-outline-secondary flex-fill">
+            <i class="bi bi-download me-1"></i>Download
+          </a>
+          {% endif %}
+        </div>
+        {% if not item.file_path %}
+        <div class="text-muted small text-center mt-2 py-1" style="font-size:11px">
+          <i class="bi bi-journal-text me-1 opacity-50"></i>Teacher note is readable inside the app
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# Pagination #}
+{% if pagination.pages > 1 %}
+<div class="mt-4">
+  {{ render_pagination(pagination, request.args) }}
+</div>
+{% endif %}
+
+{% else %}
+{# Empty state #}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-collection fs-1 d-block mb-3 opacity-25"></i>
+    <div class="fw-semibold mb-1">No materials found</div>
+    {% if q or subj_filter or type_filter %}
+    <div class="small mb-3">Try adjusting your filters.</div>
+    <a href="{{ url_for('student.student_content') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-x-circle me-1"></i>Clear filters
+    </a>
+    {% else %}
+    <div class="small">Your teachers haven't published any content yet.</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* Stat tabs */
+.sc-tab { transition: box-shadow .18s, transform .18s; }
+.sc-tab:hover { box-shadow: 0 6px 20px rgba(0,0,0,.12) !important; transform: translateY(-2px); }
+.sc-tab.ring-active { outline: 2px solid currentColor; outline-offset: 2px; }
+.sc-icon-wrap {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.sc-num { font-size: 22px; font-weight: 800; line-height: 1; color: #0f172a; }
+.sc-lbl { font-size: 11px; color: #64748b; font-weight: 600; }
+
+.sc-tab-dark    .sc-icon-wrap { background: #e2e8f0; color: #334155; }
+.sc-tab-primary .sc-icon-wrap { background: #dbeafe; color: #3b82f6; }
+.sc-tab-purple  .sc-icon-wrap { background: #ede9fe; color: #8b5cf6; }
+.sc-tab-orange  .sc-icon-wrap { background: #ffedd5; color: #f97316; }
+.sc-tab-teal    .sc-icon-wrap { background: #ccfbf1; color: #14b8a6; }
+
+.sc-tab-dark.ring-active    { outline-color: #334155; }
+.sc-tab-primary.ring-active { outline-color: #3b82f6; }
+.sc-tab-purple.ring-active  { outline-color: #8b5cf6; }
+.sc-tab-orange.ring-active  { outline-color: #f97316; }
+.sc-tab-teal.ring-active    { outline-color: #14b8a6; }
+
+/* Content cards */
+.content-card { transition: box-shadow .18s, transform .18s; }
+.content-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,.1) !important; transform: translateY(-2px); }
+
+/* Type badges */
+.type-badge {
+  display: inline-flex; align-items: center;
+  padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+}
+.type-note       { background: #dbeafe; color: #1d4ed8; }
+.type-assignment { background: #ede9fe; color: #6d28d9; }
+.type-lab        { background: #ffedd5; color: #c2410c; }
+.type-question   { background: #ccfbf1; color: #0f766e; }
+</style>
+{% endblock %}

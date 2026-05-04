@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Marksheet Management{% endblock %}
+{% block page_title %}<i class="bi bi-award-fill me-2"></i>Marksheet Management{% endblock %}
+
+{% block content %}
+
+{# ── Filter bar ── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body px-4 py-3">
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-lg-4">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" name="q" class="form-control"
+                 placeholder="Search by name or roll number…"
+                 value="{{ q }}" autocomplete="off">
+          {% if q %}
+          <a href="{{ url_for('admin.marksheet_list', dept_id=dept_id, sem=sem) }}"
+             class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-lg-3">
+        <select name="dept_id" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Departments</option>
+          {% for d in departments %}
+          <option value="{{ d.id }}" {% if dept_id == d.id %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-lg-2">
+        <select name="sem" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Semesters</option>
+          {% for s in semesters %}
+          <option value="{{ s }}" {% if sem == s %}selected{% endif %}>Semester {{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel-fill me-1"></i>Filter
+        </button>
+      </div>
+      {% if q or dept_id or sem %}
+      <div class="col-auto">
+        <a href="{{ url_for('admin.marksheet_list') }}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-x-circle me-1"></i>Clear
+        </a>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{# ── Student list ── #}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-0 px-4 pt-3 pb-0">
+    <span class="fw-semibold text-secondary small">
+      {{ students|length }} student{{ 's' if students|length != 1 }} found
+    </span>
+  </div>
+  <div class="card-body p-0">
+    {% if students %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">#</th>
+            <th>Student</th>
+            <th>Roll Number</th>
+            <th>Department</th>
+            <th>Semester</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+          <tr>
+            <td class="px-4 text-muted small">{{ loop.index }}</td>
+            <td>
+              <div class="fw-semibold">{{ s.user.name }}</div>
+              <div class="text-muted small">{{ s.user.email }}</div>
+            </td>
+            <td class="fw-semibold text-primary">{{ s.roll_number }}</td>
+            <td class="text-muted small">{{ s.department.name if s.department else '—' }}</td>
+            <td>
+              <span class="badge bg-secondary-subtle text-secondary">Sem {{ s.semester }}</span>
+            </td>
+            <td>
+              <a href="{{ url_for('admin.admin_marksheet', student_id=s.id) }}"
+                 class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-award-fill me-1"></i>View Marksheet
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-people fs-1 d-block mb-3 opacity-25"></i>
+      <div class="fw-semibold">No students found.</div>
+      {% if q or dept_id or sem %}
+      <a href="{{ url_for('admin.marksheet_list') }}" class="btn btn-sm btn-outline-secondary mt-2">
+        <i class="bi bi-x-circle me-1"></i>Clear filters
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

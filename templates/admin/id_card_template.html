@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+{% block title %}ID Card Template{% endblock %}
+{% block page_title %}<i class="bi bi-person-badge me-2"></i>ID Card Template{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Settings Form -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-sliders me-2 text-primary"></i>Template Settings</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <form method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">College Logo</label>
+            {% if tpl.logo_path %}
+            <div class="mb-2 d-flex align-items-center gap-2">
+              <img src="{{ url_for('static', filename=tpl.logo_path) }}"
+                   class="rounded border" style="height:50px;object-fit:contain">
+              <span class="text-success small"><i class="bi bi-check-circle-fill me-1"></i>Logo set</span>
+            </div>
+            {% endif %}
+            <input type="file" name="logo" class="form-control form-control-sm" accept="image/*">
+            <div class="form-text">PNG or JPG recommended. Displays in card header.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">College Building / Banner Image</label>
+            {% if tpl.college_image_path %}
+            <div class="mb-2">
+              <img src="{{ url_for('static', filename=tpl.college_image_path) }}"
+                   class="rounded border" style="width:100%;height:80px;object-fit:cover">
+              <span class="text-success small d-block mt-1"><i class="bi bi-check-circle-fill me-1"></i>Image set</span>
+            </div>
+            {% endif %}
+            <input type="file" name="college_image" class="form-control form-control-sm" accept="image/*">
+            <div class="form-text">Shown as background on the back of the ID card. Wide/landscape image recommended.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Principal's Signature</label>
+            {% if tpl.principal_signature_path %}
+            <div class="mb-2 d-flex align-items-center gap-2">
+              <img src="{{ url_for('static', filename=tpl.principal_signature_path) }}"
+                   class="rounded border bg-white px-2" style="height:40px;object-fit:contain">
+              <span class="text-success small"><i class="bi bi-check-circle-fill me-1"></i>Signature set</span>
+            </div>
+            {% endif %}
+            <input type="file" name="principal_signature" class="form-control form-control-sm" accept="image/*">
+            <div class="form-text">Upload principal's signature image (transparent PNG ideal). Shown only on approved cards.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Principal's Name</label>
+            <input type="text" name="principal_name" class="form-control"
+                   value="{{ tpl.principal_name or '' }}" placeholder="e.g. Dr. Ramesh Sharma">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Principal's Title</label>
+            <input type="text" name="principal_title" class="form-control"
+                   value="{{ tpl.principal_title or 'Principal' }}" placeholder="Principal">
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label fw-semibold small">College Phone</label>
+              <input type="text" name="college_phone" class="form-control"
+                     value="{{ tpl.college_phone or '' }}" placeholder="+977-1-XXXXXXX">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold small">ID Valid For (years)</label>
+              <input type="number" name="valid_years" class="form-control"
+                     value="{{ tpl.valid_years or 4 }}" min="1" max="8">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">College Website</label>
+            <input type="text" name="college_website" class="form-control"
+                   value="{{ tpl.college_website or '' }}" placeholder="www.college.edu.np">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">College Location</label>
+            <div class="row g-2">
+              <div class="col-6">
+                <input type="text" name="map_lat" class="form-control form-control-sm font-monospace"
+                       value="{{ tpl.map_lat or '' }}" placeholder="Latitude e.g. 27.7172">
+              </div>
+              <div class="col-6">
+                <input type="text" name="map_lng" class="form-control form-control-sm font-monospace"
+                       value="{{ tpl.map_lng or '' }}" placeholder="Longitude e.g. 85.3240">
+              </div>
+            </div>
+            <div class="form-text">
+              Optional — currently not displayed on card.
+            </div>
+          </div>
+
+          <div class="row g-2 mb-4">
+            <div class="col-6">
+              <label class="form-label fw-semibold small">Card Color</label>
+              <div class="input-group input-group-sm">
+                <input type="color" name="card_color" class="form-control form-control-color"
+                       value="{{ tpl.card_color or '#1e3a5f' }}" style="width:48px">
+                <input type="text" id="cardColorText" class="form-control font-monospace"
+                       value="{{ tpl.card_color or '#1e3a5f' }}" readonly>
+              </div>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold small">Accent Color</label>
+              <div class="input-group input-group-sm">
+                <input type="color" name="accent_color" class="form-control form-control-color"
+                       value="{{ tpl.accent_color or '#e63946' }}" style="width:48px">
+                <input type="text" id="accentColorText" class="form-control font-monospace"
+                       value="{{ tpl.accent_color or '#e63946' }}" readonly>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary fw-semibold w-100">
+            <i class="bi bi-save me-2"></i>Save Template
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-3">
+      <div class="card-body px-4 py-3 d-flex justify-content-between align-items-center">
+        <div>
+          <div class="fw-semibold small">Review ID Card Requests</div>
+          <div class="text-muted" style="font-size:12px">Approve or reject student submissions</div>
+        </div>
+        <a href="{{ url_for('admin.id_cards') }}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-eye me-1"></i>View Requests
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Preview -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-eye me-2 text-success"></i>Live Preview</h6>
+        <p class="text-muted small mb-0">Colors update live as you change settings</p>
+      </div>
+      <div class="card-body px-4 pb-4 d-flex flex-column align-items-center gap-3">
+
+        <div id="pvCard" class="pv-card">
+
+          <!-- Gradient header -->
+          <div class="pv-top" id="pvTop">
+            <div class="pv-blob pv-blob-1"></div>
+            <div class="pv-blob pv-blob-2"></div>
+
+            <div class="pv-badge-wrap">
+              <span class="pv-badge" id="pvBadge"><i class="bi bi-person-badge-fill"></i> IDENTITY CARD</span>
+            </div>
+
+            <div class="pv-college-row">
+              {% if tpl.logo_path %}
+              <img src="{{ url_for('static', filename=tpl.logo_path) }}" class="pv-logo">
+              {% else %}
+              <div class="pv-logo-ph"><i class="bi bi-building"></i></div>
+              {% endif %}
+              <div>
+                <div class="pv-cname">{{ cs.college_name }}</div>
+                <div class="pv-caddr">{{ cs.address or 'College Address' }}</div>
+              </div>
+            </div>
+
+            <div class="pv-identity-row">
+              <div class="pv-ring" id="pvRing">
+                <div class="pv-ring-in"><i class="bi bi-person-fill pv-ph-icon"></i></div>
+              </div>
+              <div class="pv-identity-text">
+                <div class="pv-sname">Student Full Name</div>
+                <div class="pv-dept" id="pvDept">Computer Science</div>
+                <div class="pv-sem">5th Semester</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- White info body -->
+          <div class="pv-body" id="pvBody">
+            <div class="pv-row"><i class="bi bi-hash pv-ri"></i><span class="pv-lbl">Roll Number</span><span class="pv-val">BCA2024001</span></div>
+            <div class="pv-row"><i class="bi bi-mortarboard-fill pv-ri"></i><span class="pv-lbl">Faculty</span><span class="pv-val">BCA</span></div>
+            <div class="pv-row"><i class="bi bi-droplet-fill" style="color:#ef4444"></i><span class="pv-lbl">Blood Group</span><span class="pv-val" style="color:#dc2626;font-weight:800">B+</span></div>
+            <div class="pv-row"><i class="bi bi-calendar3 pv-ri"></i><span class="pv-lbl">Date of Birth</span><span class="pv-val">15 Aug 2002</span></div>
+            <div class="pv-row"><i class="bi bi-telephone-fill pv-ri"></i><span class="pv-lbl">Phone</span><span class="pv-val">+977-9800000000</span></div>
+            <div class="pv-row"><i class="bi bi-geo-alt-fill pv-ri"></i><span class="pv-lbl">Address</span><span class="pv-val">Kathmandu</span></div>
+          </div>
+
+          <!-- Gradient footer -->
+          <div class="pv-ftr" id="pvFtr">
+            <div>
+              <div class="pv-fline"><span class="pv-flbl">Card No</span><span class="pv-fval">BCA-2024001</span></div>
+              <div class="pv-fline"><span class="pv-flbl">Valid Till</span><span class="pv-fval" style="color:#86efac">2028</span></div>
+            </div>
+            <div class="pv-sig">
+              {% if tpl.principal_signature_path %}
+              <img src="{{ url_for('static', filename=tpl.principal_signature_path) }}" class="pv-sig-img">
+              {% else %}
+              <div class="pv-sig-line"></div>
+              {% endif %}
+              <div class="pv-sig-name">{{ tpl.principal_name or 'Principal Name' }}</div>
+              <div class="pv-sig-ttl">{{ tpl.principal_title or 'Principal' }}</div>
+            </div>
+          </div>
+
+          <div class="pv-stripe" id="pvStripe"></div>
+        </div>
+
+        <div class="text-muted small text-center">
+          <i class="bi bi-info-circle me-1"></i>
+          Actual card uses real student photo &amp; data. Signature shows on approved cards only.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* ── Admin template live preview — matches v5 card design ── */
+.pv-card {
+  --pv-cc: #1e3a5f; --pv-ac: #e63946;
+  width: 270px; height: 490px; border-radius: 18px; overflow: hidden;
+  font-family: 'Segoe UI', sans-serif;
+  box-shadow: 0 22px 60px rgba(0,0,0,.32), 0 6px 16px rgba(0,0,0,.16);
+  display: flex; flex-direction: column; position: relative;
+  background: #fff;
+}
+
+/* Gradient header */
+.pv-top {
+  background: linear-gradient(145deg, #0b2040 0%, #172f4e 50%, #1e3a5f 100%);
+  padding: 14px 14px 16px; position: relative; overflow: hidden; flex-shrink: 0;
+}
+.pv-blob { position:absolute; border-radius:50%; background:rgba(255,255,255,.07); pointer-events:none; }
+.pv-blob-1 { width:170px; height:170px; top:-70px; right:-45px; }
+.pv-blob-2 { width:90px;  height:90px;  bottom:-30px; left:-25px; }
+
+.pv-badge-wrap { margin-bottom:10px; position:relative; z-index:1; }
+.pv-badge {
+  display:inline-flex; align-items:center; gap:5px;
+  background: var(--pv-ac); color:#fff;
+  font-size:6.5px; font-weight:800; letter-spacing:2.2px; text-transform:uppercase;
+  padding:4px 11px; border-radius:4px; box-shadow:0 3px 10px rgba(0,0,0,.3);
+}
+.pv-badge i { font-size:9px; }
+
+.pv-college-row { display:flex; align-items:center; gap:9px; margin-bottom:13px; position:relative; z-index:1; }
+.pv-logo    { width:40px; height:40px; flex-shrink:0; object-fit:contain; border-radius:9px; background:rgba(255,255,255,.18); padding:3px; }
+.pv-logo-ph { width:40px; height:40px; flex-shrink:0; border-radius:9px; background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; font-size:18px; color:rgba(255,255,255,.45); }
+.pv-cname   { font-size:13.5px; font-weight:900; color:#fff; line-height:1.2; text-shadow:0 2px 6px rgba(0,0,0,.28); }
+.pv-caddr   { font-size:7.5px; color:rgba(255,255,255,.6); margin-top:3px; }
+
+.pv-identity-row { display:flex; align-items:center; gap:12px; position:relative; z-index:1; }
+.pv-ring {
+  width:76px; height:76px; flex-shrink:0; border-radius:50%; padding:3px;
+  background: conic-gradient(from 180deg, var(--pv-ac) 0%, rgba(255,255,255,.5) 40%, rgba(255,255,255,.8) 55%, rgba(255,255,255,.5) 70%, var(--pv-ac) 100%);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.12), 0 8px 26px rgba(0,0,0,.45);
+}
+.pv-ring-in { width:100%; height:100%; border-radius:50%; overflow:hidden; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; }
+.pv-ph-icon { font-size:36px; color:rgba(255,255,255,.28); }
+.pv-identity-text { flex:1; min-width:0; }
+.pv-sname { font-size:14px; font-weight:900; color:#fff; line-height:1.2; margin-bottom:5px; text-shadow:0 2px 8px rgba(0,0,0,.3); }
+.pv-dept  { font-size:7px; font-weight:700; color:var(--pv-cc); background:rgba(255,255,255,.92); padding:2px 9px; border-radius:3px; display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-bottom:4px; }
+.pv-sem   { font-size:6.5px; font-weight:600; color:rgba(255,255,255,.7); }
+
+/* White info body */
+.pv-body {
+  background:#fff; flex:1; display:flex; flex-direction:column;
+  border-top: 3px solid var(--pv-ac); overflow:hidden;
+}
+.pv-row {
+  display:flex; align-items:center; gap:10px;
+  padding:0 14px; flex:1;
+  border-bottom:1px solid #f1f5f9; position:relative;
+}
+.pv-row:last-child { border-bottom:none; }
+.pv-row::before {
+  content:''; position:absolute; left:0; top:22%; bottom:22%;
+  width:3px; border-radius:0 2px 2px 0;
+  background: var(--pv-ac);
+}
+.pv-row > i { font-size:9.5px; color:var(--pv-ac); width:14px; text-align:center; flex-shrink:0; }
+.pv-ri { color: var(--pv-ac) !important; }
+.pv-lbl { font-size:7.5px; color:#94a3b8; font-weight:600; flex:1; }
+.pv-val { font-size:8.5px; font-weight:700; color:#0f172a; text-align:right; max-width:125px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Gradient footer */
+.pv-ftr { background:linear-gradient(135deg, #0b2040, #172f4e); padding:9px 14px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+.pv-fline { display:flex; align-items:baseline; gap:5px; line-height:2; }
+.pv-flbl  { font-size:6.5px; font-weight:700; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.6px; }
+.pv-fval  { font-size:8px; font-weight:700; color:rgba(255,255,255,.92); }
+.pv-sig   { text-align:center; }
+.pv-sig-img  { height:28px; display:block; margin:0 auto 2px; object-fit:contain; max-width:80px; }
+.pv-sig-line { width:70px; border-bottom:1px solid rgba(255,255,255,.28); height:22px; margin:0 auto 2px; }
+.pv-sig-name { font-size:7px; font-weight:700; color:#fff; white-space:nowrap; }
+.pv-sig-ttl  { font-size:6.5px; color:rgba(255,255,255,.5); }
+
+.pv-stripe { height:4px; flex-shrink:0; background:linear-gradient(90deg,#b91c1c,#e63946,#f97316,#e63946,#b91c1c); }
+</style>
+<script>
+function hexToRgb(h) {
+  const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+  return r ? [parseInt(r[1],16), parseInt(r[2],16), parseInt(r[3],16)] : [30,58,95];
+}
+function darken(rgb, f)  { return rgb.map(v => Math.max(0, Math.round(v * f))); }
+function lighten(rgb, f) { return rgb.map(v => Math.min(255, Math.round(v + (255-v)*f))); }
+function toRgb(rgb)  { return `rgb(${rgb.join(',')})`; }
+
+function applyCardColor(hex) {
+  document.getElementById('cardColorText').value = hex;
+  const rgb = hexToRgb(hex);
+  const dk  = darken(rgb, .60);
+  const md  = darken(rgb, .80);
+  const lt  = lighten(rgb, .18);
+  document.getElementById('pvTop').style.background =
+    `linear-gradient(145deg, ${toRgb(dk)} 0%, ${toRgb(md)} 50%, ${toRgb(lt)} 100%)`;
+  document.getElementById('pvFtr').style.background =
+    `linear-gradient(135deg, ${toRgb(dk)}, ${toRgb(md)})`;
+  document.getElementById('pvCard').style.setProperty('--pv-cc', hex);
+}
+
+function applyAccentColor(hex) {
+  document.getElementById('accentColorText').value = hex;
+  const rgb = hexToRgb(hex);
+  const dk  = darken(rgb, .68);
+  document.getElementById('pvCard').style.setProperty('--pv-ac', hex);
+  document.getElementById('pvStripe').style.background =
+    `linear-gradient(90deg, ${toRgb(dk)}, ${hex}, ${hex}, ${toRgb(dk)})`;
+}
+
+const ccIn = document.querySelector('input[name="card_color"]');
+const acIn = document.querySelector('input[name="accent_color"]');
+ccIn.addEventListener('input', e => applyCardColor(e.target.value));
+acIn.addEventListener('input', e => applyAccentColor(e.target.value));
+
+applyCardColor(ccIn.value);
+applyAccentColor(acIn.value);
+</script>
+{% endblock %}

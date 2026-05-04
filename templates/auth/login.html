@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Sign In — {{ college_name }}{% endblock %}
+
+{% block auth_content %}
+<div class="auth-root">
+
+  {# ══════════════════════════════════════════════
+  LEFT PANEL — branding + feature showcase
+  ══════════════════════════════════════════════ #}
+  <div class="auth-left">
+
+    {# Floating decorative circles #}
+    <div class="deco-circle deco-1"></div>
+    <div class="deco-circle deco-2"></div>
+    <div class="deco-circle deco-3"></div>
+
+    <div class="auth-left-inner">
+
+      {# Logo + system name #}
+      <div class="brand-block">
+        <div class="brand-icon">
+          <i class="bi bi-mortarboard-fill"></i>
+        </div>
+        <div class="brand-text">
+          <div class="brand-title">SmartAttend</div>
+          <div class="brand-sub">College Management System</div>
+        </div>
+      </div>
+
+      {# College name #}
+      <div class="college-banner">
+        <i class="bi bi-building-fill me-2 opacity-75"></i>
+        {{ college_name }}
+      </div>
+
+      {# Headline #}
+      <div class="left-headline">
+        The smarter way to run<br>your institution.
+      </div>
+      <div class="left-subtext">
+        Attendance tracking, leave management, exams, fees, and more —
+        all in one unified platform.
+      </div>
+
+      {# Feature list #}
+      <div class="feature-list">
+        {% for icon, label in [
+        ('bi-camera-video-fill', 'Face Recognition Attendance'),
+        ('bi-shield-fill-check', 'Liveness Detection & Anti-Spoofing'),
+        ('bi-people-fill', 'Role-Based Access Control'),
+        ('bi-calendar-check-fill', 'Smart Leave Management'),
+        ('bi-journals', 'Exams, Marks & Reports'),
+        ('bi-collection-fill', 'Content & Study Materials'),
+        ] %}
+        <div class="feature-item">
+          <div class="feature-dot"><i class="bi {{ icon }}"></i></div>
+          <span>{{ label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# Role badges #}
+      <div class="role-badges">
+        <span class="role-badge role-admin">
+          <i class="bi bi-shield-fill me-1"></i>Admin
+        </span>
+        <span class="role-badge role-teacher">
+          <i class="bi bi-person-badge me-1"></i>Teacher
+        </span>
+        <span class="role-badge role-student">
+          <i class="bi bi-person me-1"></i>Student
+        </span>
+        <span class="role-badge role-parent">
+          <i class="bi bi-house-heart me-1"></i>Parent
+        </span>
+      </div>
+
+    </div>
+  </div>
+
+  {# ══════════════════════════════════════════════
+  RIGHT PANEL — login form
+  ══════════════════════════════════════════════ #}
+  <div class="auth-right">
+    <div class="auth-form-wrap">
+
+      {# Header #}
+      <div class="form-header">
+        <h2 class="form-title">Welcome back</h2>
+        <p class="form-sub">Sign in to your account to continue</p>
+      </div>
+
+      {# Flash messages #}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show mb-4 py-2 px-3 small" role="alert">
+        <i
+          class="bi bi-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-triangle{% else %}info-circle{% endif %}-fill me-2"></i>
+        {{ message }}
+        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+      {% endwith %}
+
+      {# Form #}
+      <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="field-group mb-4">
+          <label class="field-label">Email Address</label>
+          <div class="field-wrap">
+            <span class="field-icon"><i class="bi bi-envelope-fill"></i></span>
+            <input type="email" name="email" class="field-input" placeholder="you@college.edu" required autofocus
+              autocomplete="email">
+          </div>
+        </div>
+
+        <div class="field-group mb-3">
+          <label class="field-label">Password</label>
+          <div class="field-wrap">
+            <span class="field-icon"><i class="bi bi-lock-fill"></i></span>
+            <input type="password" name="password" id="pwInput" class="field-input" placeholder="Enter your password"
+              required autocomplete="current-password">
+            <button type="button" class="field-eye" id="togglePw" tabindex="-1" title="Toggle visibility">
+              <i class="bi bi-eye-fill" id="eyeIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between mb-5">
+          <label class="remember-label">
+            <input type="checkbox" name="remember" class="remember-check">
+            <span>Remember me</span>
+          </label>
+        </div>
+
+        <button type="submit" class="signin-btn">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+        </button>
+      </form>
+
+      {# Footer #}
+      <div class="form-footer">
+        <div class="security-line">
+          <span class="sec-badge"><i class="bi bi-lock-fill"></i> SSL Secured</span>
+          <span class="sec-badge"><i class="bi bi-shield-check-fill"></i> CSRF Protected</span>
+          <span class="sec-badge"><i class="bi bi-eye-slash-fill"></i> Rate Limited</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const pwInput = document.getElementById('pwInput');
+  const eyeIcon = document.getElementById('eyeIcon');
+  document.getElementById('togglePw').addEventListener('click', () => {
+    const show = pwInput.type === 'password';
+    pwInput.type = show ? 'text' : 'password';
+    eyeIcon.className = show ? 'bi bi-eye-slash-fill' : 'bi bi-eye-fill';
+  });
+</script>
+{% endblock %}

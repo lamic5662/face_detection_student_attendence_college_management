@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if notice else 'Post' }} Notice{% endblock %}
+{% block page_title %}<i class="bi bi-megaphone-fill me-2"></i>{{ 'Edit' if notice else 'Post' }} Notice{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body px-4 py-4">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Title <span class="text-danger">*</span></label>
+            <input type="text" name="title" class="form-control" required
+                   value="{{ notice.title if notice else '' }}" placeholder="Notice title…">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Content <span class="text-danger">*</span></label>
+            <textarea name="content" class="form-control" rows="7" required
+                      placeholder="Write the full notice here…">{{ notice.content if notice else '' }}</textarea>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Category</label>
+              <select name="category" class="form-select">
+                {% for cat in ['general','exam','holiday','event','fee','urgent'] %}
+                <option value="{{ cat }}" {% if notice and notice.category == cat %}selected{% endif %}>
+                  {{ cat.capitalize() }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Visible To</label>
+              <select name="target_role" class="form-select">
+                <option value="all" {% if notice and notice.target_role == 'all' %}selected{% endif %}>Everyone</option>
+                <option value="student" {% if notice and notice.target_role == 'student' %}selected{% endif %}>Students Only</option>
+                <option value="teacher" {% if notice and notice.target_role == 'teacher' %}selected{% endif %}>Teachers Only</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Expires At</label>
+              <input type="datetime-local" name="expires_at" class="form-control"
+                     value="{{ notice.expires_at.strftime('%Y-%m-%dT%H:%M') if notice and notice.expires_at else '' }}">
+            </div>
+          </div>
+          <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" name="is_pinned" id="pinCheck"
+                   {% if notice and notice.is_pinned %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="pinCheck">
+              <i class="bi bi-pin-angle-fill text-warning me-1"></i>Pin this notice to the top
+            </label>
+          </div>
+          <div class="d-flex gap-2">
+            <a href="{{ url_for('notice.list_notices') }}" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-primary fw-semibold px-4">
+              <i class="bi bi-send-fill me-2"></i>{{ 'Update' if notice else 'Post' }} Notice
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

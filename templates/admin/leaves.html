@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block title %}Leave Management{% endblock %}
+{% block page_title %}<i class="bi bi-calendar-x-fill me-2"></i>Leave Management{% endblock %}
+
+{% block content %}
+
+{# ── Summary badges ── #}
+<div class="d-flex gap-3 flex-wrap mb-4">
+  <div class="stat-mini stat-warning">
+    <i class="bi bi-hourglass-split me-1"></i>
+    {{ stu_pending|length + tch_pending|length }} Pending
+  </div>
+  <div class="stat-mini stat-info">
+    <i class="bi bi-people-fill me-1"></i>
+    {{ stu_pending|length }} Student (Full-Day)
+  </div>
+  <div class="stat-mini stat-purple">
+    <i class="bi bi-person-badge-fill me-1"></i>
+    {{ tch_pending|length }} Teacher
+  </div>
+</div>
+
+{# ── Tabs ── #}
+<ul class="nav nav-tabs mb-4" id="adminLeaveTabs">
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'student' %}active{% endif %}"
+       href="{{ url_for('leave.admin_leaves', tab='student') }}">
+      <i class="bi bi-people-fill me-1"></i>Student Full-Day Leaves
+      {% if stu_pending %}
+      <span class="badge bg-warning text-dark ms-1">{{ stu_pending|length }}</span>
+      {% endif %}
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if tab == 'teacher' %}active{% endif %}"
+       href="{{ url_for('leave.admin_leaves', tab='teacher') }}">
+      <i class="bi bi-person-badge-fill me-1"></i>Teacher Leaves
+      {% if tch_pending %}
+      <span class="badge bg-warning text-dark ms-1">{{ tch_pending|length }}</span>
+      {% endif %}
+    </a>
+  </li>
+</ul>
+
+{% if tab == 'student' %}
+{# ════════════════════════════════════════════════ #}
+{# Student Full-Day Leaves                         #}
+{# ════════════════════════════════════════════════ #}
+{% set pending  = stu_pending %}
+{% set reviewed = stu_reviewed %}
+{% set type_label = 'Student' %}
+{% else %}
+{# ════════════════════════════════════════════════ #}
+{# Teacher Leaves                                  #}
+{# ════════════════════════════════════════════════ #}
+{% set pending  = tch_pending %}
+{% set reviewed = tch_reviewed %}
+{% set type_label = 'Teacher' %}
+{% endif %}
+
+{# ── Pending ── #}
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0">
+      <i class="bi bi-hourglass-split text-warning me-2"></i>Pending — {{ type_label }} Leaves
+    </h6>
+    <span class="badge bg-warning text-dark">{{ pending|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if pending %}
+    <div class="d-flex flex-column">
+      {% for lr in pending %}
+      <div class="al-row px-4 py-4 border-bottom">
+        <div class="d-flex align-items-start gap-3">
+
+          {# Avatar #}
+          <div class="al-avatar">{{ lr.applicant_name[0].upper() }}</div>
+
+          <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="fw-semibold">{{ lr.applicant_name }}</span>
+              <span class="badge bg-secondary-subtle text-secondary" style="font-size:10px">
+                {{ lr.applicant_id_str }}
+              </span>
+              {% if lr.department %}
+              <span class="badge bg-primary-subtle text-primary" style="font-size:10px">
+                {{ lr.department.name }}
+              </span>
+              {% endif %}
+              {% if lr.student %}
+              <span class="badge bg-info-subtle text-info" style="font-size:10px">
+                Sem {{ lr.student.semester }}
+              </span>
+              {% endif %}
+              <span class="badge bg-light text-dark border" style="font-size:10px">
+                {{ lr.ref_number }}
+              </span>
+            </div>
+
+            <div class="d-flex gap-3 mt-1 flex-wrap text-muted small">
+              <span><i class="bi bi-calendar3 me-1"></i>
+                {{ lr.from_date.strftime('%d %b %Y') }}
+                {% if lr.from_date != lr.to_date %} → {{ lr.to_date.strftime('%d %b %Y') }}{% endif %}
+              </span>
+              <span><i class="bi bi-clock me-1"></i>{{ lr.days }} day{% if lr.days != 1 %}s{% endif %}</span>
+              <span><i class="bi bi-send me-1"></i>Applied {{ lr.created_at.strftime('%d %b %Y') }}</span>
+            </div>
+
+            <div class="al-reason mt-2">
+              <i class="bi bi-chat-right-text me-1 text-muted"></i>
+              {{ lr.reason }}
+            </div>
+          </div>
+
+          {# Actions #}
+          <div class="d-flex gap-2 flex-shrink-0 flex-column flex-sm-row">
+            <a href="{{ url_for('leave.view_letter', lid=lr.id) }}"
+               class="btn btn-sm btn-outline-secondary" title="View Letter">
+              <i class="bi bi-file-earmark-text me-1"></i>Letter
+            </a>
+            <button class="btn btn-sm btn-primary" data-bs-toggle="modal"
+                    data-bs-target="#adminModal{{ lr.id }}">
+              <i class="bi bi-pencil-square me-1"></i>Review
+            </button>
+            <button class="btn btn-sm btn-outline-danger" title="Delete"
+                    data-bs-toggle="modal" data-bs-target="#delPendModal{{ lr.id }}">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {# Admin Review Modal #}
+      <div class="modal fade" id="adminModal{{ lr.id }}" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header border-0">
+              <h6 class="modal-title fw-semibold">
+                Review Leave — {{ lr.applicant_name }}
+              </h6>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="bg-light rounded p-3 mb-3 small">
+                <div><strong>Applicant:</strong> {{ lr.applicant_name }} ({{ lr.applicant_id_str }})</div>
+                {% if lr.department %}
+                <div><strong>Department:</strong> {{ lr.department.name }}</div>
+                {% endif %}
+                <div><strong>Dates:</strong> {{ lr.from_date.strftime('%d %b %Y') }} →
+                  {{ lr.to_date.strftime('%d %b %Y') }} ({{ lr.days }} day(s))</div>
+                <div><strong>Ref:</strong> {{ lr.ref_number }}</div>
+                <div class="mt-1"><strong>Reason:</strong></div>
+                <div class="fst-italic mt-1">{{ lr.reason }}</div>
+              </div>
+
+              {% if tab == 'teacher' %}
+              <div class="alert alert-info py-2 px-3 small border-0 mb-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Approving this leave will <strong>automatically notify all students</strong>
+                in {{ lr.teacher.user.name if lr.teacher else 'this teacher' }}'s subjects
+                via the Notice Board.
+              </div>
+              {% endif %}
+
+              <form method="POST" action="{{ url_for('leave.admin_review_leave', lid=lr.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="action" id="aaction{{ lr.id }}" value="approved">
+                <div class="mb-3">
+                  <label class="form-label fw-semibold small">Remark (optional)</label>
+                  <input type="text" name="remark" class="form-control form-control-sm"
+                         placeholder="Add a note for the applicant…">
+                </div>
+                <div class="d-flex gap-2">
+                  <button type="submit" class="btn btn-success flex-grow-1"
+                          onclick="document.getElementById('aaction{{ lr.id }}').value='approved'">
+                    <i class="bi bi-check-circle-fill me-1"></i>Approve
+                    {% if tab == 'teacher' %}&amp; Notify Students{% endif %}
+                  </button>
+                  <button type="submit" class="btn btn-danger flex-grow-1"
+                          onclick="document.getElementById('aaction{{ lr.id }}').value='rejected'">
+                    <i class="bi bi-x-circle-fill me-1"></i>Reject
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-4">
+      <i class="bi bi-check-all fs-2 text-success d-block mb-2"></i>
+      No pending {{ type_label | lower }} leave requests.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Pending: delete option ── #}
+{# (delete button already in the pending row actions, handled below via modal) #}
+
+{# ── Reviewed history ── #}
+{% if reviewed %}
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex align-items-center gap-3">
+    <h6 class="fw-semibold mb-0 text-muted">
+      <i class="bi bi-clock-history me-2"></i>Recent Decisions
+      <span class="badge bg-secondary-subtle text-secondary ms-2">{{ reviewed|length }}</span>
+    </h6>
+    <div class="ms-auto d-flex gap-2">
+      <form method="POST" action="{{ url_for('leave.admin_bulk_delete_leaves') }}"
+            data-confirm="Delete all REJECTED {{ type_label }} leaves? This cannot be undone."
+            data-confirm-title="Delete Rejected Leaves"
+            data-confirm-type="danger"
+            data-confirm-ok="Yes, Delete All"
+            data-confirm-icon="bi-trash3-fill">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="tab"   value="{{ tab }}">
+        <input type="hidden" name="scope" value="rejected">
+        <button class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-trash3 me-1"></i>Delete All Rejected
+        </button>
+      </form>
+      <form method="POST" action="{{ url_for('leave.admin_bulk_delete_leaves') }}"
+            data-confirm="Delete ALL reviewed {{ type_label }} leave records (approved + rejected)? This cannot be undone."
+            data-confirm-title="Delete All Reviewed"
+            data-confirm-type="danger"
+            data-confirm-ok="Yes, Delete All"
+            data-confirm-icon="bi-archive-fill">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="tab"   value="{{ tab }}">
+        <input type="hidden" name="scope" value="all_reviewed">
+        <button class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-archive me-1"></i>Delete All Reviewed
+        </button>
+      </form>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Applicant</th>
+            <th>Ref</th>
+            <th>Dates</th>
+            <th>Days</th>
+            <th>Status</th>
+            <th>Remark</th>
+            <th>Reviewed</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lr in reviewed %}
+          <tr>
+            <td class="px-4">
+              <div class="fw-semibold small">{{ lr.applicant_name }}</div>
+              <div class="text-muted" style="font-size:11px">{{ lr.applicant_id_str }}</div>
+            </td>
+            <td><span class="badge bg-secondary-subtle text-secondary">{{ lr.ref_number }}</span></td>
+            <td class="text-muted small">
+              {{ lr.from_date.strftime('%d %b') }}–{{ lr.to_date.strftime('%d %b %Y') }}
+            </td>
+            <td><span class="badge bg-secondary">{{ lr.days }}d</span></td>
+            <td>
+              <span class="badge {% if lr.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">
+                <i class="bi bi-{% if lr.status == 'approved' %}check-circle{% else %}x-circle{% endif %} me-1"></i>
+                {{ lr.status.capitalize() }}
+              </span>
+            </td>
+            <td class="text-muted small">{{ lr.remark or '—' }}</td>
+            <td class="text-muted small">
+              {{ lr.reviewed_at.strftime('%d %b %Y') if lr.reviewed_at else '—' }}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{{ url_for('leave.view_letter', lid=lr.id) }}"
+                   class="btn btn-sm btn-outline-secondary py-1 px-2" title="View Letter">
+                  <i class="bi bi-file-earmark-text"></i>
+                </a>
+                <form method="POST"
+                      action="{{ url_for('leave.admin_delete_leave', lid=lr.id) }}"
+                      data-confirm="Delete leave record {{ lr.ref_number }}? This cannot be undone."
+                      data-confirm-title="Delete Leave Record"
+                      data-confirm-type="danger"
+                      data-confirm-ok="Delete"
+                      data-confirm-icon="bi-trash3-fill">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Delete Record">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Delete pending modal trigger is inline in pending rows ── #}
+{% for lr in pending %}
+<div class="modal fade" id="delPendModal{{ lr.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h6 class="modal-title fw-semibold text-danger">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>Delete Pending Leave?
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body small">
+        <p>This will permanently delete <strong>{{ lr.ref_number }}</strong>
+        ({{ lr.applicant_name }}) without reviewing it.</p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button class="btn btn-sm btn-light" data-bs-dismiss="modal">Cancel</button>
+        <form method="POST" action="{{ url_for('leave.admin_delete_leave', lid=lr.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-sm btn-danger">
+            <i class="bi bi-trash3 me-1"></i>Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+.stat-mini {
+  display: inline-flex; align-items: center;
+  padding: 6px 16px; border-radius: 20px;
+  font-size: 13px; font-weight: 600;
+}
+.stat-warning { background: #fef3c7; color: #92400e; }
+.stat-info    { background: #e0f2fe; color: #0369a1; }
+.stat-purple  { background: #ede9fe; color: #6d28d9; }
+
+.al-row { transition: background .15s; }
+.al-row:hover { background: #f8fafc; }
+
+.al-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; font-weight: 700; font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.al-reason {
+  font-size: 13px; color: #334155;
+  background: #f8fafc; border-radius: 6px;
+  padding: 8px 12px; border-left: 3px solid #94a3b8;
+  font-style: italic;
+}
+</style>
+{% endblock %}

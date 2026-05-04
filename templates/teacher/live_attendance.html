@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% block title %}Live Attendance — {{ subject.name }}{% endblock %}
+{% block page_title %}
+  <i class="bi bi-record-circle-fill text-danger me-2"></i>
+  Live Attendance &mdash; {{ subject.name }}
+{% endblock %}
+
+{% block head %}
+<style>
+  #video-container { position:relative; border-radius:12px; overflow:hidden; background:#000; }
+  #webcam { width:100%; height:360px; object-fit:cover; display:block; }
+  #overlay { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }
+  .face-box { position:absolute; border:3px solid #00ff88; border-radius:4px; transition:all 0.1s; }
+  .face-label { position:absolute; bottom:-28px; left:0; background:rgba(0,255,136,0.9);
+                color:#000; font-size:11px; font-weight:600; padding:2px 6px; border-radius:3px;
+                white-space:nowrap; }
+  .liveness-indicator { display:inline-block; width:10px; height:10px; border-radius:50%;
+                         animation:pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .student-row.present { background:#f0fff4; }
+  .student-row.present td:first-child { border-left:4px solid #198754; }
+  .timer { font-family:monospace; font-size:1.5rem; font-weight:700; }
+  .btn-xs { padding:2px 7px; font-size:12px; border-radius:6px !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Camera Feed -->
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+        <h6 class="fw-semibold mb-0">
+          <span class="liveness-indicator bg-danger me-2"></span>
+          Camera Feed
+        </h6>
+        <div class="timer text-primary" id="sessionTimer">00:00</div>
+      </div>
+      <div class="card-body px-4 pb-3">
+        <div id="video-container">
+          <video id="webcam" autoplay playsinline muted></video>
+          <canvas id="overlay"></canvas>
+        </div>
+
+        <div class="mt-3 d-flex gap-2 align-items-center">
+          <div id="statusBadge" class="badge bg-secondary px-3 py-2">
+            <i class="bi bi-hourglass me-1"></i>Initialising camera...
+          </div>
+          <div class="ms-auto">
+            <span class="text-muted small" id="fpsDisplay"></span>
+          </div>
+        </div>
+
+        <!-- EAR / Liveness Info -->
+        <div class="row g-2 mt-2">
+          <div class="col-6">
+            <div class="bg-light rounded p-2 text-center">
+              <div class="small text-muted">EAR Value</div>
+              <div class="fw-bold text-primary" id="earDisplay">—</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="bg-light rounded p-2 text-center">
+              <div class="small text-muted">Faces Detected</div>
+              <div class="fw-bold text-primary" id="facesDisplay">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer bg-transparent border-0 px-4 pb-4">
+        {% if session.status == 'active' %}
+        <div class="d-flex gap-2">
+          <button id="startBtn" class="btn btn-success btn-lg flex-grow-1 fw-semibold">
+            <i class="bi bi-camera-video-fill me-2"></i>Start Recognition
+          </button>
+          <button id="stopBtn" class="btn btn-outline-secondary btn-lg" style="display:none">
+            <i class="bi bi-pause-fill me-2"></i>Pause
+          </button>
+        </div>
+        <div class="d-flex gap-2 mt-2">
+          <form method="POST" action="{{ url_for('teacher.complete_session', session_id=session.id) }}" class="flex-grow-1"
+                data-confirm="Complete this session? All absent students will be finalised and the session will be locked."
+                data-confirm-title="Complete Session"
+                data-confirm-type="warning"
+                data-confirm-ok="Complete Session"
+                data-confirm-icon="bi-check-circle-fill">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-danger w-100 fw-semibold">
+              <i class="bi bi-check-circle-fill me-2"></i>Complete Session
+            </button>
+          </form>
+          <form method="POST" action="{{ url_for('teacher.cancel_session', session_id=session.id) }}"
+                data-confirm="Cancel this session? All attendance records will be discarded and cannot be recovered."
+                data-confirm-title="Cancel Session"
+                data-confirm-type="danger"
+                data-confirm-ok="Yes, Cancel"
+                data-confirm-icon="bi-x-circle-fill">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-secondary fw-semibold">
+              <i class="bi bi-x-circle me-1"></i>Cancel
+            </button>
+          </form>
+        </div>
+        {% else %}
+        <div class="alert alert-secondary mb-0">Session is {{ session.status }}.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Student List -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-people-fill text-primary me-2"></i>Students</h6>
+        <div class="d-flex gap-2 align-items-center">
+          <span class="badge bg-success" id="presentCount">0 Present</span>
+          <span class="badge bg-danger" id="absentCount">{{ students_info|length }} Absent</span>
+        </div>
+      </div>
+      <div class="card-body p-0" style="overflow-y:auto;max-height:520px">
+        <table class="table table-hover mb-0" id="studentTable">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th class="px-3">Student</th>
+              <th>Face</th>
+              <th>Status</th>
+              <th>Manual</th>
+            </tr>
+          </thead>
+          <tbody id="studentRows">
+            {% for s in students_info %}
+            <tr class="student-row {% if s.status == 'present' %}present{% endif %}" id="row-{{ s.id }}">
+              <td class="px-3">
+                <div class="fw-semibold small">{{ s.name }}</div>
+                <div class="text-muted" style="font-size:11px">{{ s.roll }}</div>
+              </td>
+              <td>
+                {% if s.face_enrolled %}
+                  <i class="bi bi-check-circle-fill text-success" title="Enrolled"></i>
+                {% else %}
+                  <i class="bi bi-x-circle-fill text-danger" title="Not enrolled"></i>
+                {% endif %}
+              </td>
+              <td id="status-{{ s.id }}">
+                <span class="badge {% if s.status == 'present' %}bg-success{% else %}bg-danger{% endif %}">
+                  {{ s.status.capitalize() }}
+                </span>
+                {% if s.liveness %}<i class="bi bi-eye-fill text-info ms-1" title="Liveness verified"></i>{% endif %}
+              </td>
+              <td>
+                {% if session.status == 'active' %}
+                <button class="btn btn-xs manual-btn
+                               {% if s.status == 'present' %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                        data-id="{{ s.id }}"
+                        data-status="{{ s.status }}"
+                        title="{% if s.status == 'present' %}Mark Absent{% else %}Mark Present{% endif %}">
+                  <i class="bi bi-{% if s.status == 'present' %}x-circle{% else %}check-circle{% endif %}"></i>
+                </button>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="card-footer bg-transparent border-0 px-4 pb-4">
+        <div class="d-flex justify-content-between small mb-1">
+          <span class="text-muted">Attendance Progress</span>
+          <span id="progressPct" class="fw-semibold">0%</span>
+        </div>
+        <div class="progress" style="height:8px">
+          <div class="progress-bar bg-success" id="progressBar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SESSION_ID = {{ session.id }};
+const TOTAL_STUDENTS = {{ students_info|length }};
+const PROCESS_URL = "{{ url_for('teacher.process_frame', session_id=session.id) }}";
+const STATUS_URL = "{{ url_for('teacher.session_status', session_id=session.id) }}";
+
+let stream = null;
+let processing = false;
+let frameInterval = null;
+let pollInterval = null;
+let startTime = null;
+let timerInterval = null;
+
+const video = document.getElementById('webcam');
+const canvas = document.getElementById('overlay');
+const ctx = canvas.getContext('2d');
+
+// ── Timer ──────────────────────────────────────────────────────────────────
+function startTimer() {
+  startTime = Date.now();
+  timerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+    const s = String(elapsed % 60).padStart(2, '0');
+    document.getElementById('sessionTimer').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+// ── Camera ─────────────────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user' }
+    });
+    video.srcObject = stream;
+    await new Promise(r => video.onloadedmetadata = r);
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    document.getElementById('statusBadge').innerHTML =
+      '<i class="bi bi-camera-video-fill me-1"></i>Camera ready';
+    document.getElementById('statusBadge').className = 'badge bg-success px-3 py-2';
+  } catch (err) {
+    document.getElementById('statusBadge').innerHTML = `<i class="bi bi-exclamation-triangle me-1"></i>Camera error: ${err.message}`;
+    document.getElementById('statusBadge').className = 'badge bg-danger px-3 py-2';
+  }
+}
+
+// ── Capture frame as base64 ────────────────────────────────────────────────
+function captureFrame() {
+  const cap = document.createElement('canvas');
+  cap.width = video.videoWidth;
+  cap.height = video.videoHeight;
+  cap.getContext('2d').drawImage(video, 0, 0);
+  return cap.toDataURL('image/jpeg', 0.7);
+}
+
+// ── Send frame to server ───────────────────────────────────────────────────
+async function processFrame() {
+  if (!stream || processing) return;
+  processing = true;
+  const frameData = captureFrame();
+
+  try {
+    const resp = await fetch(PROCESS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frame: frameData }),
+    });
+    const data = await resp.json();
+    document.getElementById('facesDisplay').textContent = data.results?.length || 0;
+
+    if (data.results) {
+      for (const r of data.results) {
+        if (!r.student_id) continue;
+        if (r.status === 'present') {
+          updateStudentRow(r.student_id, r.status, r.liveness_verified);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Frame process error:', e);
+  }
+  processing = false;
+}
+
+// ── Poll for full status ───────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const resp = await fetch(STATUS_URL);
+    const data = await resp.json();
+    updateCounts(data.present, data.absent, data.total);
+
+    for (const r of data.records) {
+      if (r.status === 'present') {
+        updateStudentRow(r.student_id, r.status, r.liveness, r.marked_at);
+      }
+    }
+  } catch (e) {}
+}
+
+function updateStudentRow(studentId, status, liveness, markedAt) {
+  const row = document.getElementById(`row-${studentId}`);
+  const statusCell = document.getElementById(`status-${studentId}`);
+  const timeCell = document.getElementById(`time-${studentId}`);
+  if (!row || !statusCell) return;
+
+  if (status === 'present') {
+    row.classList.add('present');
+    statusCell.innerHTML = '<span class="badge bg-success">Present</span>';
+    if (liveness) statusCell.innerHTML += ' <i class="bi bi-eye-fill text-info" title="Liveness verified"></i>';
+    if (markedAt) timeCell.textContent = markedAt;
+  }
+}
+
+function updateCounts(present, absent, total) {
+  document.getElementById('presentCount').textContent = `${present} Present`;
+  document.getElementById('absentCount').textContent = `${absent} Absent`;
+  const pct = total > 0 ? Math.round(present / total * 100) : 0;
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+}
+
+// ── Start / Stop buttons ───────────────────────────────────────────────────
+document.getElementById('startBtn')?.addEventListener('click', async () => {
+  if (!stream) await startCamera();
+  document.getElementById('startBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = 'inline-flex';
+  document.getElementById('statusBadge').innerHTML = '<i class="bi bi-cpu-fill me-1"></i>Recognising faces...';
+  document.getElementById('statusBadge').className = 'badge bg-primary px-3 py-2';
+
+  startTimer();
+  frameInterval = setInterval(processFrame, 800);
+  pollInterval = setInterval(pollStatus, 3000);
+});
+
+document.getElementById('stopBtn')?.addEventListener('click', () => {
+  clearInterval(frameInterval);
+  clearInterval(timerInterval);
+  document.getElementById('startBtn').style.display = 'inline-flex';
+  document.getElementById('stopBtn').style.display = 'none';
+  document.getElementById('statusBadge').innerHTML = '<i class="bi bi-pause-fill me-1"></i>Paused';
+  document.getElementById('statusBadge').className = 'badge bg-warning text-dark px-3 py-2';
+});
+
+// ── Manual mark buttons ────────────────────────────────────────────────────
+const MANUAL_URL = "{{ url_for('teacher.manual_mark', session_id=session.id) }}";
+
+document.querySelectorAll('.manual-btn').forEach(btn => {
+  btn.addEventListener('click', async function() {
+    const studentId  = parseInt(this.dataset.id);
+    const curStatus  = this.dataset.status;
+    const newStatus  = curStatus === 'present' ? 'absent' : 'present';
+
+    this.disabled = true;
+    try {
+      const resp = await fetch(MANUAL_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id: studentId, status: newStatus }),
+      });
+      const data = await resp.json();
+      if (data.success) {
+        updateStudentRow(studentId, newStatus, false, data.marked_at);
+        this.dataset.status = newStatus;
+        this.className = `btn btn-xs manual-btn ${newStatus === 'present' ? 'btn-outline-danger' : 'btn-outline-success'}`;
+        this.title = newStatus === 'present' ? 'Mark Absent' : 'Mark Present';
+        this.innerHTML = `<i class="bi bi-${newStatus === 'present' ? 'x-circle' : 'check-circle'}"></i>`;
+        await pollStatus();
+      }
+    } catch (e) { console.warn('manual mark error:', e); }
+    this.disabled = false;
+  });
+});
+
+// Initialise camera on page load
+startCamera();
+pollStatus();
+</script>
+{% endblock %}

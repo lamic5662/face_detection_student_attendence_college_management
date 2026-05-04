@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Preview — {{ item.title }}{% endblock %}
+{% block page_title %}
+  <i class="bi bi-eye-fill me-2"></i>{{ item.title }}
+{% endblock %}
+
+{% block content %}
+
+{# ── Header bar ── #}
+<div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+  <a href="{{ back_url if back_url is defined else url_for('student.student_content') }}"
+     class="btn btn-light btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="type-badge type-{{ item.content_type }}">
+      {% if item.content_type == 'note' %}<i class="bi bi-journal-text me-1"></i>Note
+      {% elif item.content_type == 'assignment' %}<i class="bi bi-clipboard-check me-1"></i>Assignment
+      {% elif item.content_type == 'lab' %}<i class="bi bi-flask me-1"></i>Lab Work
+      {% else %}<i class="bi bi-patch-question-fill me-1"></i>Question{% endif %}
+    </span>
+    {% if item.subject %}
+    <span class="badge bg-secondary-subtle text-secondary">{{ item.subject.name }} ({{ item.subject.code }})</span>
+    {% endif %}
+    {% if item.due_date %}
+    <span class="badge bg-danger-subtle text-danger">
+      <i class="bi bi-calendar-event me-1"></i>Due {{ item.due_date.strftime('%d %b %Y') }}
+    </span>
+    {% endif %}
+    {% if item.marks %}
+    <span class="badge bg-warning-subtle text-warning">
+      <i class="bi bi-trophy me-1"></i>{{ item.marks }} marks
+    </span>
+    {% endif %}
+  </div>
+
+  {% if download_url %}
+  <a href="{{ download_url }}" target="_blank"
+     class="btn btn-sm btn-primary ms-auto">
+    <i class="bi bi-download me-1"></i>Download
+  </a>
+  {% endif %}
+</div>
+
+{# ── Description / body ── #}
+{% if show_note_body %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body px-4 py-4">
+    <h6 class="fw-semibold text-secondary mb-3 small text-uppercase tracking-wide">Note Contents</h6>
+    <div class="note-body-preview">{{ item.body }}</div>
+  </div>
+</div>
+{% elif item.body and preview_type != 'content' %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body px-4 py-3">
+    <h6 class="fw-semibold text-secondary mb-2 small text-uppercase tracking-wide">Description</h6>
+    <p class="mb-0" style="white-space: pre-wrap; font-size: 14px; line-height: 1.7">{{ item.body }}</p>
+  </div>
+</div>
+{% endif %}
+
+{# ── File preview ── #}
+<div class="card border-0 shadow-sm" id="previewCard">
+  <div class="card-header bg-transparent border-bottom px-4 py-3 d-flex align-items-center gap-2">
+    <span class="fw-semibold">
+      {% if preview_type == 'content' %}
+        <i class="bi bi-journal-richtext text-primary me-2"></i>Content Preview
+      {% elif preview_type == 'pdf' %}
+        <i class="bi bi-file-earmark-pdf-fill text-danger me-2"></i>PDF Preview
+      {% elif preview_type == 'pptx' %}
+        <i class="bi bi-file-earmark-slides-fill text-warning me-2" style="color:#d04a02!important"></i>Presentation Preview
+      {% elif preview_type in ('docx', 'doc') %}
+        <i class="bi bi-file-earmark-word-fill me-2" style="color:#2b579a"></i>Document Preview
+      {% elif preview_type in ('png','jpg','jpeg','gif','webp','bmp') %}
+        <i class="bi bi-file-earmark-image-fill text-success me-2"></i>Image Preview
+      {% else %}
+        <i class="bi bi-file-earmark-fill me-2"></i>File Preview
+      {% endif %}
+    </span>
+    <span class="badge bg-secondary-subtle text-secondary ms-auto" style="font-size:11px">
+      {{ 'Body Only' if preview_type == 'content' else '.' ~ (preview_type | upper) }}
+    </span>
+
+    {# PPTX slide navigator buttons #}
+    {% if preview_type == 'pptx' and preview_html %}
+    <div class="d-flex align-items-center gap-2 ms-3">
+      <button class="btn btn-sm btn-outline-secondary" onclick="navigateSlide(-1)" id="prevSlide" disabled>
+        <i class="bi bi-chevron-left"></i>
+      </button>
+      <span class="small fw-semibold" id="slideIndicator">1 / 1</span>
+      <button class="btn btn-sm btn-outline-secondary" onclick="navigateSlide(1)" id="nextSlide">
+        <i class="bi bi-chevron-right"></i>
+      </button>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card-body p-0" id="previewBody">
+
+    {# ── Error state ── #}
+    {% if error %}
+    <div class="text-center text-muted py-5 px-4">
+      <i class="bi bi-exclamation-triangle fs-1 d-block mb-3 text-warning"></i>
+      <div class="fw-semibold mb-2">Could not render file preview</div>
+      <div class="small text-muted">{{ error }}</div>
+      {% if download_url %}
+      <a href="{{ download_url }}" target="_blank" class="btn btn-sm btn-outline-primary mt-3">
+        <i class="bi bi-download me-1"></i>Download to view
+      </a>
+      {% endif %}
+    </div>
+
+    {# ── PDF ── #}
+    {% elif preview_type == 'content' %}
+    <div class="docx-viewer px-4 py-4">
+      {% if show_note_body %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-journal-richtext fs-1 d-block mb-3 opacity-50"></i>
+        <div class="fw-semibold mb-2">The full note contents are shown above.</div>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-journal-richtext fs-1 d-block mb-3 opacity-50"></i>
+        <div class="fw-semibold mb-2">This item has no file preview.</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% elif preview_type == 'pdf' %}
+    <div class="pdf-wrapper">
+      <embed src="{{ file_url }}"
+             type="application/pdf"
+             id="pdfEmbed"
+             class="w-100"
+             style="height: 80vh; min-height: 500px; display: block;">
+      {# Fallback for browsers that block embedded PDFs #}
+      <noscript>
+        <div class="text-center py-5">
+          <a href="{{ download_url }}" target="_blank" class="btn btn-primary">
+            <i class="bi bi-download me-1"></i>Open PDF
+          </a>
+        </div>
+      </noscript>
+    </div>
+
+    {# ── PPTX ── #}
+    {% elif preview_type == 'pptx' and preview_html %}
+    <div class="pptx-viewer px-4 py-3" id="pptxViewer">
+      {{ preview_html | safe }}
+    </div>
+
+    {# ── DOCX / DOC ── #}
+    {% elif preview_type in ('docx', 'doc', 'txt', 'csv') and preview_html %}
+    <div class="docx-viewer px-4 py-4">
+      {{ preview_html | safe }}
+    </div>
+
+    {# ── Images ── #}
+    {% elif preview_type in ('png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp') %}
+    <div class="text-center p-4">
+      <img src="{{ file_url }}" alt="{{ item.title }}"
+           class="img-fluid rounded shadow-sm" style="max-height: 80vh;">
+    </div>
+
+    {# ── Unsupported / no preview ── #}
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-file-earmark-fill fs-1 d-block mb-3 opacity-25"></i>
+      <div class="fw-semibold mb-2">No in-browser preview for .{{ preview_type | upper }} files</div>
+      <a href="{{ download_url }}" target="_blank" class="btn btn-outline-primary btn-sm mt-1">
+        <i class="bi bi-download me-1"></i>Download file
+      </a>
+    </div>
+    {% endif %}
+
+  </div>{# /card-body #}
+</div>{# /card #}
+
+{% endblock %}
+
+
+{% block scripts %}
+<style>
+/* Type badges */
+.type-badge {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600;
+}
+.type-note       { background: #dbeafe; color: #1d4ed8; }
+.type-assignment { background: #ede9fe; color: #6d28d9; }
+.type-lab        { background: #ffedd5; color: #c2410c; }
+.type-question   { background: #ccfbf1; color: #0f766e; }
+
+/* ── PPTX viewer ── */
+.pptx-viewer {
+  background: #f1f5f9;
+  min-height: 400px;
+}
+.pptx-slide {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  padding: 32px 40px 28px;
+  margin-bottom: 24px;
+  min-height: 300px;
+  position: relative;
+  display: none;
+}
+.pptx-slide.active { display: block; }
+.slide-num-badge {
+  position: absolute;
+  top: 12px; right: 16px;
+  font-size: 11px; color: #94a3b8;
+  font-weight: 600; letter-spacing: .04em;
+}
+.slide-title {
+  font-size: 22px; font-weight: 700;
+  color: #1e293b; margin: 0 0 16px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 12px;
+  line-height: 1.3;
+}
+.slide-para {
+  font-size: 14px; color: #334155;
+  margin: 0 0 8px; line-height: 1.65;
+}
+.slide-img {
+  max-width: 100%; max-height: 320px;
+  border-radius: 6px; margin: 10px 0;
+  display: block; object-fit: contain;
+}
+
+/* ── DOCX viewer ── */
+.docx-viewer {
+  max-width: 820px;
+  margin: 0 auto;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #1e293b;
+}
+.docx-h1 {
+  font-size: 24px; font-weight: 700;
+  color: #0f172a; margin: 28px 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e2e8f0;
+}
+.docx-h2 {
+  font-size: 19px; font-weight: 700;
+  color: #1e293b; margin: 22px 0 8px;
+}
+.docx-h3 {
+  font-size: 16px; font-weight: 600;
+  color: #334155; margin: 16px 0 6px;
+}
+.docx-para { margin: 0 0 8px; }
+.docx-list {
+  padding-left: 24px; margin: 6px 0 12px;
+}
+.docx-list li { margin-bottom: 4px; }
+.text-file-preview {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #1e293b;
+}
+.note-body-preview {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 15px;
+  line-height: 1.9;
+  color: #1e293b;
+}
+</style>
+
+{% if preview_type == 'pptx' and preview_html %}
+<script>
+(function () {
+  const slides = document.querySelectorAll('.pptx-slide');
+  let current = 0;
+
+  function show(idx) {
+    slides.forEach(s => s.classList.remove('active'));
+    slides[idx].classList.add('active');
+    document.getElementById('slideIndicator').textContent =
+      `${idx + 1} / ${slides.length}`;
+    document.getElementById('prevSlide').disabled = idx === 0;
+    document.getElementById('nextSlide').disabled = idx === slides.length - 1;
+    current = idx;
+  }
+
+  window.navigateSlide = function(delta) {
+    const next = current + delta;
+    if (next >= 0 && next < slides.length) show(next);
+  };
+
+  // Keyboard nav
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigateSlide(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   navigateSlide(-1);
+  });
+
+  if (slides.length > 0) show(0);
+})();
+</script>
+{% endif %}
+
+{# PDF fallback — if embed is blocked, show a link overlay #}
+{% if preview_type == 'pdf' %}
+<script>
+window.addEventListener('load', function() {
+  const em = document.getElementById('pdfEmbed');
+  if (!em) return;
+  // Some browsers (like Firefox on some configs) won't fire error on embed;
+  // just ensure it has a height so the card looks intentional
+  em.style.minHeight = '500px';
+});
+</script>
+{% endif %}
+
+{% endblock %}
