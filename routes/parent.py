@@ -272,6 +272,8 @@ def parent_marksheet(student_id):
     ParentStudent.query.filter_by(
         parent_id=current_user.id, student_id=student_id
     ).first_or_404()
-    student = Student.query.get_or_404(student_id)
+    student = db.session.get(Student, student_id)
+    if student is None:
+        abort(404)
     data = build_marksheet_data(student)
-    return render_template('exam/marksheet.html', **data, is_admin=False)
+    return render_template('exam/marksheet.html', **data, is_admin=False, is_parent=True)

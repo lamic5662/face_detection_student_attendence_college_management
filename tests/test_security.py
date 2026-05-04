@@ -80,3 +80,16 @@ def test_student_can_fetch_private_note_attachment(app, client):
 
     assert response.status_code == 200
     assert response.data == b'private note body'
+
+
+def test_parent_can_open_linked_child_marksheet(app, client):
+    login(client, 'parent1@example.com')
+    student_id = app.config['TEST_DATA']['student_profile_id']
+
+    response = client.get('/parent/marksheets')
+    assert response.status_code == 200
+    assert b'View Full Marksheet' in response.data
+
+    child_response = client.get(f'/parent/marksheet/{student_id}')
+    assert child_response.status_code == 200
+    assert b'Child Marksheet' in child_response.data

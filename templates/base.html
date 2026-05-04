@@ -175,6 +175,9 @@
     <li><a href="{{ url_for('parent.dashboard') }}" class="{% if request.endpoint == 'parent.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
       <i class="bi bi-house-heart-fill"></i><span>Dashboard</span>
     </a></li>
+    <li><a href="{{ url_for('parent.parent_marksheets') }}" class="{% if request.endpoint in ('parent.parent_marksheets', 'parent.parent_marksheet') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Marksheets">
+      <i class="bi bi-award-fill"></i><span>Marksheets</span>
+    </a></li>
     <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
       <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
     </a></li>

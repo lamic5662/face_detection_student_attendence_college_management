@@ -1366,7 +1366,7 @@ def admin_marksheet(student_id):
     from routes.exam import build_marksheet_data
     student = Student.query.get_or_404(student_id)
     data    = build_marksheet_data(student)
-    return render_template('exam/marksheet.html', **data, is_admin=True)
+    return render_template('exam/marksheet.html', **data, is_admin=True, is_parent=False)
 
 
 # ── Admin: marksheet signature management ─────────────────────────────────────

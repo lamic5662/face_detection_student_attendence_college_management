@@ -2,7 +2,7 @@
 {% block title %}Marksheet — {{ student.user.name }}{% endblock %}
 {% block page_title %}
   <i class="bi bi-award-fill me-2"></i>
-  {% if is_admin %}Student Marksheet{% else %}My Marksheet{% endif %}
+  {% if is_admin %}Student Marksheet{% elif is_parent %}Child Marksheet{% else %}My Marksheet{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -12,6 +12,10 @@
   {% if is_admin %}
   <a href="{{ url_for('admin.marksheet_list') }}" class="btn btn-sm btn-outline-secondary">
     <i class="bi bi-arrow-left me-1"></i>Back to Students
+  </a>
+  {% elif is_parent %}
+  <a href="{{ url_for('parent.parent_marksheets') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Marksheets
   </a>
   {% else %}
   <a href="{{ url_for('exam.student_results') }}" class="btn btn-sm btn-outline-secondary">

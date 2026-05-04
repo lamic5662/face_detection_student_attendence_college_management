@@ -383,4 +383,4 @@ def admin_exams():
 def student_marksheet():
     student = current_user.student_profile
     data = build_marksheet_data(student)
-    return render_template('exam/marksheet.html', **data, is_admin=False)
+    return render_template('exam/marksheet.html', **data, is_admin=False, is_parent=False)

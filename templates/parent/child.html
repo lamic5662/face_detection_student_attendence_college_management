@@ -15,6 +15,9 @@
   <a href="{{ url_for('parent.dashboard') }}" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-arrow-left me-1"></i>Back
   </a>
+  <a href="{{ url_for('parent.parent_marksheet', student_id=student.id) }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-award-fill me-1"></i>View Marksheet
+  </a>
   <span class="text-muted small">{{ relationship.title() }} of {{ student.user.name }} &bull;
     {{ student.department.name }} &bull; Semester {{ student.semester }}</span>
 </div>

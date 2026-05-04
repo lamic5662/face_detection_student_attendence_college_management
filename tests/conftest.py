@@ -17,6 +17,7 @@ from models import Department, Subject, User
 from models.attendance import AttendanceSession
 from models.content import TeacherContent
 from models.notice import Notice
+from models.parent import ParentStudent
 from models.student import Student
 from models.teacher import Teacher
 
@@ -54,9 +55,11 @@ def app():
         other_teacher_user.set_password('Password@123')
         student_user = User(name='Student One', email='student1@example.com', role='student')
         student_user.set_password('Password@123')
+        parent_user = User(name='Parent One', email='parent1@example.com', role='parent')
+        parent_user.set_password('Password@123')
         admin_user = User(name='Admin User', email='admin@example.com', role='admin')
         admin_user.set_password('Password@123')
-        db.session.add_all([teacher_user, other_teacher_user, student_user, admin_user])
+        db.session.add_all([teacher_user, other_teacher_user, student_user, parent_user, admin_user])
         db.session.flush()
 
         teacher = Teacher(user_id=teacher_user.id, employee_id='T-001', department_id=dept.id)
@@ -115,11 +118,14 @@ def app():
             is_published=True,
         )
         db.session.add(content)
+        db.session.add(ParentStudent(parent_id=parent_user.id, student_id=student.id, relationship='guardian'))
         db.session.commit()
 
         app.config['TEST_DATA'] = {
             'teacher_user_id': teacher_user.id,
             'student_user_id': student_user.id,
+            'student_profile_id': student.id,
+            'parent_user_id': parent_user.id,
             'foreign_session_id': foreign_session.id,
             'other_subject_id': other_subject.id,
             'teacher_notice_id': teacher_only_notice.id,
