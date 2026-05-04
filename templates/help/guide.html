@@ -97,7 +97,7 @@
       <p class="opacity-75 mb-0">Complete step-by-step guide for all features available to {{ meta[r].label|lower }}s.</p>
     </div>
     <div class="ms-auto text-end no-print">
-      <div class="opacity-60 small">Version 1.0</div>
+      <div class="opacity-60 small">Version 1.1</div>
       <div class="opacity-60 small">{{ college_name }}</div>
     </div>
   </div>
@@ -113,7 +113,7 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-primary"></i>Table of Contents</h6>
     <div class="row g-2">
-      {% for num, title in [('1','Dashboard Overview'),('2','Managing Students'),('3','Managing Teachers'),('4','Parent Accounts'),('5','Attendance Sessions'),('6','Subjects & Departments'),('7','Fee Management'),('8','Exams & Marks'),('9','Notice Board'),('10','Timetable'),('11','College Settings'),('12','Reports & Analytics')] %}
+      {% for num, title in [('1','Dashboard Overview'),('2','Managing Students'),('3','Managing Teachers'),('4','Parent Accounts'),('5','Attendance Sessions'),('6','Subjects & Departments'),('7','Fee Management'),('8','Exams & Marks'),('9','Notice Board'),('10','Timetable'),('11','College Settings'),('12','Reports & Analytics'),('13','ID Cards'),('14','File Manager')] %}
       <div class="col-md-6">
         <a href="#admin-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
           <span class="badge bg-primary-subtle text-primary fw-semibold" style="min-width:28px">{{ num }}</span>
@@ -189,7 +189,9 @@
     <div class="step-row"><span class="step-badge">1</span><div>Click <strong>+ Add Student</strong> → fill in Name, Email, Roll Number, Department, Semester → click <strong>Save</strong>. A password is auto-generated and emailed.</div></div>
     <div class="step-row"><span class="step-badge">2</span><div>Click the <strong>edit (✏) icon</strong> in any row to update a student's details.</div></div>
     <div class="step-row"><span class="step-badge">3</span><div>Use the <strong>Department / Semester filter</strong> dropdowns at the top to narrow the list.</div></div>
-    <div class="step-row"><span class="step-badge">4</span><div>Click <strong>Export CSV</strong> to download the full student list as a spreadsheet.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Use <strong>Import CSV</strong> when you need to create many students at once. Keep the spreadsheet columns aligned with the sample format used by the system.</div></div>
+    <div class="step-row"><span class="step-badge">5</span><div>Open a student's <strong>Attendance</strong> view from the list to inspect subject-wise records and export their data.</div></div>
+    <div class="step-row"><span class="step-badge">6</span><div>Click <strong>Export CSV</strong> to download the full student list as a spreadsheet.</div></div>
     <div class="warn-box mt-3"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i><strong>Note:</strong> Deactivating a student (toggle Active) prevents them from logging in but keeps their attendance history intact.</div>
   </div>
 </div>
@@ -201,7 +203,7 @@
     <p class="text-muted small">Add teachers and assign them to subjects. Navigate to <strong>Sidebar → Teachers</strong>.</p>
     <div class="step-row"><span class="step-badge">1</span><div>Click <strong>+ Add Teacher</strong> → enter Name, Email, Employee ID → <strong>Save</strong>.</div></div>
     <div class="step-row"><span class="step-badge">2</span><div>Go to <strong>Subjects</strong> and assign each subject to a teacher using the Teacher dropdown when creating/editing a subject.</div></div>
-    <div class="step-row"><span class="step-badge">3</span><div>Use <strong>All Users</strong> in the sidebar to reset any teacher's password or deactivate their account.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Use <strong>All Users</strong> in the sidebar to reset any teacher's password, change their access state, or disable login without deleting academic history.</div></div>
     <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Each teacher can see only the subjects assigned to them and can take attendance only for those subjects.</div>
   </div>
 </div>
@@ -215,6 +217,7 @@
     <div class="step-row"><span class="step-badge">2</span><div>In the parent's row, click <strong>Link Child</strong> → select the student and specify the relationship (Father / Mother / Guardian) → <strong>Link</strong>.</div></div>
     <div class="step-row"><span class="step-badge">3</span><div>One parent can be linked to multiple children. Click <strong>Unlink</strong> to remove a connection.</div></div>
     <div class="step-row"><span class="step-badge">4</span><div>Parents will immediately see their linked child's attendance, location, fees and exam results on their dashboard.</div></div>
+    <div class="step-row"><span class="step-badge">5</span><div>Use <strong>Send Class Alerts</strong> from the Parents area to manually notify students and parents when a scheduled class has no active session after the timetable slot has passed.</div></div>
     <div class="info-box mt-3"><i class="bi bi-info-circle-fill text-primary me-2"></i>When the student enables location sharing and enters the college campus (within 300 m), the parent receives an <strong>automatic email notification</strong>.</div>
   </div>
 </div>
@@ -259,6 +262,8 @@
     <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Exams</strong> → click <strong>+ Schedule Exam</strong> → set Title, Subject, Date, Max Marks.</div></div>
     <div class="step-row"><span class="step-badge">2</span><div>After the exam, the assigned teacher enters marks via their dashboard. Admins can also enter marks from the Exams page.</div></div>
     <div class="step-row"><span class="step-badge">3</span><div>Students can view their marks in <strong>My Results</strong>. Parents can see results in the child's full report.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Use the <strong>Marksheet</strong> pages to open printable student marksheets generated from stored exam marks.</div></div>
+    <div class="step-row"><span class="step-badge">5</span><div>Before printing official marksheets, configure <strong>Principal / HoD signatures</strong> so the output includes the correct signatories.</div></div>
   </div>
 </div>
 
@@ -289,7 +294,8 @@
     <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">11</span>College Settings</h5>
     <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Settings</strong>. Enter your college's official name and address.</div></div>
     <div class="step-row"><span class="step-badge">2</span><div><strong>Set College Location:</strong> Type your college name in the search box → the map flies to it and places a red pin. Or click directly on the map. Drag the pin to fine-tune.</div></div>
-    <div class="step-row"><span class="step-badge">3</span><div>Click <strong>Save Settings</strong>. The college name and location are used on parent maps and arrival notifications.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Upload or update the <strong>Principal, HoD and Class Teacher signature images</strong> in the same settings area when you need signed printable outputs.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Click <strong>Save Settings</strong>. The college name and location are used on parent maps and arrival notifications.</div></div>
     <div class="info-box mt-3"><i class="bi bi-geo-alt-fill text-primary me-2"></i>The college GPS location is the reference point for the <strong>student arrival notification</strong> — students within 300 m trigger an email to parents.</div>
   </div>
 </div>
@@ -301,6 +307,29 @@
     <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Analytics</strong> for visual charts: overall attendance trend, department-wise breakdown, and subject-wise comparison.</div></div>
     <div class="step-row"><span class="step-badge">2</span><div>Each student has a <strong>Download Report (PDF/Excel)</strong> button on their profile page with full subject-wise attendance and marks.</div></div>
     <div class="step-row"><span class="step-badge">3</span><div>The student list has an <strong>Export CSV</strong> button to download all student data including attendance percentages.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Use the <strong>Marksheet List</strong> to filter students by department and semester before opening their official marksheet view.</div></div>
+  </div>
+</div>
+
+<!-- S13: ID Cards -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s13">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">13</span>ID Cards</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Open <strong>Sidebar → ID Card Template</strong> to configure the visual design, principal details, contact info, colors, map location, logo and signature used on every card.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Go to <strong>Sidebar → ID Cards</strong> to review student submissions. Filter by status, department, semester or student name.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Use <strong>Approve</strong> to issue a card and auto-generate its card number, or <strong>Reject</strong> with a rejection note if the photo or details need correction.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Click <strong>View</strong> to open the full printable digital card with QR code and college map.</div></div>
+  </div>
+</div>
+
+<!-- S14: File Manager -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s14">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">14</span>File Manager</h5>
+    <div class="step-row"><span class="step-badge">1</span><div>Open <strong>Sidebar → Files</strong> to inspect all teaching-content attachments uploaded by teachers.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Use the <strong>type filter</strong> and search box to find files by extension or by the linked content title.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Files marked as <strong>orphan</strong> are present on disk but no longer linked to a content record. Remove them individually or use the orphan clean-up option.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Deleting a file also clears the attachment reference from the linked note, assignment, lab or question entry.</div></div>
   </div>
 </div>
 
@@ -317,7 +346,7 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-success"></i>Table of Contents</h6>
     <div class="row g-2">
-      {% for num, title in [('1','Dashboard & Status'),('2','Starting Attendance'),('3','Managing Sessions'),('4','Exam Marks'),('5','Leave Requests'),('6','Reports')] %}
+      {% for num, title in [('1','Dashboard & Status'),('2','Starting Attendance'),('3','Managing Sessions'),('4','Exam Marks'),('5','Leave Requests'),('6','Reports'),('7','Teaching Content')] %}
       <div class="col-md-6">
         <a href="#teacher-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
           <span class="badge bg-success-subtle text-success fw-semibold" style="min-width:28px">{{ num }}</span>
@@ -384,6 +413,7 @@
     <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">3</span>Managing Past Sessions</h5>
     <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>In <strong>Attendance Sessions</strong>, click any completed session row to see the full attendance list — who was present, absent or late.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>You can <strong>manually override</strong> individual student statuses (e.g., mark someone Present who was misidentified) by clicking their status badge.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">3</span><div>Use <strong>Print Sheet</strong> when you need a printable attendance snapshot for a completed session.</div></div>
   </div>
 </div>
 
@@ -410,9 +440,22 @@
 <div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s6">
   <div class="card-body px-4 py-4">
     <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">6</span>Attendance Reports</h5>
-    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Go to <strong>Sidebar → Reports</strong> → select a subject and date range → click <strong>Generate</strong>.</div></div>
-    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Download as <strong>Excel</strong> or <strong>PDF</strong> for record-keeping or sharing with the admin.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Go to <strong>Sidebar → Reports</strong> and pick a subject to review completed sessions for that subject.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Download either a <strong>single-session report</strong> or a <strong>full subject report</strong> depending on whether you need one class or the complete attendance history.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">3</span><div>Exports are available as <strong>Excel (.xlsx)</strong> or <strong>CSV</strong> for sharing with admin or importing into other systems.</div></div>
     <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Students below 75% attendance are highlighted in red in all reports — share these with students as early warnings.</div>
+  </div>
+</div>
+
+<!-- T7: Content -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s7">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">7</span>Teaching Content</h5>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Go to <strong>Sidebar → Content</strong> to create <strong>notes, assignments, labs</strong> and <strong>question sets</strong> for your department and semester.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Use <strong>Create</strong> to add a title, written body, optional subject, due date, marks and optional attachment such as PDF, DOCX, PPTX, spreadsheet or text file.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">3</span><div>Keep items as <strong>Draft</strong> while preparing them, then toggle to <strong>Published</strong> when students should be able to see them.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">4</span><div>Use <strong>Preview</strong> to check how notes and supported attachments will appear inside the student app before publishing.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">5</span><div>Edit or delete old content from the same page when material changes between semesters.</div></div>
   </div>
 </div>
 
@@ -429,7 +472,7 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-info"></i>Table of Contents</h6>
     <div class="row g-2">
-      {% for num, title in [('1','Dashboard Overview'),('2','Face Enrollment'),('3','Location Sharing'),('4','Leave Applications'),('5','Attendance History'),('6','Exam Results & Fees')] %}
+      {% for num, title in [('1','Dashboard & Profile'),('2','Face Enrollment'),('3','Location Sharing'),('4','Learning Content'),('5','Digital ID Card'),('6','Leave Applications'),('7','Attendance History & Downloads'),('8','Exam Results & Fees')] %}
       <div class="col-md-6">
         <a href="#student-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
           <span class="badge bg-info-subtle text-info fw-semibold" style="min-width:28px">{{ num }}</span>
@@ -478,6 +521,7 @@
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div><strong>Subject cards</strong> show each subject's attendance % with a colour bar: 🟢 ≥75% Good, 🟡 60–74% Warning, 🔴 &lt;60% Critical.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>A <strong>red alert banner</strong> appears at the top if any subject is below the minimum requirement — act quickly to avoid academic consequences.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div>Upcoming exams (within 7 days) are highlighted in the <strong>exam banner</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">5</span><div>Use <strong>Sidebar → Profile</strong> for a more detailed academic view with subject-wise attendance charts.</div></div>
   </div>
 </div>
 
@@ -508,10 +552,32 @@
   </div>
 </div>
 
-<!-- St4: Leave -->
+<!-- St4: Learning Content -->
 <div class="guide-section card border-0 shadow-sm mb-4" id="student-s4">
   <div class="card-body px-4 py-4">
-    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">4</span>Leave Applications</h5>
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">4</span>Learning Content &amp; Notes</h5>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>Go to <strong>Sidebar → Content</strong> to browse notes, assignments, labs and question sets published by your teachers.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>Use the <strong>type</strong>, <strong>subject</strong> and search filters to find the right item quickly.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>Click <strong>Read Note</strong> or <strong>Preview</strong> to open the full note inside the app. Supported documents are rendered in-app when possible.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div>Use the <strong>Download</strong> button when you want the original attachment file on your device.</div></div>
+  </div>
+</div>
+
+<!-- St5: ID Card -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s5">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">5</span>Digital ID Card</h5>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>Go to <strong>Sidebar → ID Card</strong> and complete any missing personal details such as date of birth, blood group, phone, address and parent contact.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>Upload a clear <strong>ID photo</strong> and submit the request for admin review.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>After submission, the card status becomes <strong>Pending</strong>. If it is rejected, correct the issue and submit again.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div>Once approved, your digital ID card becomes viewable inside the system with QR code and official college branding.</div></div>
+  </div>
+</div>
+
+<!-- St6: Leave -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s6">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">6</span>Leave Applications</h5>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>Go to <strong>Sidebar → Leave Applications</strong> → click <strong>Apply for Leave</strong>.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>Select the <strong>Subject</strong>, <strong>Date</strong>, and write a <strong>reason</strong>. Attach a medical certificate if applicable.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>Submit the form. The teacher reviews and approves/rejects. You will see the status update on the same page.</div></div>
@@ -519,20 +585,21 @@
   </div>
 </div>
 
-<!-- St5: Attendance History -->
-<div class="guide-section card border-0 shadow-sm mb-4" id="student-s5">
+<!-- St7: Attendance History -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s7">
   <div class="card-body px-4 py-4">
-    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">5</span>Attendance History</h5>
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">7</span>Attendance History &amp; Downloads</h5>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div>Go to <strong>Sidebar → My Attendance</strong> for a full date-wise list of all sessions — Present, Absent or Late.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div>Filter by subject or month to see specific periods.</div></div>
-    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>A <strong>liveness verified ✓</strong> icon indicates the session used face recognition (not manual override).</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>Use the <strong>download</strong> option to export your attendance as <strong>Excel</strong> or <strong>CSV</strong>, either for all subjects or for a selected subject.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div>A <strong>liveness verified ✓</strong> icon indicates the session used face recognition (not manual override).</div></div>
   </div>
 </div>
 
-<!-- St6: Results & Fees -->
-<div class="guide-section card border-0 shadow-sm mb-4" id="student-s6">
+<!-- St8: Results & Fees -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="student-s8">
   <div class="card-body px-4 py-4">
-    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">6</span>Exam Results &amp; Fees</h5>
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">8</span>Exam Results &amp; Fees</h5>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div><strong>Results:</strong> Go to <strong>Sidebar → My Results</strong> to see all exam marks organised by subject and date.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div><strong>Fees:</strong> Go to <strong>Sidebar → My Fees</strong> to see a list of fee structures, what you have paid, and any outstanding balance.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>A red <strong>Fee Due</strong> alert on your dashboard means you have an outstanding balance — visit the Fees page for details.</div></div>
@@ -552,7 +619,7 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-warning"></i>Table of Contents</h6>
     <div class="row g-2">
-      {% for num, title in [('1','Dashboard Overview'),('2','Live Location Tracking'),('3','Attendance & Progress'),('4','Fees & Exams'),('5','Notices & Timetable')] %}
+      {% for num, title in [('1','Dashboard Overview'),('2','Live Location Tracking'),('3','Attendance & Progress'),('4','Fees & Exams'),('5','Notices & Timetable'),('6','Official Marksheets')] %}
       <div class="col-md-6">
         <a href="#parent-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
           <span class="badge bg-warning-subtle text-warning fw-semibold" style="min-width:28px">{{ num }}</span>
@@ -657,12 +724,22 @@
   </div>
 </div>
 
+<!-- P6: Marksheets -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="parent-s6">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#fd7e14">6</span>Official Marksheets</h5>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">1</span><div>Use <strong>Sidebar → Marksheets</strong> to see all linked children who have printable marksheets available.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">2</span><div>Click a child to open the full official marksheet generated from exam records and configured signature data.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>From the browser print dialog, you can save the marksheet as PDF for home records.</div></div>
+  </div>
+</div>
+
 {% endif %}
 {# ═══ END PARENT ════════════════════════════════════════════ #}
 
 <!-- Footer (visible in PDF) -->
 <div class="text-center text-muted small mt-5 pt-4 border-top">
-  <strong>{{ college_name }}</strong> &bull; SmartAttend College Management System &bull; User Guide v1.0<br>
+  <strong>{{ college_name }}</strong> &bull; SmartAttend College Management System &bull; User Guide v1.1<br>
   <span class="no-print">To save this guide as PDF: click <strong>Download as PDF</strong> above or press <kbd>Ctrl+P</kbd> → Save as PDF.</span>
 </div>
 
