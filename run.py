@@ -107,6 +107,24 @@ def create_admin():
         print(f'Admin {email} created for {college.name}.')
 
 
+@app.cli.command('create-super-admin')
+def create_super_admin():
+    """Create a platform super admin user."""
+    with app.app_context():
+        college = College.ensure_default()
+        email = input('Super admin email: ').strip().lower()
+        name = input('Full name: ').strip()
+        pw = input('Password: ').strip()
+        if User.query.filter_by(college_id=college.id, email=email).first():
+            print(f'User {email} already exists in {college.code}.')
+            return
+        u = User(college_id=college.id, name=name, email=email, role='super_admin', is_active=True)
+        u.set_password(pw)
+        db.session.add(u)
+        db.session.commit()
+        print(f'Super admin {email} created.')
+
+
 @app.cli.command('check-classes')
 def check_classes():
     """Notify students/parents about classes that haven't started 15+ min past scheduled time."""

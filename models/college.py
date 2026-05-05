@@ -15,6 +15,7 @@ class College(db.Model):
     created_at = db.Column(db.DateTime, default=utc_now_naive, nullable=False)
 
     users = db.relationship('User', backref='college', lazy=True)
+    feature_access = db.relationship('CollegeFeatureAccess', backref='college', lazy=True, cascade='all, delete-orphan')
     departments = db.relationship('Department', backref='college', lazy=True)
     students = db.relationship('Student', backref='college', lazy=True)
     teachers = db.relationship('Teacher', backref='college', lazy=True)

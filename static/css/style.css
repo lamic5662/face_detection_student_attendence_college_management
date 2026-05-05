@@ -190,8 +190,9 @@ body {
 
 /* Root: full-viewport split */
 .auth-root {
-  min-height: 100vh;
+  height: 100dvh;
   display: flex;
+  overflow: hidden;
 }
 
 /* ── Left panel ── */
@@ -204,6 +205,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 48px;
+  min-height: 100dvh;
 }
 
 .auth-left-inner {
@@ -211,6 +213,9 @@ body {
   z-index: 2;
   max-width: 480px;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 /* Decorative blurred circles */
@@ -268,34 +273,58 @@ body {
   font-size: 13px; font-weight: 600;
   padding: 7px 16px;
   border-radius: 30px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
   backdrop-filter: blur(6px);
 }
 
 /* Headline */
 .left-headline {
-  font-size: 34px; font-weight: 800; line-height: 1.2;
-  color: #fff; margin-bottom: 14px; letter-spacing: -.5px;
+  font-size: 32px; font-weight: 800; line-height: 1.2;
+  color: #fff; margin-bottom: 12px; letter-spacing: -.5px;
 }
 .left-subtext {
   font-size: 14px; color: rgba(255,255,255,.65);
-  line-height: 1.7; margin-bottom: 36px;
+  line-height: 1.65; margin-bottom: 20px;
 }
 
 /* Feature list */
 .feature-list {
-  display: flex; flex-direction: column; gap: 12px;
-  margin-bottom: 36px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
 }
 .feature-item {
-  display: flex; align-items: center; gap: 12px;
-  color: rgba(255,255,255,.85); font-size: 13px; font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.9);
 }
 .feature-dot {
   width: 32px; height: 32px; border-radius: 8px;
   background: rgba(255,255,255,.12);
   display: flex; align-items: center; justify-content: center;
   font-size: 14px; color: #93c5fd; flex-shrink: 0;
+}
+.feature-copy {
+  min-width: 0;
+}
+.feature-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.auth-side-note {
+  margin-bottom: 18px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(255,255,255,.6);
 }
 
 /* Role badges */
@@ -310,6 +339,7 @@ body {
 .role-teacher { background: rgba(59,130,246,.25); color: #93c5fd; }
 .role-student { background: rgba(34,197,94,.25);  color: #86efac; }
 .role-parent  { background: rgba(168,85,247,.25); color: #d8b4fe; }
+.role-super-admin { background: rgba(250,204,21,.18); color: #fde68a; }
 
 /* ── Right panel ── */
 .auth-right {
@@ -319,6 +349,8 @@ body {
   align-items: center;
   justify-content: center;
   padding: 48px 40px;
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
 .auth-form-wrap {
@@ -326,10 +358,10 @@ body {
   max-width: 400px;
 }
 
-.form-header { margin-bottom: 32px; }
+.form-header { margin-bottom: 24px; }
 .form-title {
-  font-size: 28px; font-weight: 800;
-  color: #0f172a; margin-bottom: 6px;
+  font-size: 30px; font-weight: 800;
+  color: #0f172a; margin-bottom: 8px;
 }
 .form-sub { font-size: 14px; color: #64748b; }
 
@@ -406,6 +438,13 @@ body {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11px; color: #94a3b8; font-weight: 500;
   background: #f1f5f9; padding: 4px 10px; border-radius: 20px;
+}
+
+.auth-copyright {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 /* ── Responsive ── */

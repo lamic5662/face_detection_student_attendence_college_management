@@ -22,7 +22,7 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.Enum('admin', 'teacher', 'student', 'parent'), nullable=False)
+    role = db.Column(db.Enum('super_admin', 'admin', 'teacher', 'student', 'parent'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     sidebar_pins = db.Column(db.Text, nullable=True)
     dashboard_widgets = db.Column(db.Text, nullable=True)
@@ -64,6 +64,10 @@ class User(UserMixin, db.Model):
     @property
     def is_admin(self):
         return self.role == 'admin'
+
+    @property
+    def is_super_admin(self):
+        return self.role == 'super_admin'
 
     @property
     def is_teacher(self):

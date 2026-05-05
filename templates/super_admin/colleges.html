@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}Colleges{% endblock %}
+{% block page_title %}<i class="bi bi-buildings-fill me-2"></i>Colleges{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-plus-circle-fill text-primary me-2"></i>Create College</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <form method="post" action="{{ url_for('super_admin.create_college') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">College Name</label>
+            <input type="text" name="name" class="form-control" required placeholder="e.g. Everest International College">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">College Code</label>
+            <input type="text" name="code" class="form-control text-uppercase" required placeholder="e.g. EVEREST">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Subdomain</label>
+            <input type="text" name="subdomain" class="form-control" placeholder="e.g. everest">
+            <div class="form-text">Optional. Use this if each college gets its own subdomain portal later.</div>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check2-circle me-1"></i>Create College
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-shield-check text-success me-2"></i>Super Admin Responsibilities</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="platform-duty-card">
+              <div class="platform-duty-icon"><i class="bi bi-buildings"></i></div>
+              <div>
+                <div class="fw-semibold">College Management</div>
+                <div class="text-muted small">Create colleges, update identity, enable or disable a tenant, and watch onboarding progress.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="platform-duty-card">
+              <div class="platform-duty-icon"><i class="bi bi-person-badge"></i></div>
+              <div>
+                <div class="fw-semibold">College Admin Provisioning</div>
+                <div class="text-muted small">Create the first admin account for each college so local operations can begin.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="platform-duty-card">
+              <div class="platform-duty-icon"><i class="bi bi-cpu"></i></div>
+              <div>
+                <div class="fw-semibold">Platform Setup</div>
+                <div class="text-muted small">Own ALLOWED_HOSTS, rate limiting, Redis, proxy headers, backups, and overall production readiness.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="platform-duty-card">
+              <div class="platform-duty-icon"><i class="bi bi-graph-up-arrow"></i></div>
+              <div>
+                <div class="fw-semibold">Tenant Oversight</div>
+                <div class="text-muted small">Track setup progress, college health, and usage maturity across the whole platform.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0">Tenant Colleges</h6>
+    <a href="{{ url_for('super_admin.system_setup') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-list-check me-1"></i>Platform Setup
+    </a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">College</th>
+            <th>Code</th>
+            <th>Status</th>
+            <th>Admins</th>
+            <th>Departments</th>
+            <th>Teachers</th>
+            <th>Students</th>
+            <th>Subjects</th>
+            <th>Features</th>
+            <th>Setup</th>
+            <th class="text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in college_rows %}
+          <tr>
+            <td class="px-4">
+              <div class="fw-semibold">{{ row.college.name }}</div>
+              <div class="text-muted small">
+                {% if row.college.subdomain %}
+                {{ row.college.subdomain }}
+                {% else %}
+                No subdomain
+                {% endif %}
+              </div>
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ row.college.code }}</span></td>
+            <td>
+              <span class="badge {% if row.college.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                {{ 'Active' if row.college.is_active else 'Inactive' }}
+              </span>
+            </td>
+            <td>{{ row.admins }}</td>
+            <td>{{ row.departments }}</td>
+            <td>{{ row.teachers }}</td>
+            <td>{{ row.students }}</td>
+            <td>{{ row.subjects }}</td>
+            <td>
+              <div class="fw-semibold">{{ row.enabled_features }}/{{ feature_count }}</div>
+              <div class="small text-muted">enabled</div>
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:8px; min-width:88px;">
+                  <div class="progress-bar {% if row.report.is_ready %}bg-success{% else %}bg-primary{% endif %}" style="width: {{ row.report.progress }}%"></div>
+                </div>
+                <span class="small fw-semibold">{{ row.report.progress }}%</span>
+              </div>
+            </td>
+            <td class="text-end pe-4">
+              <div class="d-flex justify-content-end gap-2 flex-wrap">
+                <a class="btn btn-sm btn-outline-info"
+                   href="{{ url_for('super_admin.college_detail', college_id=row.college.id) }}">
+                  <i class="bi bi-eye-fill"></i>
+                </a>
+                <button class="btn btn-sm btn-outline-secondary"
+                        data-bs-toggle="modal"
+                        data-bs-target="#editCollegeModal{{ row.college.id }}">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary"
+                        data-bs-toggle="modal"
+                        data-bs-target="#createAdminModal{{ row.college.id }}">
+                  <i class="bi bi-person-plus-fill"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-dark"
+                        data-bs-toggle="modal"
+                        data-bs-target="#featureAccessModal{{ row.college.id }}">
+                  <i class="bi bi-sliders2"></i>
+                </button>
+                <form method="post" action="{{ url_for('super_admin.toggle_college', college_id=row.college.id) }}" class="d-inline">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit"
+                          class="btn btn-sm {% if row.college.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}">
+                    <i class="bi bi-{% if row.college.is_active %}pause-circle{% else %}play-circle{% endif %}"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+
+          <div class="modal fade" id="editCollegeModal{{ row.college.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title fw-bold">Edit {{ row.college.name }}</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{{ url_for('super_admin.edit_college', college_id=row.college.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="modal-body">
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold small">College Name</label>
+                      <input type="text" name="name" class="form-control" required value="{{ row.college.name }}">
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold small">College Code</label>
+                      <input type="text" name="code" class="form-control text-uppercase" required value="{{ row.college.code }}">
+                    </div>
+                    <div class="mb-0">
+                      <label class="form-label fw-semibold small">Subdomain</label>
+                      <input type="text" name="subdomain" class="form-control" value="{{ row.college.subdomain or '' }}">
+                    </div>
+                  </div>
+                  <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal fade" id="createAdminModal{{ row.college.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+              <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title fw-bold">Create College Admin</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{{ url_for('super_admin.create_college_admin', college_id=row.college.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="modal-body">
+                    <div class="alert alert-light border small">
+                      This admin will manage <strong>{{ row.college.name }}</strong>.
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold small">Full Name</label>
+                      <input type="text" name="name" class="form-control" required placeholder="College admin name">
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label fw-semibold small">Email</label>
+                      <input type="email" name="email" class="form-control" required placeholder="admin@college.edu">
+                    </div>
+                    <div class="mb-0">
+                      <label class="form-label fw-semibold small">Password</label>
+                      <input type="password" name="password" class="form-control" required placeholder="Strong password">
+                    </div>
+                  </div>
+                  <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Admin</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal fade" id="featureAccessModal{{ row.college.id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+              <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0">
+                  <div>
+                    <h5 class="modal-title fw-bold">Feature Access for {{ row.college.name }}</h5>
+                    <div class="text-muted small">{{ row.enabled_features }} of {{ feature_count }} modules currently enabled.</div>
+                  </div>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post" action="{{ url_for('super_admin.update_college_features', college_id=row.college.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <div class="modal-body pt-0">
+                    <div class="alert alert-light border small mb-4">
+                      Super admin controls what this college can access. Disabled modules disappear from navigation and direct URLs return access denied.
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2 mb-4">
+                      {% for preset_key, preset in feature_presets.items() %}
+                      <button type="submit"
+                              name="preset"
+                              value="{{ preset_key }}"
+                              class="btn btn-sm btn-outline-secondary">
+                        {{ preset.label }}
+                      </button>
+                      {% endfor %}
+                    </div>
+
+                    {% for group_key, group in feature_groups.items() %}
+                    <div class="feature-group-card mb-3">
+                      <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                          <div class="fw-semibold">{{ group.label }}</div>
+                          <div class="small text-muted">{{ group.description }}</div>
+                        </div>
+                        <span class="badge text-bg-light">{{ group.features|length }} modules</span>
+                      </div>
+
+                      <div class="row g-3">
+                        {% for feature_key in group.features %}
+                        {% set meta = feature_catalog[feature_key] %}
+                        <div class="col-md-6">
+                          <label class="feature-access-item">
+                            <span class="d-block">
+                              <span class="d-flex align-items-center justify-content-between gap-2">
+                                <span class="fw-semibold">{{ meta.label }}</span>
+                                <span class="badge {% if row.feature_matrix[feature_key] %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                                  {{ 'Enabled' if row.feature_matrix[feature_key] else 'Blocked' }}
+                                </span>
+                              </span>
+                              <span class="d-block text-muted small mt-1">{{ meta.description }}</span>
+                            </span>
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   name="enabled_features"
+                                   value="{{ feature_key }}"
+                                   {% if row.feature_matrix[feature_key] %}checked{% endif %}>
+                          </label>
+                        </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Feature Access</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <tr>
+            <td colspan="11" class="text-center text-muted py-5">No colleges found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+.platform-duty-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(13, 110, 253, .04), rgba(255,255,255,1));
+}
+.platform-duty-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: #0d6efd;
+  color: #fff;
+  flex-shrink: 0;
+}
+.feature-group-card {
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 18px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 1), rgba(255,255,255,1));
+}
+.feature-access-item {
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  min-height: 120px;
+}
+</style>
+{% endblock %}

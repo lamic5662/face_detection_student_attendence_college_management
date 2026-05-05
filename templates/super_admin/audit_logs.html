@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs{% endblock %}
+{% block page_title %}<i class="bi bi-journal-text me-2"></i>Audit Logs{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold small">College</label>
+        <select name="college_id" class="form-select">
+          <option value="">All colleges</option>
+          {% for college in colleges %}
+          <option value="{{ college.id }}" {% if selected_college_id == college.id %}selected{% endif %}>
+            {{ college.name }} ({{ college.code }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold small">Action</label>
+        <select name="action" class="form-select">
+          <option value="">All actions</option>
+          {% for action in actions %}
+          <option value="{{ action }}" {% if selected_action == action %}selected{% endif %}>{{ action }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-funnel-fill me-1"></i>Filter Logs
+        </button>
+        <a href="{{ url_for('super_admin.audit_logs') }}" class="btn btn-light">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0">Platform Audit Trail</h6>
+    <span class="badge bg-light text-dark border">{{ logs|length }} entries</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">When</th>
+            <th>Actor</th>
+            <th>College</th>
+            <th>Action</th>
+            <th>Summary</th>
+            <th>Target</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          {% set details = log.get_details() %}
+          <tr>
+            <td class="px-4 text-nowrap small text-muted">
+              {{ log.created_at.strftime('%d %b %Y %H:%M') if log.created_at else '-' }}
+            </td>
+            <td>
+              <div class="fw-semibold">{{ log.actor.name if log.actor else 'System' }}</div>
+              <div class="small text-muted">{{ log.actor.email if log.actor else '-' }}</div>
+            </td>
+            <td>
+              {% if log.college %}
+              <div class="fw-semibold">{{ log.college.name }}</div>
+              <div class="small text-muted">{{ log.college.code }}</div>
+              {% else %}
+              <span class="text-muted small">Platform</span>
+              {% endif %}
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ log.action_key }}</span></td>
+            <td>
+              <div class="fw-semibold">{{ log.summary }}</div>
+              {% if details %}
+              <div class="small text-muted mt-1">
+                {% for key, value in details.items() %}
+                <span class="me-2">{{ key }}: {{ value }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </td>
+            <td class="small text-muted">
+              {% if log.target_type %}
+              {{ log.target_type|replace('_', ' ')|title }}
+              {% if log.target_id %} #{{ log.target_id }}{% endif %}
+              {% else %}
+              -
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-5">No audit entries found for the selected filters.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

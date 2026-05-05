@@ -6,12 +6,56 @@ from extensions import db
 from models.id_card import StudentIDCard
 from models.leave import LeaveRequest
 from models.subject import Subject
+from utils.feature_access import nav_item_is_enabled
 
 
 PIN_LIMIT = 4
 
 
 NAV_ITEMS = {
+    'super_admin': [
+        {
+            'key': 'dashboard',
+            'label': 'Dashboard',
+            'icon': 'bi-speedometer2',
+            'endpoint': 'super_admin.dashboard',
+            'description': 'Platform overview across all colleges.',
+            'section': 'core',
+        },
+        {
+            'key': 'system_setup',
+            'label': 'System Setup',
+            'icon': 'bi-shield-check',
+            'endpoint': 'super_admin.system_setup',
+            'description': 'Platform production readiness and checks.',
+            'section': 'core',
+        },
+        {
+            'key': 'colleges',
+            'label': 'Colleges',
+            'icon': 'bi-buildings-fill',
+            'endpoint': 'super_admin.colleges',
+            'description': 'View tenant colleges and platform onboarding status.',
+            'section': 'core',
+        },
+        {
+            'key': 'audit_logs',
+            'label': 'Audit Logs',
+            'icon': 'bi-journal-text',
+            'endpoint': 'super_admin.audit_logs',
+            'description': 'Review platform-level admin actions and changes.',
+            'section': 'more',
+            'active_contains': ['audit_logs'],
+        },
+        {
+            'key': 'user_guide',
+            'label': 'User Guide',
+            'icon': 'bi-book-fill',
+            'endpoint': 'help.guide',
+            'description': 'Built-in documentation and walkthroughs.',
+            'section': 'more',
+        },
+    ],
     'admin': [
         {
             'key': 'dashboard',
@@ -180,14 +224,6 @@ NAV_ITEMS = {
             'description': 'College-wide configuration.',
             'section': 'more',
             'active_endpoints': ['admin.save_settings'],
-        },
-        {
-            'key': 'system_setup',
-            'label': 'System Setup',
-            'icon': 'bi-shield-check',
-            'endpoint': 'admin.system_setup',
-            'description': 'Production readiness and launch checklist.',
-            'section': 'more',
         },
         {
             'key': 'digital_id_cards',
@@ -549,6 +585,9 @@ def build_sidebar_navigation(user, endpoint: str | None) -> dict:
     always_visible_items = []
 
     for spec in specs:
+        if not nav_item_is_enabled(user, spec['key']):
+            continue
+
         item = {
             'key': spec['key'],
             'label': spec['label'],

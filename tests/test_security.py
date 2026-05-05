@@ -6,6 +6,7 @@ from extensions import db
 from models.academic_calendar import AcademicCalendarEvent
 from models.assignment import AssignmentSubmission
 from models.college import College
+from models.college_feature import CollegeFeatureAccess
 from models.content import TeacherContent
 from models.department import Department
 from models.fee import FeePayment, FeeStructure
@@ -13,6 +14,7 @@ from models.id_card import IDCardTemplate, StudentIDCard
 from models.leave import LeaveRequest
 from models.notice import Notice
 from models.notice_read import NoticeRead
+from models.platform_audit import PlatformAuditLog
 from models.student import Student
 from models.user import User
 
@@ -97,14 +99,443 @@ def test_student_can_fetch_private_note_attachment(app, client):
     assert response.data == b'private note body'
 
 
-def test_admin_system_setup_page_loads(app, client):
-    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+def test_super_admin_system_setup_page_loads(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
 
-    response = client.get('/admin/system-setup')
+    response = client.get('/super-admin/system-setup')
 
     assert response.status_code == 200
-    assert b'Production Readiness' in response.data
-    assert b'Launch Checklist' in response.data
+    assert b'Platform Readiness' in response.data
+    assert b'Platform Checks' in response.data
+
+
+def test_admin_cannot_open_super_admin_system_setup(app, client):
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    response = client.get('/super-admin/system-setup')
+
+    assert response.status_code == 403
+
+
+def test_super_admin_can_create_college(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    response = client.post(
+        '/super-admin/colleges/create',
+        data={
+            'name': 'Gamma College',
+            'code': 'GAMMA',
+            'subdomain': 'gamma',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        college = College.query.filter_by(code='GAMMA').first()
+        assert college is not None
+        assert college.name == 'Gamma College'
+        assert college.subdomain == 'gamma'
+        log = PlatformAuditLog.query.filter_by(action_key='college.created', college_id=college.id).first()
+        assert log is not None
+        assert 'Created college Gamma College [GAMMA]' in log.summary
+
+
+def test_super_admin_can_create_college_admin(app, client):
+    with app.app_context():
+        college = College(name='Beta College', code='BETA')
+        db.session.add(college)
+        db.session.commit()
+        college_id = college.id
+
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        f'/super-admin/colleges/{college_id}/admins/create',
+        data={
+            'name': 'Beta Admin',
+            'email': 'beta.admin@example.com',
+            'password': 'Password@123',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        user = User.query.filter_by(email='beta.admin@example.com', college_id=college_id).first()
+        assert user is not None
+        assert user.role == 'admin'
+
+
+def test_super_admin_cannot_deactivate_host_college(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    college_id = app.config['TEST_DATA']['college_id']
+
+    response = client.post(
+        f'/super-admin/colleges/{college_id}/toggle',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        college = db.session.get(College, college_id)
+        assert college is not None
+        assert college.is_active is True
+
+
+def test_super_admin_can_update_college_feature_access(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    college_id = app.config['TEST_DATA']['college_id']
+
+    response = client.post(
+        f'/super-admin/colleges/{college_id}/features',
+        data={
+            'enabled_features': ['attendance', 'learning_content', 'notices'],
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'Feature access updated for Alpha College.' in response.data
+
+    with app.app_context():
+        fees_access = CollegeFeatureAccess.query.filter_by(college_id=college_id, feature_key='fees').first()
+        content_access = CollegeFeatureAccess.query.filter_by(college_id=college_id, feature_key='learning_content').first()
+        assert fees_access is not None
+        assert fees_access.enabled is False
+        assert content_access is not None
+        assert content_access.enabled is True
+        log = PlatformAuditLog.query.filter_by(
+            action_key='college.features_updated',
+            college_id=college_id,
+        ).order_by(PlatformAuditLog.created_at.desc()).first()
+        assert log is not None
+
+
+def test_super_admin_can_open_college_detail_with_role_activity(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    college_id = app.config['TEST_DATA']['college_id']
+
+    response = client.get(f'/super-admin/colleges/{college_id}')
+    page = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'Role Activity Summary' in page
+    assert 'College Admin Accounts' in page
+    assert 'College Setup Status' in page
+    assert 'Feature Access Summary' in page
+    assert 'College Admins' in page
+    assert 'Teachers' in page
+    assert 'Students' in page
+    assert 'Parents' in page
+    assert 'admin@example.com' in page
+
+
+def test_super_admin_can_open_audit_logs_page(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    response = client.get('/super-admin/audit-logs')
+
+    assert response.status_code == 200
+    assert b'Platform Audit Trail' in response.data
+
+
+def test_super_admin_topbar_uses_platform_activity_instead_of_college_notices(app, client):
+    with app.app_context():
+        college_id = app.config['TEST_DATA']['college_id']
+        db.session.add(Notice(
+            college_id=college_id,
+            title='College Notice For Students',
+            content='This should not appear in the super admin bell.',
+            category='general',
+            target_role='student',
+            author_id=app.config['TEST_DATA']['teacher_user_id'],
+        ))
+        db.session.commit()
+
+    login(client, 'superadmin@example.com')
+    response = client.get('/super-admin/dashboard')
+    page = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'Platform Activity' in page
+    assert 'Open Audit' in page
+    assert 'Open Board' not in page
+    assert 'College Notice For Students' not in page
+
+
+def test_super_admin_notifications_feed_returns_platform_audit_entries(app, client):
+    login(client, 'superadmin@example.com')
+    client.post(
+        '/super-admin/colleges/create',
+        data={
+            'name': 'Zeta College',
+            'code': 'ZETA',
+            'subdomain': 'zeta',
+        },
+        follow_redirects=True,
+    )
+
+    response = client.get('/super-admin/notifications/feed')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['items']
+    assert any('Created college Zeta College [ZETA]' in item['title'] for item in payload['items'])
+
+
+def test_super_admin_can_mark_platform_notifications_as_read(app, client):
+    login(client, 'superadmin@example.com')
+    client.post(
+        '/super-admin/colleges/create',
+        data={
+            'name': 'Eta College',
+            'code': 'ETA',
+            'subdomain': 'eta',
+        },
+        follow_redirects=True,
+    )
+
+    response = client.post('/super-admin/notifications/mark-all-read')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['count'] == 0
+    assert payload['marked_count'] >= 1
+    assert payload['items']
+    assert all(item['is_read'] is True for item in payload['items'])
+
+
+def test_super_admin_can_delete_read_platform_notifications_from_tray(app, client):
+    login(client, 'superadmin@example.com')
+    client.post(
+        '/super-admin/colleges/create',
+        data={
+            'name': 'Theta College',
+            'code': 'THETA',
+            'subdomain': 'theta',
+        },
+        follow_redirects=True,
+    )
+    client.post('/super-admin/notifications/mark-all-read')
+
+    response = client.post('/super-admin/notifications/delete-read')
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload['deleted_count'] >= 1
+
+
+def test_super_admin_notification_dropdown_has_platform_controls_and_scroll_list(app, client):
+    login(client, 'superadmin@example.com')
+    response = client.get('/super-admin/dashboard')
+    page = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert 'Platform Activity' in page
+    assert 'topbarDeleteReadButton' in page
+    assert 'topbarMarkReadButton' in page
+    assert 'topbar-notice-list' in page
+
+
+def test_super_admin_can_toggle_college_admin_status(app, client):
+    with app.app_context():
+        college = College(name='Beta College', code='BETA')
+        db.session.add(college)
+        db.session.flush()
+        beta_admin = User(
+            college_id=college.id,
+            name='Beta Admin',
+            email='beta.admin@example.com',
+            role='admin',
+            is_active=True,
+        )
+        beta_admin.set_password('Password@123')
+        db.session.add(beta_admin)
+        backup_admin = User(
+            college_id=college.id,
+            name='Beta Backup',
+            email='beta.backup@example.com',
+            role='admin',
+            is_active=True,
+        )
+        backup_admin.set_password('Password@123')
+        db.session.add(backup_admin)
+        db.session.commit()
+        college_id = college.id
+        admin_id = beta_admin.id
+
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        f'/super-admin/colleges/{college_id}/admins/{admin_id}/toggle',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        beta_admin = db.session.get(User, admin_id)
+        assert beta_admin is not None
+        assert beta_admin.is_active is False
+        log = PlatformAuditLog.query.filter_by(
+            action_key='college_admin.toggled',
+            college_id=college_id,
+            target_id=admin_id,
+        ).order_by(PlatformAuditLog.created_at.desc()).first()
+        assert log is not None
+
+
+def test_super_admin_can_reset_college_admin_password(app, client):
+    with app.app_context():
+        college = College(name='Gamma College', code='GAMMA')
+        db.session.add(college)
+        db.session.flush()
+        gamma_admin = User(
+            college_id=college.id,
+            name='Gamma Admin',
+            email='gamma.admin@example.com',
+            role='admin',
+            is_active=True,
+        )
+        gamma_admin.set_password('Password@123')
+        db.session.add(gamma_admin)
+        db.session.commit()
+        college_id = college.id
+        admin_id = gamma_admin.id
+
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        f'/super-admin/colleges/{college_id}/admins/{admin_id}/reset-password',
+        data={'new_password': 'NewStrong@123'},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        gamma_admin = db.session.get(User, admin_id)
+        assert gamma_admin is not None
+        assert gamma_admin.check_password('NewStrong@123') is True
+        log = PlatformAuditLog.query.filter_by(
+            action_key='college_admin.password_reset',
+            college_id=college_id,
+            target_id=admin_id,
+        ).order_by(PlatformAuditLog.created_at.desc()).first()
+        assert log is not None
+
+
+def test_super_admin_cannot_delete_last_active_admin_of_active_college(app, client):
+    with app.app_context():
+        college = College(name='Delta College', code='DELTA')
+        db.session.add(college)
+        db.session.flush()
+        delta_admin = User(
+            college_id=college.id,
+            name='Delta Admin',
+            email='delta.admin@example.com',
+            role='admin',
+            is_active=True,
+        )
+        delta_admin.set_password('Password@123')
+        db.session.add(delta_admin)
+        db.session.commit()
+        college_id = college.id
+        admin_id = delta_admin.id
+
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        f'/super-admin/colleges/{college_id}/admins/{admin_id}/delete',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        delta_admin = db.session.get(User, admin_id)
+        assert delta_admin is not None
+
+
+def test_super_admin_deleting_college_admin_creates_audit_log(app, client):
+    with app.app_context():
+        college = College(name='Epsilon College', code='EPSILON')
+        db.session.add(college)
+        db.session.flush()
+        first_admin = User(
+            college_id=college.id,
+            name='Epsilon Admin One',
+            email='epsilon.one@example.com',
+            role='admin',
+            is_active=True,
+        )
+        first_admin.set_password('Password@123')
+        second_admin = User(
+            college_id=college.id,
+            name='Epsilon Admin Two',
+            email='epsilon.two@example.com',
+            role='admin',
+            is_active=True,
+        )
+        second_admin.set_password('Password@123')
+        db.session.add_all([first_admin, second_admin])
+        db.session.commit()
+        college_id = college.id
+        admin_id = second_admin.id
+
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        f'/super-admin/colleges/{college_id}/admins/{admin_id}/delete',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        deleted_admin = db.session.get(User, admin_id)
+        assert deleted_admin is None
+        log = PlatformAuditLog.query.filter_by(
+            action_key='college_admin.deleted',
+            college_id=college_id,
+            target_id=admin_id,
+        ).order_by(PlatformAuditLog.created_at.desc()).first()
+        assert log is not None
+
+
+def test_disabled_feature_is_hidden_and_blocked_for_admin(app, client):
+    with app.app_context():
+        db.session.add(CollegeFeatureAccess(
+            college_id=app.config['TEST_DATA']['college_id'],
+            feature_key='fees',
+            enabled=False,
+        ))
+        db.session.commit()
+
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    dashboard = client.get('/admin/dashboard')
+    page = dashboard.get_data(as_text=True)
+
+    assert dashboard.status_code == 200
+    assert 'data-nav-group="more" data-nav-key="fees"' not in page
+
+    blocked = client.get('/admin/fees')
+    assert blocked.status_code == 403
+
+
+def test_disabled_notices_hide_bell_and_block_notice_board(app, client):
+    with app.app_context():
+        db.session.add(CollegeFeatureAccess(
+            college_id=app.config['TEST_DATA']['college_id'],
+            feature_key='notices',
+            enabled=False,
+        ))
+        db.session.commit()
+
+    login(client, 'student1@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    dashboard = client.get('/student/dashboard')
+    page = dashboard.get_data(as_text=True)
+
+    assert dashboard.status_code == 200
+    assert 'topbarBellButton' not in page
+    assert 'data-nav-group="quick" data-nav-key="notice_board"' not in page
+
+    blocked = client.get('/notices')
+    assert blocked.status_code == 403
 
 
 def test_parent_can_open_linked_child_marksheet(app, client):
@@ -967,6 +1398,20 @@ def test_login_requires_college_code_when_multiple_colleges_exist(app, client):
 
     assert success.status_code == 302
     assert '/student/dashboard' in success.headers['Location']
+
+
+def test_super_admin_can_login_without_college_code(app, client):
+    response = client.post(
+        '/login',
+        data={
+            'email': 'superadmin@example.com',
+            'password': 'Password@123',
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert '/super-admin/dashboard' in response.headers['Location']
 
 
 def test_student_dashboard_hides_other_college_notice(app, client):

@@ -1,5 +1,6 @@
 from extensions import db
 from models.college import College
+from models.college_feature import CollegeFeatureAccess
 from models.user import User
 from models.department import Department
 from models.student import Student
@@ -19,3 +20,5 @@ from models.id_card import IDCardTemplate, StudentIDCard
 from models.marksheet_signature import MarksheetSignature
 from models.academic_calendar import AcademicCalendarEvent
 from models.assignment import AssignmentSubmission
+from models.platform_audit import PlatformAuditLog
+from models.platform_audit_read import PlatformAuditRead

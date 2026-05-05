@@ -116,10 +116,10 @@
   <div class="sidebar-footer">
     <div class="user-info">
       <div class="user-avatar" data-bs-toggle="tooltip" data-bs-placement="right" title="{{ current_user.name }}">{{ current_user.name[0].upper() }}</div>
-      <div class="ms-2 sidebar-user-text">
-        <div class="fw-semibold text-truncate" style="max-width:140px">{{ current_user.name }}</div>
-        <small class="text-muted text-capitalize">{{ current_user.role }}</small>
-      </div>
+        <div class="ms-2 sidebar-user-text">
+          <div class="fw-semibold text-truncate" style="max-width:140px">{{ current_user.name }}</div>
+          <small class="text-muted">{{ current_user.role.replace('_', ' ') | title }}</small>
+        </div>
     </div>
     <div class="sidebar-footer-btns mt-2">
       <a href="{{ url_for('auth.change_password') }}"
@@ -144,6 +144,7 @@
     </button>
     <div class="topbar-title">{% block page_title %}{% endblock %}</div>
     <div class="ms-auto d-flex align-items-center gap-3">
+      {% if notices_enabled %}
       <div class="dropdown">
         <button class="btn btn-light position-relative topbar-bell" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="topbarBellButton">
           <i class="bi bi-bell-fill"></i>
@@ -154,16 +155,19 @@
         <div class="dropdown-menu dropdown-menu-end p-0 shadow border-0 topbar-notice-menu" id="topbarNoticeMenu">
           <div class="px-3 py-3 border-bottom d-flex justify-content-between align-items-center">
             <div>
-              <div class="fw-bold">Notifications</div>
-              <div class="text-muted small">Quick access to recent notices</div>
+              <div class="fw-bold">{{ 'Platform Activity' if notification_mode == 'platform' else 'Notifications' }}</div>
+              <div class="text-muted small">
+                {{ 'Recent super admin actions and tenant changes' if notification_mode == 'platform' else 'Quick access to recent notices' }}
+              </div>
             </div>
             <div class="d-flex align-items-center gap-2">
+              {% if notification_mode == 'notice' %}
               <button type="button"
                       class="btn btn-sm btn-outline-secondary topbar-delete-read-btn"
                       id="topbarDeleteReadButton"
                       title="Delete read notifications from the tray"
                       aria-label="Delete read notifications from the tray"
-                      {% if not (notification_items | selectattr('is_read_for_current_user') | list | length) %}disabled{% endif %}>
+                      {% if not (notification_items | selectattr('is_read') | list | length) %}disabled{% endif %}>
                 <i class="bi bi-trash3"></i>
               </button>
               <button type="button"
@@ -175,13 +179,32 @@
                 <i class="bi bi-check2-all"></i>
               </button>
               <a href="{{ url_for('notice.list_notices') }}" class="btn btn-sm btn-outline-secondary">Open Board</a>
+              {% else %}
+              <button type="button"
+                      class="btn btn-sm btn-outline-secondary topbar-delete-read-btn"
+                      id="topbarDeleteReadButton"
+                      title="Delete read platform activity from the tray"
+                      aria-label="Delete read platform activity from the tray"
+                      {% if not (notification_items | selectattr('is_read') | list | length) %}disabled{% endif %}>
+                <i class="bi bi-trash3"></i>
+              </button>
+              <button type="button"
+                      class="btn btn-sm btn-outline-secondary topbar-mark-read-btn"
+                      id="topbarMarkReadButton"
+                      title="Mark all unread platform activity as read"
+                      aria-label="Mark all unread platform activity as read"
+                      {% if not notification_count %}disabled{% endif %}>
+                <i class="bi bi-check2-all"></i>
+              </button>
+              <a href="{{ url_for('super_admin.audit_logs') }}" class="btn btn-sm btn-outline-secondary">Open Audit</a>
+              {% endif %}
             </div>
           </div>
 
           {% if notification_items %}
-          <div class="py-2" id="topbarNoticeList">
+          <div class="py-2 topbar-notice-list" id="topbarNoticeList">
             {% for notice in notification_items %}
-            <a href="{{ url_for('notice.detail', nid=notice.id) }}" class="dropdown-item px-3 py-3 topbar-notice-item {% if not notice.is_read_for_current_user %}is-unread{% endif %}">
+            <a href="{{ notice.detail_url }}" class="dropdown-item px-3 py-3 topbar-notice-item {% if notification_mode == 'notice' and not notice.is_read %}is-unread{% endif %}">
               <div class="d-flex gap-3 align-items-start">
                 <span class="topbar-notice-dot dot-{{ notice.category }}"></span>
                 <div class="min-w-0 flex-grow-1">
@@ -190,12 +213,12 @@
                       {{ notice.title }}
                       {% if notice.is_pinned %}<i class="bi bi-pin-angle-fill text-warning ms-1"></i>{% endif %}
                     </div>
-                    <small class="text-muted flex-shrink-0">{{ notice.created_at.strftime('%d %b') }}</small>
+                    <small class="text-muted flex-shrink-0">{{ notice.created_label }}</small>
                   </div>
                   <div class="small text-muted text-wrap">{{ notice.content | truncate(70) }}</div>
                   <div class="mt-2 d-flex gap-2 flex-wrap">
                     <span class="badge bg-light text-secondary border text-uppercase">{{ notice.category.replace('_', ' ') }}</span>
-                    {% if notice.target_role != 'all' %}
+                    {% if notification_mode == 'notice' and notice.target_role != 'all' %}
                     <span class="badge bg-secondary-subtle text-secondary">{{ notice.target_role }}s</span>
                     {% endif %}
                   </div>
@@ -206,20 +229,21 @@
           </div>
           <div class="px-4 py-5 text-center text-muted d-none" id="topbarNoticeEmpty">
             <i class="bi bi-bell-slash fs-3 d-block mb-2 opacity-50"></i>
-            No recent notices.
+            {{ 'No recent platform activity.' if notification_mode == 'platform' else 'No recent notices.' }}
           </div>
           {% else %}
-          <div class="py-2 d-none" id="topbarNoticeList"></div>
+          <div class="py-2 topbar-notice-list d-none" id="topbarNoticeList"></div>
           <div class="px-4 py-5 text-center text-muted" id="topbarNoticeEmpty">
             <i class="bi bi-bell-slash fs-3 d-block mb-2 opacity-50"></i>
-            No recent notices.
+            {{ 'No recent platform activity.' if notification_mode == 'platform' else 'No recent notices.' }}
           </div>
           {% endif %}
         </div>
       </div>
+      {% endif %}
       <span class="badge bg-primary-subtle text-primary text-capitalize px-3 py-2">
         <i class="bi bi-circle-fill text-success me-1" style="font-size:8px"></i>
-        {{ current_user.role }}
+        {{ current_user.role.replace('_', ' ') }}
       </span>
     </div>
   </nav>
@@ -357,9 +381,10 @@
   const markReadButton = document.getElementById('topbarMarkReadButton');
   const noticeList = document.getElementById('topbarNoticeList');
   const noticeEmpty = document.getElementById('topbarNoticeEmpty');
-  const noticeFeedUrl = '{{ url_for("notice.feed") if current_user.is_authenticated else "" }}';
-  const noticeMarkReadUrl = '{{ url_for("notice.mark_all_read") if current_user.is_authenticated else "" }}';
-  const noticeDeleteReadUrl = '{{ url_for("notice.delete_read") if current_user.is_authenticated else "" }}';
+  const notificationMode = '{{ notification_mode }}';
+  const noticeFeedUrl = '{% if current_user.is_authenticated and notices_enabled and notification_mode == "notice" %}{{ url_for("notice.feed") }}{% elif current_user.is_authenticated and notices_enabled and notification_mode == "platform" %}{{ url_for("super_admin.notifications_feed") }}{% else %}{% endif %}';
+  const noticeMarkReadUrl = '{% if current_user.is_authenticated and notices_enabled and notification_mode == "notice" %}{{ url_for("notice.mark_all_read") }}{% elif current_user.is_authenticated and notices_enabled and notification_mode == "platform" %}{{ url_for("super_admin.notifications_mark_all_read") }}{% else %}{% endif %}';
+  const noticeDeleteReadUrl = '{% if current_user.is_authenticated and notices_enabled and notification_mode == "notice" %}{{ url_for("notice.delete_read") }}{% elif current_user.is_authenticated and notices_enabled and notification_mode == "platform" %}{{ url_for("super_admin.notifications_delete_read") }}{% else %}{% endif %}';
   const csrfToken = '{{ csrf_token() if current_user.is_authenticated else "" }}';
 
   function escapeHtml(value) {
@@ -394,7 +419,7 @@
             <div class="small text-muted text-wrap">${escapeHtml(notice.content)}</div>
             <div class="mt-2 d-flex gap-2 flex-wrap">
               <span class="badge bg-light text-secondary border text-uppercase">${escapeHtml(notice.category.replace('_', ' '))}</span>
-              ${notice.target_role !== 'all' ? `<span class="badge bg-secondary-subtle text-secondary">${escapeHtml(notice.target_role)}s</span>` : ''}
+              ${notificationMode === 'notice' && notice.target_role !== 'all' ? `<span class="badge bg-secondary-subtle text-secondary">${escapeHtml(notice.target_role)}s</span>` : ''}
             </div>
           </div>
         </div>
@@ -418,6 +443,7 @@
   }
 
   function updateDeleteReadState(items) {
+    if (notificationMode !== 'notice') return;
     if (!deleteReadButton) return;
     const hasReadItems = (items || []).some((notice) => notice.is_read);
     deleteReadButton.disabled = !hasReadItems;
@@ -496,7 +522,7 @@
 
   updateDeleteReadState([
     {% for notice in notification_items %}
-    { is_read: {{ 'true' if notice.is_read_for_current_user else 'false' }} }{% if not loop.last %},{% endif %}
+    { is_read: {{ 'true' if notice.is_read else 'false' }} }{% if not loop.last %},{% endif %}
     {% endfor %}
   ]);
 
@@ -728,6 +754,11 @@
   width: min(390px, calc(100vw - 2rem));
   border-radius: 18px;
   overflow: hidden;
+}
+.topbar-notice-list {
+  max-height: min(62vh, 420px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 .topbar-mark-read-btn {
   width: 34px;

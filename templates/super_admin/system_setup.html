@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Platform Setup{% endblock %}
+{% block page_title %}<i class="bi bi-shield-check me-2"></i>Platform Setup{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body p-4">
+        <div class="text-uppercase text-muted small fw-semibold">Platform Readiness</div>
+        <h2 class="fw-bold mt-2 mb-2">{{ setup_report.progress }}%</h2>
+        <p class="text-muted">These are the environment and platform checks that should be managed by the super admin.</p>
+        <div class="progress mb-4" style="height:10px">
+          <div class="progress-bar {% if setup_report.is_ready %}bg-success{% else %}bg-primary{% endif %}" style="width: {{ setup_report.progress }}%"></div>
+        </div>
+        <div class="d-grid gap-2">
+          <div class="alert alert-success border-0 py-2 mb-0">Passed: {{ setup_report.passed }}</div>
+          <div class="alert alert-warning border-0 py-2 mb-0">Warnings: {{ setup_report.warnings }}</div>
+          <div class="alert alert-danger border-0 py-2 mb-0">Failures: {{ setup_report.failures }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-cpu text-primary me-2"></i>Platform Checks</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <div class="d-flex flex-column gap-3">
+          {% for item in setup_report.checks %}
+          <div class="d-flex gap-3 align-items-start p-3 rounded-4 border
+                      {% if item.status == 'pass' %}border-success-subtle bg-success-subtle{% elif item.status == 'warning' %}border-warning-subtle bg-warning-subtle{% else %}border-danger-subtle bg-danger-subtle{% endif %}">
+            <div class="fs-5">
+              {% if item.status == 'pass' %}
+              <i class="bi bi-check-circle-fill text-success"></i>
+              {% elif item.status == 'warning' %}
+              <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+              {% else %}
+              <i class="bi bi-x-octagon-fill text-danger"></i>
+              {% endif %}
+            </div>
+            <div>
+              <div class="fw-semibold">{{ item.label }}</div>
+              <div class="small text-muted">{{ item.detail }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-buildings text-primary me-2"></i>College Onboarding Status</h6>
+        <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-sm btn-outline-secondary">Open Colleges</a>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <div class="d-flex flex-column gap-3">
+          {% for row in college_rows %}
+          <div class="border rounded-4 p-3 bg-light-subtle">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="fw-semibold">{{ row.college.name }} <span class="text-muted small">({{ row.college.code }})</span></div>
+              <span class="badge {% if row.report.is_ready %}bg-success{% else %}bg-primary{% endif %}">{{ row.report.progress }}%</span>
+            </div>
+            <div class="progress mb-2" style="height:8px">
+              <div class="progress-bar {% if row.report.is_ready %}bg-success{% else %}bg-primary{% endif %}" style="width: {{ row.report.progress }}%"></div>
+            </div>
+            <div class="small text-muted">{{ row.report.failures }} failures, {{ row.report.warnings }} warnings, {{ row.report.passed }} checks passed.</div>
+          </div>
+          {% else %}
+          <div class="text-center text-muted py-4">No colleges found.</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

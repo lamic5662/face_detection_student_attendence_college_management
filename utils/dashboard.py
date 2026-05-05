@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from utils.feature_access import dashboard_widget_is_enabled
+
 
 DASHBOARD_WIDGETS = {
     'admin': {
@@ -191,8 +193,14 @@ def normalize_dashboard_widget_keys(role: str, requested_keys: list[str]) -> lis
 
 def build_dashboard_preferences(user) -> dict:
     config = DASHBOARD_WIDGETS.get(user.role, {'core': [], 'optional': []})
-    core_items = config['core']
-    optional_items = config['optional']
+    core_items = [
+        item for item in config['core']
+        if dashboard_widget_is_enabled(user, item['key'])
+    ]
+    optional_items = [
+        item for item in config['optional']
+        if dashboard_widget_is_enabled(user, item['key'])
+    ]
     optional_map = {item['key']: item for item in optional_items}
     selected_optional_keys = normalize_dashboard_widget_keys(
         user.role,

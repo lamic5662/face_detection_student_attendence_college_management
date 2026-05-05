@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 help_bp = Blueprint('help', __name__)
 
 ROLES_META = {
+    'super_admin': {'color': 'dark', 'icon': 'bi-shield-lock-fill', 'label': 'Super Admin'},
     'admin':   {'color': 'primary',  'icon': 'bi-shield-fill-check', 'label': 'Administrator'},
     'teacher': {'color': 'success',  'icon': 'bi-person-badge-fill', 'label': 'Teacher'},
     'student': {'color': 'info',     'icon': 'bi-mortarboard-fill',  'label': 'Student'},
@@ -15,13 +16,16 @@ ROLES_META = {
 @login_required
 def guide():
     role = current_user.role
-    if role == 'admin':
+    active_role = role
+    if role == 'super_admin':
+        active_role = 'admin'
+    if role in ('admin', 'super_admin'):
         roles = ['admin', 'teacher', 'student', 'parent']
     else:
         roles = [role]
     return render_template('help/guide.html',
                            roles=roles,
-                           active_role=role,
+                           active_role=active_role,
                            meta=ROLES_META)
 
 
@@ -30,10 +34,10 @@ def guide():
 def guide_role(role_name):
     if role_name not in ROLES_META:
         abort(404)
-    if current_user.role != 'admin' and current_user.role != role_name:
+    if current_user.role not in ('admin', 'super_admin') and current_user.role != role_name:
         abort(403)
     roles = [role_name]
-    if current_user.role == 'admin':
+    if current_user.role in ('admin', 'super_admin'):
         roles = ['admin', 'teacher', 'student', 'parent']
     return render_template('help/guide.html',
                            roles=roles,

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Super Admin Dashboard{% endblock %}
+{% block page_title %}<i class="bi bi-shield-lock-fill me-2"></i>Super Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="alert alert-dark border-0 shadow-sm mb-4">
+  <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+    <div>
+      <div class="fw-semibold">Platform readiness</div>
+      <div class="small text-light-emphasis">
+        {{ setup_report.progress }}% ready. {{ setup_report.failures }} failures and {{ setup_report.warnings }} warnings remain at the platform level.
+      </div>
+    </div>
+    <a href="{{ url_for('super_admin.system_setup') }}" class="btn btn-light btn-sm">
+      <i class="bi bi-list-check me-1"></i>Open Platform Setup
+    </a>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-blue">
+      <div class="stat-icon"><i class="bi bi-buildings-fill"></i></div>
+      <div class="stat-value">{{ stats.colleges }}</div>
+      <div class="stat-label">Colleges</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-green">
+      <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
+      <div class="stat-value">{{ stats.active_colleges }}</div>
+      <div class="stat-label">Active</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-red">
+      <div class="stat-icon"><i class="bi bi-person-badge-fill"></i></div>
+      <div class="stat-value">{{ stats.college_admins }}</div>
+      <div class="stat-label">College Admins</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-purple">
+      <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+      <div class="stat-value">{{ stats.students }}</div>
+      <div class="stat-label">Students</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-orange">
+      <div class="stat-icon"><i class="bi bi-person-workspace"></i></div>
+      <div class="stat-value">{{ stats.teachers }}</div>
+      <div class="stat-label">Teachers</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-teal">
+      <div class="stat-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
+      <div class="stat-value">{{ stats.subjects }}</div>
+      <div class="stat-label">Subjects</div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-buildings text-primary me-2"></i>College Status</h6>
+    <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">College</th>
+            <th>Code</th>
+            <th>Status</th>
+            <th>Admins</th>
+            <th>Students</th>
+            <th>Teachers</th>
+            <th>Progress</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in college_rows %}
+          <tr>
+            <td class="px-4 fw-semibold">{{ row.college.name }}</td>
+            <td><span class="badge bg-light text-dark border">{{ row.college.code }}</span></td>
+            <td>
+              <span class="badge {% if row.college.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                {{ 'Active' if row.college.is_active else 'Inactive' }}
+              </span>
+            </td>
+            <td>{{ row.admins }}</td>
+            <td>{{ row.students }}</td>
+            <td>{{ row.teachers }}</td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1" style="height:8px; min-width:90px;">
+                  <div class="progress-bar {% if row.report.is_ready %}bg-success{% else %}bg-primary{% endif %}" style="width: {{ row.report.progress }}%"></div>
+                </div>
+                <span class="small fw-semibold">{{ row.report.progress }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-5">No colleges found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mt-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-journal-text text-primary me-2"></i>Recent Platform Audit</h6>
+    <a href="{{ url_for('super_admin.audit_logs') }}" class="btn btn-sm btn-outline-secondary">Open Audit Logs</a>
+  </div>
+  <div class="card-body px-4 pb-4">
+    <div class="d-flex flex-column gap-3">
+      {% for log in recent_logs %}
+      <div class="border rounded-4 p-3 bg-light-subtle">
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <div>
+            <div class="fw-semibold">{{ log.summary }}</div>
+            <div class="small text-muted">
+              {{ log.actor.name if log.actor else 'System' }}
+              {% if log.college %} · {{ log.college.name }}{% endif %}
+              {% if log.target_type %} · {{ log.target_type|replace('_', ' ')|title }}{% endif %}
+            </div>
+          </div>
+          <div class="text-end small text-muted">
+            {{ log.created_at.strftime('%d %b %Y %H:%M') if log.created_at else '-' }}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-4">No platform audit entries yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

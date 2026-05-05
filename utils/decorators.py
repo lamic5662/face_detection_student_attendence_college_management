@@ -18,6 +18,10 @@ def admin_required(f):
     return role_required('admin')(f)
 
 
+def super_admin_required(f):
+    return role_required('super_admin')(f)
+
+
 def teacher_required(f):
     return role_required('teacher')(f)
 

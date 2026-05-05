@@ -15,6 +15,14 @@ _PASSWORD_RE = re.compile(
 )
 
 
+def _find_global_super_admin(email: str) -> User | None:
+    return User.query.filter_by(
+        email=email,
+        role='super_admin',
+        is_active=True,
+    ).first()
+
+
 def _is_safe_url(target: str) -> bool:
     """Prevent open-redirect: only allow same-host relative URLs."""
     ref_url = urlparse(request.host_url)
@@ -43,6 +51,18 @@ def login():
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         remember = request.form.get('remember') == 'on'
+
+        if not college_locked and not college_code:
+            super_admin = _find_global_super_admin(email)
+            if super_admin and super_admin.check_password(password):
+                login_user(super_admin, remember=remember)
+                store_login_college(super_admin.college)
+                current_app.logger.info('Super admin %s logged in from %s', super_admin.email, request.remote_addr)
+                next_page = request.args.get('next')
+                if next_page and _is_safe_url(next_page):
+                    return redirect(next_page)
+                return redirect(url_for(f'{super_admin.role}.dashboard'))
+
         login_college = resolve_login_college(college_code)
 
         if login_college is None:

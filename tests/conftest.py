@@ -66,7 +66,9 @@ def app():
         parent_user.set_password('Password@123')
         admin_user = User(college_id=college.id, name='Admin User', email='admin@example.com', role='admin')
         admin_user.set_password('Password@123')
-        db.session.add_all([teacher_user, other_teacher_user, student_user, parent_user, admin_user])
+        super_admin_user = User(college_id=college.id, name='Platform Owner', email='superadmin@example.com', role='super_admin')
+        super_admin_user.set_password('Password@123')
+        db.session.add_all([teacher_user, other_teacher_user, student_user, parent_user, admin_user, super_admin_user])
         db.session.flush()
 
         teacher = Teacher(college_id=college.id, user_id=teacher_user.id, employee_id='T-001', department_id=dept.id)
@@ -154,6 +156,7 @@ def app():
             'student_user_id': student_user.id,
             'student_profile_id': student.id,
             'parent_user_id': parent_user.id,
+            'super_admin_user_id': super_admin_user.id,
             'foreign_session_id': foreign_session.id,
             'other_subject_id': other_subject.id,
             'teacher_notice_id': teacher_only_notice.id,

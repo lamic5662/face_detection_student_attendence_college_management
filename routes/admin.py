@@ -24,7 +24,6 @@ from datetime import datetime, date, timedelta
 import csv, io, os
 from utils.content_storage import is_valid_content_relpath, resolve_content_path, content_storage_dirs
 from utils.dashboard import build_dashboard_preferences
-from utils.system_setup import evaluate_production_setup
 from utils.tenancy import current_college_id
 from utils.time import utc_now_naive
 
@@ -67,7 +66,6 @@ def _scoped_user_query():
 @admin_required
 def dashboard():
     dashboard_prefs = build_dashboard_preferences(current_user)
-    setup_report = evaluate_production_setup(current_app, current_user.college)
     stats = {
         'total_students': _scoped_student_query().count(),
         'total_teachers': _scoped_teacher_query().count(),
@@ -178,7 +176,6 @@ def dashboard():
 
     return render_template('admin/dashboard.html',
                            dashboard_prefs=dashboard_prefs,
-                           setup_report=setup_report,
                            stats=stats, trend=trend,
                            dept_stats=dept_stats,
                            recent_sessions=recent_sessions,
@@ -1048,16 +1045,7 @@ def trigger_class_alerts():
 @admin_required
 def settings():
     cs = CollegeSetting.get()
-    setup_report = evaluate_production_setup(current_app, current_user.college)
-    return render_template('admin/settings.html', cs=cs, setup_report=setup_report)
-
-
-@admin_bp.route('/system-setup', methods=['GET'])
-@login_required
-@admin_required
-def system_setup():
-    setup_report = evaluate_production_setup(current_app, current_user.college)
-    return render_template('admin/system_setup.html', setup_report=setup_report)
+    return render_template('admin/settings.html', cs=cs)
 
 
 @admin_bp.route('/settings/save', methods=['POST'])

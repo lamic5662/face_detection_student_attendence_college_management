@@ -2,16 +2,19 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import timedelta
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, url_for
 from flask_login import current_user
 from werkzeug.middleware.proxy_fix import ProxyFix
+import redis
 from config import get_config
 from extensions import db, login_manager, mail, csrf, migrate, compress, limiter
 from services.liveness_service import liveness_manager
 from utils.content_storage import resolve_content_path
 from utils.assignment_storage import resolve_submission_path
 from utils.file_preview import get_missing_preview_dependencies
+from utils.feature_access import endpoint_has_access, feature_access_message, user_has_feature
 from utils.navigation import build_sidebar_navigation
+from utils.platform_notifications import platform_notification_payload
 from utils.tenancy import get_current_college, load_request_college
 from utils.time import utc_now_naive
 
@@ -80,6 +83,7 @@ def _configure_logging(app: Flask) -> None:
 
 def _register_blueprints(app: Flask) -> None:
     from routes.auth import auth_bp
+    from routes.super_admin import super_admin_bp
     from routes.admin import admin_bp
     from routes.teacher import teacher_bp
     from routes.student import student_bp
@@ -94,6 +98,7 @@ def _register_blueprints(app: Flask) -> None:
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(help_bp)
+    app.register_blueprint(super_admin_bp, url_prefix='/super-admin')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(teacher_bp, url_prefix='/teacher')
     app.register_blueprint(student_bp, url_prefix='/student')
@@ -244,6 +249,28 @@ def _configure_runtime_services(app: Flask) -> None:
     liveness_manager.configure(app.config.get('LIVENESS_STATE_TTL_SECONDS', 600))
 
 
+def _prepare_rate_limit_storage(app: Flask) -> None:
+    storage_uri = app.config.get('RATELIMIT_STORAGE_URI', 'memory://')
+    if not storage_uri.startswith('redis://'):
+        return
+
+    # In local development, fall back cleanly if Redis is not running.
+    if not (app.debug or app.testing):
+        return
+
+    try:
+        redis.Redis.from_url(
+            storage_uri,
+            socket_connect_timeout=0.3,
+            socket_timeout=0.3,
+        ).ping()
+    except Exception:  # noqa: BLE001
+        app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
+        app.config['_RATELIMIT_FALLBACK_MESSAGE'] = (
+            f'Rate limiting fell back to memory:// because Redis is unreachable at {storage_uri}.'
+        )
+
+
 def _apply_proxy_fix(app: Flask) -> None:
     if app.config.get('TRUST_PROXY_HEADERS', True):
         hops = max(int(app.config.get('TRUSTED_PROXY_HOPS', 1)), 0)
@@ -264,6 +291,7 @@ def create_app(config_override=None) -> Flask:
     cfg = config_override or get_config()
     app.config.from_object(cfg)
     _apply_proxy_fix(app)
+    _prepare_rate_limit_storage(app)
 
     # Extensions
     db.init_app(app)
@@ -275,6 +303,8 @@ def create_app(config_override=None) -> Flask:
     limiter.init_app(app)
 
     _configure_logging(app)
+    if app.config.get('_RATELIMIT_FALLBACK_MESSAGE'):
+        app.logger.warning(app.config['_RATELIMIT_FALLBACK_MESSAGE'])
     _validate_runtime_config(app)
     _configure_runtime_services(app)
     _log_optional_preview_dependencies(app)
@@ -291,6 +321,12 @@ def create_app(config_override=None) -> Flask:
             allowed_hosts = app.config.get('ALLOWED_HOSTS', [])
             if allowed_hosts and not _host_is_allowed(request.host, allowed_hosts):
                 return render_template('errors/400.html'), 400
+        if current_user.is_authenticated and current_user.role != 'super_admin':
+            if not endpoint_has_access(current_user, request.endpoint):
+                message = feature_access_message(request.endpoint)
+                if request.is_json:
+                    return jsonify(error='Feature disabled', message=message), 403
+                return render_template('errors/403.html', message=message), 403
 
     @app.context_processor
     def inject_globals():
@@ -304,56 +340,80 @@ def create_app(config_override=None) -> Flask:
             notification_items = []
             notification_count = 0
             sidebar_navigation = None
+            notices_enabled = False
+            notification_mode = ''
 
             if current_user.is_authenticated:
-                notice_query = Notice.query.filter(
-                    Notice.college_id == current_user.college_id,
-                    db.or_(Notice.expires_at == None, Notice.expires_at > utc_now_naive())
-                )
-                if current_user.role == 'student':
-                    notice_query = notice_query.filter(Notice.target_role.in_(['all', 'student']))
-                elif current_user.role == 'teacher':
-                    notice_query = notice_query.filter(Notice.target_role.in_(['all', 'teacher']))
-                elif current_user.role == 'parent':
-                    notice_query = notice_query.filter(Notice.target_role.in_(['all', 'student']))
-
-                recent_cutoff = utc_now_naive() - timedelta(days=7)
-                scoped_query = notice_query.filter(
-                    db.or_(
-                        Notice.is_pinned == True,
-                        Notice.created_at >= recent_cutoff,
+                if current_user.role == 'super_admin':
+                    payload = platform_notification_payload(current_user)
+                    notification_items = payload['items']
+                    notification_count = payload['count']
+                    notices_enabled = True
+                    notification_mode = 'platform'
+                else:
+                    notices_enabled = user_has_feature(current_user, 'notices')
+                if notices_enabled and current_user.role != 'super_admin':
+                    notice_query = Notice.query.filter(
+                        Notice.college_id == current_user.college_id,
+                        db.or_(Notice.expires_at == None, Notice.expires_at > utc_now_naive())
                     )
-                )
-                scoped_query = scoped_query.filter(
-                    ~Notice.read_receipts.any(
-                        db.and_(
-                            NoticeRead.user_id == current_user.id,
-                            NoticeRead.dismissed_at.isnot(None),
+                    if current_user.role == 'student':
+                        notice_query = notice_query.filter(Notice.target_role.in_(['all', 'student']))
+                    elif current_user.role == 'teacher':
+                        notice_query = notice_query.filter(Notice.target_role.in_(['all', 'teacher']))
+                    elif current_user.role == 'parent':
+                        notice_query = notice_query.filter(Notice.target_role.in_(['all', 'student']))
+
+                    recent_cutoff = utc_now_naive() - timedelta(days=7)
+                    scoped_query = notice_query.filter(
+                        db.or_(
+                            Notice.is_pinned == True,
+                            Notice.created_at >= recent_cutoff,
                         )
                     )
-                )
-                notification_items = (
-                    scoped_query
-                    .order_by(Notice.is_pinned.desc(), Notice.created_at.desc())
-                    .limit(6)
-                    .all()
-                )
-                if notification_items:
-                    read_notice_ids = {
-                        notice_id
-                        for (notice_id,) in db.session.query(NoticeRead.notice_id).filter(
-                            NoticeRead.user_id == current_user.id,
-                            NoticeRead.notice_id.in_([notice.id for notice in notification_items]),
-                        ).all()
-                    }
-                else:
-                    read_notice_ids = set()
-                for notice in notification_items:
-                    notice.is_read_for_current_user = notice.id in read_notice_ids
+                    scoped_query = scoped_query.filter(
+                        ~Notice.read_receipts.any(
+                            db.and_(
+                                NoticeRead.user_id == current_user.id,
+                                NoticeRead.dismissed_at.isnot(None),
+                            )
+                        )
+                    )
+                    notices = (
+                        scoped_query
+                        .order_by(Notice.is_pinned.desc(), Notice.created_at.desc())
+                        .limit(6)
+                        .all()
+                    )
+                    if notices:
+                        read_notice_ids = {
+                            notice_id
+                            for (notice_id,) in db.session.query(NoticeRead.notice_id).filter(
+                                NoticeRead.user_id == current_user.id,
+                                NoticeRead.notice_id.in_([notice.id for notice in notices]),
+                            ).all()
+                        }
+                    else:
+                        read_notice_ids = set()
+                    notification_items = [
+                        {
+                            'id': notice.id,
+                            'title': notice.title,
+                            'content': notice.content[:140],
+                            'category': notice.category,
+                            'target_role': notice.target_role,
+                            'is_pinned': notice.is_pinned,
+                            'created_label': notice.created_at.strftime('%d %b'),
+                            'detail_url': url_for('notice.detail', nid=notice.id),
+                            'is_read': notice.id in read_notice_ids,
+                        }
+                        for notice in notices
+                    ]
 
-                notification_count = scoped_query.filter(
-                    ~Notice.read_receipts.any(NoticeRead.user_id == current_user.id)
-                ).count()
+                    notification_count = scoped_query.filter(
+                        ~Notice.read_receipts.any(NoticeRead.user_id == current_user.id)
+                    ).count()
+                    notification_mode = 'notice'
                 sidebar_navigation = build_sidebar_navigation(current_user, request.endpoint)
 
             return dict(
@@ -363,6 +423,8 @@ def create_app(config_override=None) -> Flask:
                 now=_dt.now,
                 notification_items=notification_items,
                 notification_count=notification_count,
+                notices_enabled=notices_enabled,
+                notification_mode=notification_mode,
                 sidebar_navigation=sidebar_navigation,
                 current_college=college,
             )
@@ -374,6 +436,8 @@ def create_app(config_override=None) -> Flask:
                 now=_dt.now,
                 notification_items=[],
                 notification_count=0,
+                notices_enabled=False,
+                notification_mode='',
                 sidebar_navigation=None,
                 current_college=None,
             )
