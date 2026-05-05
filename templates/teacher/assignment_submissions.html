@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Assignment Review{% endblock %}
+{% block page_title %}<i class="bi bi-clipboard-check-fill me-2"></i>{{ item.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+  <div>
+    <a href="{{ url_for('teacher.content_list', type='assignment') }}" class="btn btn-light btn-sm mb-3">
+      <i class="bi bi-arrow-left me-1"></i>Back to Content
+    </a>
+    <h3 class="fw-bold mb-1">{{ item.title }}</h3>
+    <div class="text-muted">
+      {{ item.subject.name if item.subject else 'General assignment' }} • Semester {{ item.semester }}
+      {% if item.due_date %}• Due {{ item.due_date.strftime('%d %b %Y') }}{% endif %}
+    </div>
+    {% if item.body %}
+    <p class="text-muted mt-3 mb-0" style="max-width:68ch">{{ item.body }}</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if first_unreviewed_submission_id %}
+    <a href="{{ url_for('teacher.assignment_submission_preview', sid=first_unreviewed_submission_id) }}" class="btn btn-success btn-sm">
+      <i class="bi bi-play-circle me-1"></i>Start Reviewing
+    </a>
+    {% endif %}
+    {% if item.file_path %}
+    <a href="{{ url_for('teacher.content_file', cid=item.id) }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-download me-1"></i>Assignment File
+    </a>
+    {% endif %}
+    <a href="{{ url_for('teacher.content_preview', cid=item.id) }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-eye me-1"></i>Preview Assignment
+    </a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small text-uppercase fw-semibold">Students</div>
+      <div class="display-6 fw-bold">{{ stats.total }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small text-uppercase fw-semibold">Submitted</div>
+      <div class="display-6 fw-bold text-primary">{{ stats.submitted }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small text-uppercase fw-semibold">Awaiting Review</div>
+      <div class="display-6 fw-bold text-warning">{{ stats.awaiting_review }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small text-uppercase fw-semibold">Late</div>
+      <div class="display-6 fw-bold text-danger">{{ stats.late }}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Student</th>
+            <th>Submitted</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Submission</th>
+            <th class="text-end pe-4">Review</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          {% set student = row.student %}
+          {% set submission = row.submission %}
+          <tr>
+            <td class="px-4">
+              <div class="fw-semibold">{{ student.user.name }}</div>
+              <div class="text-muted small">{{ student.roll_number }}</div>
+            </td>
+            <td class="small text-muted">
+              {% if submission %}
+              {{ submission.submitted_at.strftime('%d %b %Y %H:%M') }}
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td>
+              {% if not submission %}
+              <span class="badge bg-secondary-subtle text-secondary">Missing</span>
+              {% elif submission.status == 'reviewed' %}
+              <span class="badge bg-success-subtle text-success">Reviewed</span>
+              {% else %}
+              <span class="badge bg-primary-subtle text-primary">Submitted</span>
+              {% endif %}
+              {% if submission and submission.is_late %}
+              <span class="badge bg-danger-subtle text-danger ms-1">Late</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if submission and submission.marks_awarded is not none %}
+              <span class="fw-semibold">{{ submission.marks_awarded }}{% if item.marks %}/{{ item.marks }}{% endif %}</span>
+              {% if row.score_pct is not none %}
+              <div class="small text-muted">{{ row.score_pct }}%</div>
+              {% endif %}
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if submission %}
+              <div class="small" style="max-width:280px; white-space:pre-wrap">{{ submission.submission_text or 'No written note.' }}</div>
+              <div class="d-flex gap-2 flex-wrap mt-2">
+                <a href="{{ url_for('teacher.assignment_submission_preview', sid=submission.id) }}" class="btn btn-sm btn-outline-info">
+                  <i class="bi bi-eye me-1"></i>Preview Submission
+                </a>
+                {% if submission.file_path %}
+                <a href="{{ url_for('teacher.assignment_submission_file', sid=submission.id) }}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-download me-1"></i>Download Work
+                </a>
+                {% endif %}
+              </div>
+              {% else %}
+              <span class="text-muted small">No submission yet.</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              {% if submission %}
+              <div class="d-flex gap-2 justify-content-end flex-wrap">
+                <a href="{{ url_for('teacher.assignment_submission_preview', sid=submission.id) }}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-pencil-square me-1"></i>{{ 'Open Review' if submission.status == 'reviewed' else 'Review' }}
+                </a>
+                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#gradeSubmission{{ submission.id }}">
+                  <i class="bi bi-lightning-charge me-1"></i>Quick
+                </button>
+              </div>
+              {% else %}
+              <span class="text-muted small">Waiting</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-5">No students found for this assignment scope.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% for row in rows if row.submission %}
+{% set submission = row.submission %}
+<div class="modal fade" id="gradeSubmission{{ submission.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <div>
+          <h5 class="modal-title fw-bold mb-1">Review {{ submission.student.user.name }}</h5>
+          <div class="text-muted small">{{ submission.student.roll_number }} • {{ item.title }}</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="rounded-4 bg-light p-3 mb-3">
+          <div class="small text-uppercase text-secondary fw-semibold mb-2">Student Note</div>
+          <div style="white-space:pre-wrap">{{ submission.submission_text or 'No written note attached.' }}</div>
+        </div>
+        <form method="POST" action="{{ url_for('teacher.assignment_grade', sid=submission.id) }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Marks Awarded</label>
+            <input type="number" name="marks_awarded" class="form-control" min="0"
+                   {% if item.marks %}max="{{ item.marks }}"{% endif %}
+                   value="{{ submission.marks_awarded if submission.marks_awarded is not none else '' }}">
+            {% if item.marks %}<div class="form-text">Total marks: {{ item.marks }}</div>{% endif %}
+          </div>
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">Feedback</label>
+            <textarea name="feedback" rows="5" class="form-control" placeholder="Add review comments, corrections, or guidance...">{{ submission.feedback or '' }}</textarea>
+          </div>
+          <div class="col-12 d-flex justify-content-end">
+            <button class="btn btn-primary fw-semibold">
+              <i class="bi bi-save me-2"></i>Save Review
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

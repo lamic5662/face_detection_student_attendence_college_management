@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block title %}Manage Academic Calendar{% endblock %}
+{% block page_title %}<i class="bi bi-calendar-range-fill me-2"></i>Manage Academic Calendar{% endblock %}
+
+{% block head %}
+<style>
+  .cm-card { border:0; box-shadow:0 10px 30px rgba(15, 23, 42, .07); border-radius:22px; overflow:hidden; }
+  .cm-form-shell {
+    background:
+      radial-gradient(circle at top right, rgba(251, 191, 36, .16), transparent 34%),
+      linear-gradient(135deg, #fffdf7 0%, #ffffff 52%, #f7fbff 100%);
+  }
+  .cm-shell { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(290px, .8fr); gap:1rem; align-items:start; }
+  .cm-eyebrow {
+    display:inline-flex; align-items:center; gap:.45rem; border-radius:999px;
+    padding:.38rem .8rem; font-size:.74rem; font-weight:800; letter-spacing:.08em;
+    text-transform:uppercase; color:#7c2d12; background:rgba(255, 237, 213, .92);
+  }
+  .cm-title {
+    font-size:clamp(1.65rem, 2.2vw, 2.2rem); line-height:1.06; letter-spacing:-.04em;
+    font-weight:900; color:#0f172a; margin:.9rem 0 .55rem;
+  }
+  .cm-subtitle { color:#526071; max-width:58ch; margin:0; }
+  .cm-kpis { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.75rem; }
+  .cm-kpi {
+    background:rgba(255,255,255,.84); border:1px solid rgba(148, 163, 184, .2);
+    border-radius:18px; padding:.95rem 1rem;
+  }
+  .cm-kpi-label {
+    font-size:.72rem; text-transform:uppercase; letter-spacing:.08em; color:#64748b; font-weight:800;
+  }
+  .cm-kpi-value {
+    font-size:1.45rem; line-height:1; font-weight:900; letter-spacing:-.04em; color:#0f172a; margin:.42rem 0;
+  }
+  .cm-kpi-note { font-size:.82rem; color:#64748b; }
+  .cm-form-grid {
+    margin-top:1.15rem; padding-top:1rem; border-top:1px solid rgba(148, 163, 184, .18);
+  }
+  .cm-filter-card { background:#fff; }
+  .cm-filter-summary { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:.95rem; }
+  .cm-chip {
+    display:inline-flex; align-items:center; gap:.4rem; padding:.42rem .78rem; border-radius:999px;
+    background:#f8fafc; border:1px solid #e2e8f0; color:#475569; font-size:.78rem; font-weight:700;
+  }
+  .cm-table-wrap { background:linear-gradient(180deg, #ffffff, #fbfdff); }
+  .cm-table td, .cm-table th { vertical-align:middle; }
+  .cm-table thead th {
+    border-bottom:1px solid #e5edf6; color:#475569; font-size:.78rem;
+    text-transform:uppercase; letter-spacing:.08em; font-weight:800;
+  }
+  .cm-title-cell { min-width:220px; }
+  .cm-scope { font-size:.82rem; color:#64748b; }
+  .cm-desc { max-width:360px; color:#475569; font-size:.9rem; }
+  .cm-date {
+    display:inline-flex; align-items:center; gap:.45rem; padding:.42rem .7rem; border-radius:999px;
+    background:#f8fafc; border:1px solid #e2e8f0; color:#334155; font-size:.78rem; font-weight:700;
+  }
+  .cm-actions { white-space:nowrap; }
+  .cm-empty {
+    border:1px dashed #cbd5e1; border-radius:16px; padding:2rem 1.25rem; text-align:center; color:#64748b;
+    background:#f8fafc;
+  }
+  @media (max-width: 992px) {
+    .cm-shell { grid-template-columns:1fr; }
+  }
+  @media (max-width: 768px) {
+    .cm-kpis { grid-template-columns:1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card cm-card cm-form-shell mb-4">
+  <div class="card-body p-4">
+    <div class="cm-shell">
+      <div>
+        <span class="cm-eyebrow"><i class="bi bi-calendar2-week"></i>Calendar Control Room</span>
+        <div class="cm-title">Build the semester timeline with intent.</div>
+        <p class="cm-subtitle">Add holidays, exam weeks, and institutional events with the right scope so every user sees only the dates relevant to them.</p>
+      </div>
+      <div>
+        <div class="cm-kpis">
+          <div class="cm-kpi">
+            <div class="cm-kpi-label">Total Events</div>
+            <div class="cm-kpi-value">{{ events|length }}</div>
+            <div class="cm-kpi-note">Visible under current filters</div>
+          </div>
+          <div class="cm-kpi">
+            <div class="cm-kpi-label">Calendar View</div>
+            <div class="cm-kpi-value">Live</div>
+            <div class="cm-kpi-note">Students and staff can view updates immediately</div>
+          </div>
+        </div>
+        <div class="mt-3 text-md-end">
+          <a href="{{ url_for('calendar.view_calendar') }}" class="btn btn-outline-primary fw-semibold">
+            <i class="bi bi-eye me-2"></i>View Calendar
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('calendar.create_event') }}" class="row g-3 cm-form-grid">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Title</label>
+        <input type="text" name="title" class="form-control" placeholder="Dashain Holiday, Midterm Week, Sports Day" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Category</label>
+        <select name="category" class="form-select">
+          {% for key, meta in category_meta.items() %}
+          <option value="{{ key }}">{{ meta.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">Start Date</label>
+        <input type="date" name="start_date" class="form-control" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">End Date</label>
+        <input type="date" name="end_date" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">Department</label>
+        <select name="department_id" class="form-select">
+          <option value="">All Departments</option>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}">{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">Semester</label>
+        <select name="semester" class="form-select">
+          <option value="">All Semesters</option>
+          {% for sem in range(1, 9) %}
+          <option value="{{ sem }}">Semester {{ sem }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-7">
+        <label class="form-label fw-semibold">Description</label>
+        <textarea name="description" rows="2" class="form-control" placeholder="Optional context, instructions, or notes for students and staff."></textarea>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button class="btn btn-primary fw-semibold">
+          <i class="bi bi-plus-circle me-2"></i>Create Event
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card cm-card cm-filter-card mb-4">
+  <div class="card-body p-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h5 class="fw-bold mb-1">Filter Timeline</h5>
+        <div class="text-muted small">Narrow the event list by scope, category, or text search before editing.</div>
+      </div>
+      <div class="cm-filter-summary">
+        <span class="cm-chip"><i class="bi bi-funnel-fill"></i>{% if selected_category and selected_category in category_meta %}{{ category_meta[selected_category].label }}{% else %}All categories{% endif %}</span>
+        <span class="cm-chip"><i class="bi bi-diagram-3-fill"></i>{% if selected_dept %}Department scoped{% else %}All departments{% endif %}</span>
+        <span class="cm-chip"><i class="bi bi-mortarboard-fill"></i>{% if selected_sem %}Semester {{ selected_sem }}{% else %}All semesters{% endif %}</span>
+      </div>
+    </div>
+    <form method="GET" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small mb-1">Department</label>
+        <select name="department_id" class="form-select" onchange="this.form.submit()">
+          <option value="">All Departments</option>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}" {% if selected_dept == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold small mb-1">Semester</label>
+        <select name="semester" class="form-select" onchange="this.form.submit()">
+          <option value="">All</option>
+          {% for sem in range(1, 9) %}
+          <option value="{{ sem }}" {% if selected_sem == sem %}selected{% endif %}>Sem {{ sem }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold small mb-1">Category</label>
+        <select name="category" class="form-select" onchange="this.form.submit()">
+          <option value="">All Categories</option>
+          {% for key, meta in category_meta.items() %}
+          <option value="{{ key }}" {% if selected_category == key %}selected{% endif %}>{{ meta.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small mb-1">Search</label>
+        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Title or description">
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button class="btn btn-outline-primary w-100">Filter</button>
+        <a href="{{ url_for('calendar.manage_calendar') }}" class="btn btn-outline-secondary">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card cm-card cm-table-wrap">
+  <div class="card-body p-0">
+    {% if events %}
+    <div class="table-responsive">
+      <table class="table table-hover cm-table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Title</th>
+            <th>Category</th>
+            <th>Date Range</th>
+            <th>Scope</th>
+            <th>Description</th>
+            <th class="text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+          <tr>
+            <td class="px-4 cm-title-cell">
+              <div class="fw-semibold">{{ event.title }}</div>
+            </td>
+            <td>
+              <span class="badge bg-{{ event.category_badge }}-subtle text-{{ event.category_badge }}">{{ event.category_label }}</span>
+            </td>
+            <td class="small">
+              <span class="cm-date">
+                <i class="bi bi-calendar3"></i>
+                {{ event.start_date.strftime('%d %b %Y') }}
+                {% if event.end_date != event.start_date %} to {{ event.end_date.strftime('%d %b %Y') }}{% endif %}
+              </span>
+            </td>
+            <td class="cm-scope">{{ event.scope_label }}</td>
+            <td class="cm-desc">{{ event.description or '—' }}</td>
+            <td class="text-end pe-4 cm-actions">
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editEvent{{ event.id }}">
+                <i class="bi bi-pencil-fill me-1"></i>Edit
+              </button>
+              <form method="POST" action="{{ url_for('calendar.delete_event', event_id=event.id) }}" class="d-inline"
+                    data-confirm="Delete {{ event.title }} from the academic calendar?"
+                    data-confirm-title="Delete Event"
+                    data-confirm-type="danger"
+                    data-confirm-ok="Delete"
+                    data-confirm-icon="bi-trash3-fill">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash3 me-1"></i>Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="cm-empty m-4">
+      <i class="bi bi-calendar-x fs-2 d-block mb-2 opacity-50"></i>
+      No academic calendar events match the current filters.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% for event in events %}
+<div class="modal fade" id="editEvent{{ event.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">Edit Calendar Event</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form method="POST" action="{{ url_for('calendar.edit_event', event_id=event.id) }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">Title</label>
+            <input type="text" name="title" class="form-control" value="{{ event.title }}" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Category</label>
+            <select name="category" class="form-select">
+              {% for key, meta in category_meta.items() %}
+              <option value="{{ key }}" {% if event.category == key %}selected{% endif %}>{{ meta.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold">Start Date</label>
+            <input type="date" name="start_date" class="form-control" value="{{ event.start_date.isoformat() }}" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold">End Date</label>
+            <input type="date" name="end_date" class="form-control" value="{{ event.end_date.isoformat() }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">Department</label>
+            <select name="department_id" class="form-select">
+              <option value="">All Departments</option>
+              {% for dept in departments %}
+              <option value="{{ dept.id }}" {% if event.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold">Semester</label>
+            <select name="semester" class="form-select">
+              <option value="">All Semesters</option>
+              {% for sem in range(1, 9) %}
+              <option value="{{ sem }}" {% if event.semester == sem %}selected{% endif %}>Semester {{ sem }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label fw-semibold">Description</label>
+            <textarea name="description" rows="3" class="form-control">{{ event.description or '' }}</textarea>
+          </div>
+          <div class="col-12 d-flex justify-content-end">
+            <button class="btn btn-primary fw-semibold">
+              <i class="bi bi-save me-2"></i>Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

@@ -43,6 +43,115 @@
   {% endif %}
 </div>
 
+{% if submission is defined and submission %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body px-4 py-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h6 class="fw-bold mb-1">{{ preview_heading if preview_heading is defined else 'Student Submission Preview' }}</h6>
+        <div class="text-muted small">
+          {{ submission.student.user.name }} • {{ submission.student.roll_number }}
+          • Submitted {{ submission.submitted_at.strftime('%d %b %Y %H:%M') }}
+        </div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <span class="badge {% if submission.status == 'reviewed' %}bg-success-subtle text-success{% else %}bg-primary-subtle text-primary{% endif %}">
+          {{ 'Reviewed' if submission.status == 'reviewed' else 'Submitted' }}
+        </span>
+        {% if submission.is_late %}
+        <span class="badge bg-danger-subtle text-danger">Late</span>
+        {% endif %}
+        {% if submission.marks_awarded is not none %}
+        <span class="badge bg-warning-subtle text-warning">
+          {{ submission.marks_awarded }}{% if item.marks %}/{{ item.marks }}{% endif %}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="{% if current_user.role == 'teacher' %}col-xl-4 col-lg-6{% else %}col-lg-6{% endif %}">
+        <div class="rounded-4 border p-3 h-100 bg-light-subtle">
+          <div class="small text-uppercase text-secondary fw-semibold mb-2">Student Note</div>
+          <div style="white-space: pre-wrap; line-height: 1.65">{{ submission.submission_text or 'No written note attached.' }}</div>
+        </div>
+      </div>
+      <div class="{% if current_user.role == 'teacher' %}col-xl-4 col-lg-6{% else %}col-lg-6{% endif %}">
+        <div class="rounded-4 border p-3 h-100 bg-light-subtle">
+          <div class="small text-uppercase text-secondary fw-semibold mb-2">
+            {% if current_user.role == 'teacher' %}Current Review{% else %}Teacher Feedback{% endif %}
+          </div>
+          {% if submission.status == 'reviewed' %}
+          <div class="small text-muted mb-2">
+            Reviewed {{ submission.graded_at.strftime('%d %b %Y %H:%M') if submission.graded_at else 'recently' }}
+          </div>
+          <div style="white-space: pre-wrap; line-height: 1.65">{{ submission.feedback or 'No written feedback yet.' }}</div>
+          {% else %}
+          <div class="text-muted">
+            {% if current_user.role == 'teacher' %}
+            This submission has not been reviewed yet.
+            {% else %}
+            This submission has not been reviewed yet.
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% if current_user.role == 'teacher' and grade_action_url is defined %}
+      <div class="col-xl-4 col-12">
+        <div class="rounded-4 border p-3 h-100 bg-white shadow-sm">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div>
+              <div class="small text-uppercase text-secondary fw-semibold">Grade Submission</div>
+              <div class="text-muted small">Save marks and feedback without leaving preview.</div>
+            </div>
+            {% if item.marks %}
+            <span class="badge bg-warning-subtle text-warning">{{ item.marks }} total</span>
+            {% endif %}
+          </div>
+          <form method="POST" action="{{ grade_action_url }}" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="return_to_preview" value="1">
+            {% if next_submission_id is defined and next_submission_id %}
+            <input type="hidden" name="next_submission_id" value="{{ next_submission_id }}">
+            {% endif %}
+            <div class="col-12">
+              <label class="form-label fw-semibold">Marks Awarded</label>
+              <input type="number" name="marks_awarded" class="form-control" min="0"
+                     {% if item.marks %}max="{{ item.marks }}"{% endif %}
+                     value="{{ submission.marks_awarded if submission.marks_awarded is not none else '' }}"
+                     placeholder="{% if item.marks %}0 to {{ item.marks }}{% else %}Enter marks{% endif %}">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Feedback</label>
+              <textarea name="feedback" rows="7" class="form-control"
+                        placeholder="Add corrections, praise, and next steps for the student...">{{ submission.feedback or '' }}</textarea>
+            </div>
+            <div class="col-12 d-flex justify-content-end gap-2 flex-wrap">
+              <button class="btn btn-outline-primary fw-semibold" type="submit" id="saveReviewBtn">
+                <i class="bi bi-save me-2"></i>Save Review
+              </button>
+              {% if next_submission_id is defined and next_submission_id %}
+              <button class="btn btn-primary fw-semibold" type="submit" name="go_next" value="1" id="saveNextReviewBtn">
+                <i class="bi bi-arrow-right-circle me-2"></i>Save &amp; Next Unreviewed
+              </button>
+              {% endif %}
+            </div>
+          </form>
+          <div class="form-text mt-3">
+            Shortcuts: <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Enter</kbd> saves this review.
+            {% if next_submission_id is defined and next_submission_id %}
+            <span class="d-block mt-1"><kbd>Shift</kbd> + <kbd>Enter</kbd> on non-text fields saves and opens the next unreviewed submission.</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {# ── Description / body ── #}
 {% if show_note_body %}
 <div class="card border-0 shadow-sm mb-4">
@@ -56,6 +165,96 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-semibold text-secondary mb-2 small text-uppercase tracking-wide">Description</h6>
     <p class="mb-0" style="white-space: pre-wrap; font-size: 14px; line-height: 1.7">{{ item.body }}</p>
+  </div>
+</div>
+{% endif %}
+
+{% if current_user.role == 'student' and item.content_type == 'assignment' %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body px-4 py-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h6 class="fw-bold mb-1">Your Submission</h6>
+        <div class="text-muted small">
+          {% if item.due_date %}
+          Due on {{ item.due_date.strftime('%d %b %Y') }}.
+          {% else %}
+          No due date has been set for this assignment.
+          {% endif %}
+        </div>
+      </div>
+      {% if student_submission %}
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge {% if student_submission.status == 'reviewed' %}bg-success-subtle text-success{% else %}bg-primary-subtle text-primary{% endif %}">
+          {{ 'Reviewed' if student_submission.status == 'reviewed' else 'Submitted' }}
+        </span>
+        {% if student_submission.is_late %}
+        <span class="badge bg-danger-subtle text-danger">Late</span>
+        {% endif %}
+        {% if student_submission.marks_awarded is not none %}
+        <span class="badge bg-warning-subtle text-warning">
+          {{ student_submission.marks_awarded }}{% if item.marks %}/{{ item.marks }}{% endif %}
+        </span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if student_submission %}
+    <div class="row g-3 mb-4">
+      <div class="col-lg-6">
+        <div class="border rounded-4 p-3 h-100 bg-light-subtle">
+          <div class="small text-uppercase text-secondary fw-semibold mb-2">Latest Submission</div>
+          <div class="small text-muted mb-2">
+            Submitted {{ student_submission.submitted_at.strftime('%d %b %Y %H:%M') }}
+          </div>
+          <div style="white-space: pre-wrap; line-height: 1.65">{{ student_submission.submission_text or 'No written note attached.' }}</div>
+          {% if student_submission.file_path %}
+          <a href="{{ url_for('student.submission_file', sid=student_submission.id) }}"
+             class="btn btn-sm btn-outline-secondary mt-3">
+            <i class="bi bi-download me-1"></i>Download My Submission
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="border rounded-4 p-3 h-100 bg-light-subtle">
+          <div class="small text-uppercase text-secondary fw-semibold mb-2">Teacher Feedback</div>
+          {% if student_submission.status == 'reviewed' %}
+          <div class="small text-muted mb-2">
+            Reviewed {{ student_submission.graded_at.strftime('%d %b %Y %H:%M') if student_submission.graded_at else 'recently' }}
+          </div>
+          <div style="white-space: pre-wrap; line-height: 1.65">{{ student_submission.feedback or 'No written feedback yet.' }}</div>
+          {% else %}
+          <div class="text-muted">Your teacher has not reviewed this submission yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <form method="POST"
+          action="{{ url_for('student.submit_assignment', cid=item.id) }}"
+          enctype="multipart/form-data"
+          class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-12">
+        <label class="form-label fw-semibold">Submission Notes</label>
+        <textarea name="submission_text" rows="4" class="form-control"
+                  placeholder="Add a short note, summary, or explanation for your teacher...">{{ student_submission.submission_text if student_submission else '' }}</textarea>
+      </div>
+      <div class="col-lg-8">
+        <label class="form-label fw-semibold">Upload Work</label>
+        <input type="file" name="submission_file" class="form-control"
+               accept=".pdf,.doc,.docx,.pptx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp">
+        <div class="form-text">Upload a new file to submit or replace your previous file.</div>
+      </div>
+      <div class="col-lg-4 d-flex align-items-end">
+        <button class="btn btn-primary w-100 fw-semibold">
+          <i class="bi bi-cloud-upload me-2"></i>{{ 'Resubmit Assignment' if student_submission else 'Submit Assignment' }}
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 {% endif %}
@@ -318,6 +517,35 @@ window.addEventListener('load', function() {
   // just ensure it has a height so the card looks intentional
   em.style.minHeight = '500px';
 });
+</script>
+{% endif %}
+
+{% if current_user.role == 'teacher' and grade_action_url is defined %}
+<script>
+(function () {
+  const form = document.querySelector(`form[action="{{ grade_action_url }}"]`);
+  if (!form) return;
+
+  const saveBtn = document.getElementById('saveReviewBtn');
+  const saveNextBtn = document.getElementById('saveNextReviewBtn');
+
+  form.addEventListener('keydown', function(e) {
+    const target = e.target;
+    const tagName = target?.tagName?.toLowerCase() || '';
+    const isTextarea = tagName === 'textarea';
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      saveBtn?.click();
+      return;
+    }
+
+    if (e.shiftKey && !e.ctrlKey && !e.metaKey && e.key === 'Enter' && !isTextarea && saveNextBtn) {
+      e.preventDefault();
+      saveNextBtn.click();
+    }
+  });
+})();
 </script>
 {% endif %}
 

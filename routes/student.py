@@ -12,7 +12,8 @@ from models.notice import Notice
 from models.exam import Exam, Mark
 from models.fee import FeeStructure, FeePayment
 from models.location import StudentLocation
-from models.content import TeacherContent, content_extension
+from models.content import TeacherContent, content_extension, is_allowed_content_upload
+from models.assignment import AssignmentSubmission
 from utils.decorators import student_required
 from services.face_service import (decode_base64_image, extract_face_encoding,
                                     average_encodings, save_face_image)
@@ -20,7 +21,10 @@ from services.report_service import (generate_student_report, dataframe_to_excel
                                       dataframe_to_csv_bytes)
 from datetime import date, datetime, timedelta
 import io
+from werkzeug.utils import secure_filename
 from utils.content_storage import resolve_content_path
+from utils.assignment_storage import build_submission_relpath, resolve_submission_path
+from utils.dashboard import build_dashboard_preferences
 from utils.time import utc_now_naive
 
 student_bp = Blueprint('student', __name__)
@@ -33,18 +37,51 @@ def _current_student():
 def _content_for_student(cid: int, student):
     return TeacherContent.query.filter_by(
         id=cid,
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester,
         is_published=True,
     ).first_or_404()
 
 
+def _assignment_for_student(cid: int, student):
+    return TeacherContent.query.filter_by(
+        id=cid,
+        college_id=student.college_id,
+        department_id=student.department_id,
+        semester=student.semester,
+        is_published=True,
+        content_type='assignment',
+    ).first_or_404()
+
+
+def _submission_upload(student_id: int):
+    submission_file = request.files.get('submission_file')
+    if not submission_file or not submission_file.filename:
+        return None
+    if not is_allowed_content_upload(submission_file.filename):
+        flash(
+            'Unsupported submission type. Allowed: PDF, Office docs, spreadsheets, text, and safe images.',
+            'danger',
+        )
+        return False
+
+    upload_dir = current_app.config['ASSIGNMENT_UPLOAD_FOLDER']
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = os.path.splitext(secure_filename(submission_file.filename))[1].lower()
+    fname = f'{student_id}_{utc_now_naive().strftime("%Y%m%d%H%M%S%f")}{ext}'
+    submission_file.save(os.path.join(upload_dir, fname))
+    return build_submission_relpath(fname)
+
+
 @student_bp.route('/dashboard')
 @login_required
 @student_required
 def dashboard():
+    dashboard_prefs = build_dashboard_preferences(current_user)
     student = _current_student()
     subjects = Subject.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester
     ).all()
@@ -53,10 +90,13 @@ def dashboard():
     for sub in subjects:
         pct = student.get_attendance_percentage(subject_id=sub.id)
         total_sessions = AttendanceSession.query.filter_by(
+            college_id=student.college_id,
             subject_id=sub.id, status='completed'
         ).count()
         present_count = AttendanceRecord.query.join(AttendanceSession).filter(
+            AttendanceRecord.college_id == student.college_id,
             AttendanceRecord.student_id == student.id,
+            AttendanceSession.college_id == student.college_id,
             AttendanceSession.subject_id == sub.id,
             AttendanceSession.status == 'completed',
             AttendanceRecord.status == 'present'
@@ -73,6 +113,7 @@ def dashboard():
 
     overall_pct = student.get_attendance_percentage()
     recent_records = AttendanceRecord.query.join(AttendanceSession).filter(
+        AttendanceRecord.college_id == student.college_id,
         AttendanceRecord.student_id == student.id
     ).order_by(AttendanceSession.date.desc()).limit(10).all()
 
@@ -81,6 +122,7 @@ def dashboard():
     # Upcoming exams (next 7 days) for student's dept+semester
     subject_ids = [s['subject'].id for s in subject_attendance]
     upcoming_exams = Exam.query.filter(
+        Exam.college_id == student.college_id,
         Exam.subject_id.in_(subject_ids),
         Exam.exam_date >= today,
         Exam.exam_date <= today + timedelta(days=7)
@@ -88,6 +130,7 @@ def dashboard():
 
     # Fee summary
     structures = FeeStructure.query.filter(
+        FeeStructure.college_id == student.college_id,
         db.or_(FeeStructure.department_id == student.department_id,
                FeeStructure.department_id == None),
         db.or_(FeeStructure.semester == student.semester,
@@ -95,7 +138,7 @@ def dashboard():
         FeeStructure.is_active == True
     ).all()
     paid_map = {p.fee_structure_id: p for p in
-                FeePayment.query.filter_by(student_id=student.id).all()}
+                FeePayment.query.filter_by(college_id=student.college_id, student_id=student.id).all()}
     total_due = sum(
         max(fs.amount - (paid_map[fs.id].amount_paid if fs.id in paid_map else 0), 0)
         for fs in structures
@@ -103,13 +146,15 @@ def dashboard():
 
     # Recent notices
     notices = Notice.query.filter(
+        Notice.college_id == student.college_id,
         Notice.target_role.in_(['all', 'student']),
         db.or_(Notice.expires_at == None, Notice.expires_at > utc_now_naive())
     ).order_by(Notice.is_pinned.desc(), Notice.created_at.desc()).limit(3).all()
 
-    location = StudentLocation.query.filter_by(student_id=student.id).first()
+    location = StudentLocation.query.filter_by(college_id=student.college_id, student_id=student.id).first()
 
     return render_template('student/dashboard.html',
+                           dashboard_prefs=dashboard_prefs,
                            student=student,
                            subject_attendance=subject_attendance,
                            overall_pct=overall_pct,
@@ -129,6 +174,7 @@ def my_attendance():
     student = _current_student()
     subject_id = request.args.get('subject_id', type=int)
     subjects = Subject.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester
     ).all()
@@ -136,7 +182,9 @@ def my_attendance():
     records = []
     if subject_id:
         records = AttendanceRecord.query.join(AttendanceSession).filter(
+            AttendanceRecord.college_id == student.college_id,
             AttendanceRecord.student_id == student.id,
+            AttendanceSession.college_id == student.college_id,
             AttendanceSession.subject_id == subject_id,
             AttendanceSession.status == 'completed'
         ).order_by(AttendanceSession.date.desc()).all()
@@ -155,16 +203,20 @@ def my_attendance():
 def profile():
     student = _current_student()
     subjects = Subject.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester
     ).all()
     chart_data = []
     for sub in subjects:
         total = AttendanceSession.query.filter_by(
+            college_id=student.college_id,
             subject_id=sub.id, status='completed'
         ).count()
         present = AttendanceRecord.query.join(AttendanceSession).filter(
+            AttendanceRecord.college_id == student.college_id,
             AttendanceRecord.student_id == student.id,
+            AttendanceSession.college_id == student.college_id,
             AttendanceSession.subject_id == sub.id,
             AttendanceSession.status == 'completed',
             AttendanceRecord.status == 'present'
@@ -196,6 +248,8 @@ def download_attendance():
     if subject_id:
         sub = db.session.get(Subject, subject_id)
         if sub:
+            if sub.college_id != student.college_id:
+                abort(404)
             filename += f"_{sub.code}"
     if fmt == 'csv':
         return send_file(
@@ -288,9 +342,9 @@ def delete_face():
 @student_required
 def location_toggle():
     student = _current_student()
-    loc = StudentLocation.query.filter_by(student_id=student.id).first()
+    loc = StudentLocation.query.filter_by(college_id=student.college_id, student_id=student.id).first()
     if not loc:
-        loc = StudentLocation(student_id=student.id, is_sharing=False)
+        loc = StudentLocation(college_id=student.college_id, student_id=student.id, is_sharing=False)
         db.session.add(loc)
     loc.is_sharing = not loc.is_sharing
     if not loc.is_sharing:
@@ -375,9 +429,9 @@ def location_update():
     except (ValueError, TypeError):
         return jsonify(ok=False, error='Invalid coordinates'), 400
 
-    loc = StudentLocation.query.filter_by(student_id=student.id).first()
+    loc = StudentLocation.query.filter_by(college_id=student.college_id, student_id=student.id).first()
     if not loc:
-        loc = StudentLocation(student_id=student.id, is_sharing=True)
+        loc = StudentLocation(college_id=student.college_id, student_id=student.id, is_sharing=True)
         db.session.add(loc)
 
     if not loc.is_sharing:
@@ -438,7 +492,7 @@ def id_card():
     import os
 
     student = _current_student()
-    tpl     = IDCardTemplate.get()
+    tpl     = IDCardTemplate.get(student.college)
     cs      = CollegeSetting.get()
     card    = student.id_card  # may be None
 
@@ -466,12 +520,13 @@ def id_card():
             photo = request.files.get('id_photo')
             photo_path = card.photo_path if card else None
             if photo and photo.filename:
-                upload_dir = os.path.join(current_app.root_path,
-                                          'static', 'uploads', 'id_photos')
+                college_slug = secure_filename((student.college.code or f'college-{student.college_id}').lower()) or f'college-{student.college_id}'
+                rel_dir = os.path.join('uploads', 'id_photos', college_slug)
+                upload_dir = os.path.join(current_app.root_path, 'static', rel_dir)
                 os.makedirs(upload_dir, exist_ok=True)
                 fname = secure_filename(f"{student.roll_number}_id.jpg")
                 photo.save(os.path.join(upload_dir, fname))
-                photo_path = 'uploads/id_photos/' + fname
+                photo_path = f'{rel_dir}/{fname}'
 
             if card:
                 card.photo_path   = photo_path
@@ -480,6 +535,7 @@ def id_card():
                 card.submitted_at = utc_now_naive()
             else:
                 card = StudentIDCard(
+                    college_id=student.college_id,
                     student_id=student.id,
                     photo_path=photo_path,
                     status='pending',
@@ -511,6 +567,7 @@ def student_content():
     page        = request.args.get('page', 1, type=int)
 
     base = TeacherContent.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester,
         is_published=True
@@ -527,6 +584,7 @@ def student_content():
         page=page, per_page=12, error_out=False)
 
     subjects = Subj.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester
     ).order_by(Subj.name).all()
@@ -538,10 +596,22 @@ def student_content():
         'lab':        base.filter_by(content_type='lab').count(),
         'question':   base.filter_by(content_type='question').count(),
     }
+    assignment_ids = [item.id for item in pagination.items if item.content_type == 'assignment']
+    submission_map = {}
+    if assignment_ids:
+        submission_map = {
+            submission.content_id: submission
+            for submission in AssignmentSubmission.query.filter(
+                AssignmentSubmission.college_id == student.college_id,
+                AssignmentSubmission.student_id == student.id,
+                AssignmentSubmission.content_id.in_(assignment_ids),
+            ).all()
+        }
     return render_template('student/content.html',
                            pagination=pagination, items=pagination.items,
                            subjects=subjects, counts=counts,
-                           type_filter=type_filter, subj_filter=subj_filter, q=q)
+                           type_filter=type_filter, subj_filter=subj_filter, q=q,
+                           submission_map=submission_map)
 
 
 @student_bp.route('/content/<int:cid>/file')
@@ -570,13 +640,18 @@ def content_file(cid):
 @student_required
 def content_preview(cid):
     import html
-    from utils.file_preview import pptx_to_html, docx_to_html, preview_exception_message
+    from utils.file_preview import (
+        pptx_to_html,
+        docx_to_html,
+        preview_exception_message,
+        infer_preview_type,
+    )
 
     student = _current_student()
     item = _content_for_student(cid, student)
 
-    ext = content_extension(item.file_path)
     abs_path = resolve_content_path(current_app, item.file_path) if item.file_path else None
+    ext = infer_preview_type(item.file_path, abs_path)
     file_url = url_for('student.content_file', cid=item.id, download=0) if item.file_path else None
     download_url = url_for('student.content_file', cid=item.id) if item.file_path else None
 
@@ -607,8 +682,88 @@ def content_preview(cid):
     else:
         preview_type = 'content'
 
+    student_submission = None
+    if item.content_type == 'assignment':
+        student_submission = AssignmentSubmission.query.filter_by(
+            college_id=student.college_id,
+            content_id=item.id,
+            student_id=student.id,
+        ).first()
+
     return render_template('student/content_preview.html',
                            item=item, preview_type=preview_type,
                            file_url=file_url, download_url=download_url,
                            preview_html=preview_html, error=error,
-                           show_note_body=show_note_body)
+                           show_note_body=show_note_body,
+                           student_submission=student_submission)
+
+
+@student_bp.route('/assignments/<int:cid>/submit', methods=['POST'])
+@login_required
+@student_required
+def submit_assignment(cid):
+    student = _current_student()
+    item = _assignment_for_student(cid, student)
+
+    submission_text = request.form.get('submission_text', '').strip()
+    file_path = _submission_upload(student.id)
+    if file_path is False:
+        return redirect(url_for('student.content_preview', cid=item.id))
+
+    submission = AssignmentSubmission.query.filter_by(
+        college_id=student.college_id,
+        content_id=item.id,
+        student_id=student.id,
+    ).first()
+
+    if submission is None:
+        submission = AssignmentSubmission(
+            college_id=student.college_id,
+            content_id=item.id,
+            student_id=student.id,
+        )
+        db.session.add(submission)
+
+    if not submission_text and not file_path and not submission.file_path:
+        flash('Add a note or upload a file before submitting.', 'danger')
+        return redirect(url_for('student.content_preview', cid=item.id))
+
+    if file_path:
+        submission.file_path = file_path
+    submission.submission_text = submission_text or None
+    submission.status = 'submitted'
+    submission.submitted_at = utc_now_naive()
+    submission.updated_at = utc_now_naive()
+    submission.graded_at = None
+    submission.marks_awarded = None
+    submission.feedback = None
+    db.session.commit()
+
+    late_note = ' Late submission flagged.' if item.due_date and submission.submitted_at.date() > item.due_date else ''
+    flash(f'Assignment submitted successfully.{late_note}', 'success')
+    return redirect(url_for('student.content_preview', cid=item.id))
+
+
+@student_bp.route('/assignments/submissions/<int:sid>/file')
+@login_required
+@student_required
+def submission_file(sid):
+    student = _current_student()
+    submission = AssignmentSubmission.query.filter_by(
+        college_id=student.college_id,
+        id=sid,
+        student_id=student.id,
+    ).first_or_404()
+    if not submission.file_path:
+        abort(404)
+
+    abs_path = resolve_submission_path(current_app, submission.file_path)
+    if not abs_path or not os.path.isfile(abs_path):
+        abort(404)
+
+    return send_file(
+        abs_path,
+        as_attachment=request.args.get('download', '1') != '0',
+        download_name=os.path.basename(submission.file_path),
+        conditional=True,
+    )

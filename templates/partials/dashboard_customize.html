@@ -1,0 +1,181 @@
+{% if dashboard_prefs and dashboard_prefs.has_optional_items %}
+<div class="d-flex justify-content-end mb-4">
+  <button type="button"
+          class="btn btn-sm btn-outline-secondary dashboard-customize-btn"
+          data-bs-toggle="modal"
+          data-bs-target="#dashboardCustomizeModal">
+    <i class="bi bi-layout-wtf me-1"></i>Customize Dashboard
+  </button>
+</div>
+
+<div class="modal fade" id="dashboardCustomizeModal" tabindex="-1" aria-labelledby="dashboardCustomizeLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+      <div class="modal-header border-0 pb-0">
+        <div>
+          <h5 class="modal-title fw-bold" id="dashboardCustomizeLabel">Customize Dashboard</h5>
+          <p class="text-muted small mb-0">Keep the main widgets visible and turn on the extra blocks you actually use.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{{ url_for('auth.update_dashboard_preferences') }}">
+        <div class="modal-body pt-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+
+          <div class="dashboard-modal-panel mb-3">
+            <div class="fw-semibold mb-2">Always visible</div>
+            <div class="d-flex flex-wrap gap-2">
+              {% for item in dashboard_prefs.core_items %}
+              <span class="dashboard-fixed-pill">
+                <i class="bi {{ item.icon }}"></i>{{ item.label }}
+              </span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="dashboard-modal-panel">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="fw-semibold">Optional widgets</div>
+              <div class="small text-muted">Drag to reorder enabled widgets</div>
+            </div>
+            <div class="dashboard-option-list" id="dashboardOptionList">
+              {% for item in dashboard_prefs.optional_items %}
+              <label class="dashboard-option-card" draggable="true" data-widget-key="{{ item.key }}">
+                <span class="d-flex gap-3 align-items-start">
+                  <span class="dashboard-drag-handle" title="Drag to reorder">
+                    <i class="bi bi-grip-vertical"></i>
+                  </span>
+                  <span class="dashboard-option-icon"><i class="bi {{ item.icon }}"></i></span>
+                  <span class="d-block">
+                    <span class="d-block fw-semibold">{{ item.label }}</span>
+                    <span class="d-block text-muted small">{{ item.description }}</span>
+                  </span>
+                </span>
+                <input class="form-check-input"
+                       type="checkbox"
+                       name="dashboard_widgets"
+                       value="{{ item.key }}"
+                       {% if item.selected %}checked{% endif %}>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Dashboard</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+.dashboard-customize-btn {
+  border-radius: 999px !important;
+}
+.dashboard-modal-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 16px;
+}
+.dashboard-fixed-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #dbeafe;
+  color: #1e3a8a;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.dashboard-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dashboard-option-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+  cursor: pointer;
+}
+.dashboard-option-card.dragging {
+  opacity: 0.55;
+  border-color: #93c5fd;
+}
+.dashboard-option-card:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+.dashboard-drag-handle {
+  color: #94a3b8;
+  line-height: 1;
+  padding-top: 2px;
+}
+.dashboard-option-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+</style>
+
+<script>
+(() => {
+  const list = document.getElementById('dashboardOptionList');
+  if (!list) return;
+
+  let draggedCard = null;
+
+  function getDragAfterElement(container, y) {
+    const cards = [...container.querySelectorAll('.dashboard-option-card:not(.dragging)')];
+    return cards.reduce((closest, card) => {
+      const box = card.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: card };
+      }
+      return closest;
+    }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+  }
+
+  list.querySelectorAll('.dashboard-option-card').forEach((card) => {
+    card.addEventListener('dragstart', () => {
+      draggedCard = card;
+      card.classList.add('dragging');
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedCard = null;
+    });
+  });
+
+  list.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    if (!draggedCard) return;
+    const afterElement = getDragAfterElement(list, event.clientY);
+    if (!afterElement) {
+      list.appendChild(draggedCard);
+    } else if (afterElement !== draggedCard) {
+      list.insertBefore(draggedCard, afterElement);
+    }
+  });
+})();
+</script>
+{% endif %}

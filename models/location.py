@@ -6,6 +6,7 @@ class StudentLocation(db.Model):
     __tablename__ = 'student_locations'
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     student_id = db.Column(db.Integer, db.ForeignKey('students.id', ondelete='CASCADE'),
                            unique=True, nullable=False)
     latitude = db.Column(db.Float, nullable=True)

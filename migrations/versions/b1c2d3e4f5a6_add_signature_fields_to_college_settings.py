@@ -15,12 +15,22 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('college_settings', sa.Column('principal_name', sa.String(100), nullable=True))
-    op.add_column('college_settings', sa.Column('principal_sign_path', sa.String(255), nullable=True))
-    op.add_column('college_settings', sa.Column('hod_name', sa.String(100), nullable=True))
-    op.add_column('college_settings', sa.Column('hod_sign_path', sa.String(255), nullable=True))
-    op.add_column('college_settings', sa.Column('class_teacher_name', sa.String(100), nullable=True))
-    op.add_column('college_settings', sa.Column('class_teacher_sign_path', sa.String(255), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing = {col['name'] for col in inspector.get_columns('college_settings')}
+
+    if 'principal_name' not in existing:
+        op.add_column('college_settings', sa.Column('principal_name', sa.String(100), nullable=True))
+    if 'principal_sign_path' not in existing:
+        op.add_column('college_settings', sa.Column('principal_sign_path', sa.String(255), nullable=True))
+    if 'hod_name' not in existing:
+        op.add_column('college_settings', sa.Column('hod_name', sa.String(100), nullable=True))
+    if 'hod_sign_path' not in existing:
+        op.add_column('college_settings', sa.Column('hod_sign_path', sa.String(255), nullable=True))
+    if 'class_teacher_name' not in existing:
+        op.add_column('college_settings', sa.Column('class_teacher_name', sa.String(100), nullable=True))
+    if 'class_teacher_sign_path' not in existing:
+        op.add_column('college_settings', sa.Column('class_teacher_sign_path', sa.String(255), nullable=True))
 
 
 def downgrade():

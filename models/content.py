@@ -28,8 +28,23 @@ def is_previewable_content(filename: str | None) -> bool:
 
 class TeacherContent(db.Model):
     __tablename__ = 'teacher_contents'
+    __table_args__ = (
+        db.Index(
+            'ix_teacher_contents_college_scope_publish',
+            'college_id', 'department_id', 'semester', 'is_published'
+        ),
+        db.Index(
+            'ix_teacher_contents_college_teacher_created',
+            'college_id', 'teacher_id', 'created_at'
+        ),
+        db.Index(
+            'ix_teacher_contents_college_type_publish',
+            'college_id', 'content_type', 'is_published'
+        ),
+    )
 
     id            = db.Column(db.Integer, primary_key=True)
+    college_id    = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     teacher_id    = db.Column(db.Integer, db.ForeignKey('teachers.id'),    nullable=False)
     subject_id    = db.Column(db.Integer, db.ForeignKey('subjects.id'),    nullable=True)
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=False)
@@ -48,3 +63,7 @@ class TeacherContent(db.Model):
     teacher    = db.relationship('Teacher',    backref='contents')
     subject    = db.relationship('Subject',    backref='contents')
     department = db.relationship('Department', backref='tc_contents')
+
+    @property
+    def is_assignment(self) -> bool:
+        return self.content_type == 'assignment'

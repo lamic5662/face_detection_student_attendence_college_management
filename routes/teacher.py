@@ -9,6 +9,7 @@ from models.department import Department
 from models.notice import Notice
 from models.exam import Exam
 from models.content import TeacherContent, content_extension, is_allowed_content_upload
+from models.assignment import AssignmentSubmission
 from models.parent import TeacherStatus
 from utils.decorators import teacher_required
 from services.face_service import decode_base64_image, recognize_faces
@@ -20,6 +21,8 @@ from datetime import datetime, date, timedelta
 import io
 import os
 from utils.content_storage import build_content_relpath, resolve_content_path
+from utils.assignment_storage import build_submission_relpath, resolve_submission_path
+from utils.dashboard import build_dashboard_preferences
 from utils.time import utc_now_naive
 
 teacher_bp = Blueprint('teacher', __name__)
@@ -37,30 +40,65 @@ def _teacher_owns_subject(subject: Subject) -> bool:
     return subject.teacher_id == _current_teacher().id
 
 
+def _assignment_for_teacher(cid: int, teacher):
+    return TeacherContent.query.filter_by(
+        id=cid,
+        college_id=teacher.college_id,
+        teacher_id=teacher.id,
+        content_type='assignment',
+    ).first_or_404()
+
+
+def _next_unreviewed_submission_id(content_id: int, current_submission_id: int | None = None) -> int | None:
+    submissions = (
+        AssignmentSubmission.query
+        .join(Student, Student.id == AssignmentSubmission.student_id)
+        .filter(
+            AssignmentSubmission.college_id == current_user.college_id,
+            AssignmentSubmission.content_id == content_id,
+            AssignmentSubmission.status == 'submitted',
+        )
+        .order_by(Student.roll_number, AssignmentSubmission.submitted_at, AssignmentSubmission.id)
+        .all()
+    )
+    if not submissions:
+        return None
+    if current_submission_id is None:
+        return submissions[0].id
+
+    ids = [submission.id for submission in submissions]
+    for sid in ids:
+        if sid != current_submission_id:
+            return sid
+    return None
+
+
 @teacher_bp.route('/dashboard')
 @login_required
 @teacher_required
 def dashboard():
+    dashboard_prefs = build_dashboard_preferences(current_user)
     teacher = _current_teacher()
     subjects = teacher.subjects
     active_session = AttendanceSession.query.filter_by(
-        teacher_id=teacher.id, status='active'
+        college_id=teacher.college_id, teacher_id=teacher.id, status='active'
     ).first()
     recent_sessions = AttendanceSession.query.filter_by(
-        teacher_id=teacher.id
+        college_id=teacher.college_id, teacher_id=teacher.id
     ).order_by(AttendanceSession.created_at.desc()).limit(5).all()
 
     stats = {
         'total_subjects': len(subjects),
-        'total_sessions': AttendanceSession.query.filter_by(teacher_id=teacher.id).count(),
+        'total_sessions': AttendanceSession.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id).count(),
         'today_sessions': AttendanceSession.query.filter_by(
-            teacher_id=teacher.id, date=date.today()
+            college_id=teacher.college_id, teacher_id=teacher.id, date=date.today()
         ).count(),
     }
     # Upcoming exams for subjects this teacher teaches
     today = date.today()
     subject_ids = [s.id for s in subjects]
     upcoming_exams = Exam.query.filter(
+        Exam.college_id == teacher.college_id,
         Exam.subject_id.in_(subject_ids),
         Exam.exam_date >= today,
         Exam.exam_date <= today + timedelta(days=7)
@@ -68,13 +106,15 @@ def dashboard():
 
     # Active notices
     notices = Notice.query.filter(
+        Notice.college_id == teacher.college_id,
         Notice.target_role.in_(['all', 'teacher']),
         db.or_(Notice.expires_at == None, Notice.expires_at > utc_now_naive())
     ).order_by(Notice.is_pinned.desc(), Notice.created_at.desc()).limit(4).all()
 
-    teacher_status = TeacherStatus.query.filter_by(teacher_id=teacher.id).first()
+    teacher_status = TeacherStatus.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id).first()
 
     return render_template('teacher/dashboard.html',
+                           dashboard_prefs=dashboard_prefs,
                            teacher=teacher, subjects=subjects,
                            active_session=active_session,
                            recent_sessions=recent_sessions, stats=stats,
@@ -95,7 +135,7 @@ def sessions():
     date_to    = request.args.get('date_to')
     status_filter = request.args.get('status', '')
 
-    query = AttendanceSession.query.filter_by(teacher_id=teacher.id)
+    query = AttendanceSession.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id)
     if subject_id:
         query = query.filter_by(subject_id=subject_id)
     if status_filter:
@@ -127,7 +167,7 @@ def sessions():
 def start_session():
     teacher = _current_teacher()
     subject_id = request.form.get('subject_id', type=int)
-    subject = Subject.query.get_or_404(subject_id)
+    subject = Subject.query.filter_by(id=subject_id, college_id=teacher.college_id).first_or_404()
 
     if subject.teacher_id != teacher.id:
         flash('Unauthorised subject.', 'danger')
@@ -135,7 +175,7 @@ def start_session():
 
     # Allow only one active session per teacher
     existing = AttendanceSession.query.filter_by(
-        teacher_id=teacher.id, status='active'
+        college_id=teacher.college_id, teacher_id=teacher.id, status='active'
     ).first()
     if existing:
         flash('You already have an active session. Please complete it first.', 'warning')
@@ -143,6 +183,7 @@ def start_session():
 
     now = utc_now_naive()
     session = AttendanceSession(
+        college_id=teacher.college_id,
         subject_id=subject_id,
         teacher_id=teacher.id,
         date=now.date(),
@@ -153,11 +194,13 @@ def start_session():
 
     # Pre-populate records (all absent by default)
     students = Student.query.filter_by(
+        college_id=subject.college_id,
         department_id=subject.department_id,
         semester=subject.semester
     ).all()
     for student in students:
         db.session.add(AttendanceRecord(
+            college_id=student.college_id,
             session_id=session.id,
             student_id=student.id,
             status='absent'
@@ -173,13 +216,13 @@ def start_session():
 @teacher_required
 def live_attendance(session_id):
     teacher = _current_teacher()
-    session = AttendanceSession.query.get_or_404(session_id)
+    session = AttendanceSession.query.filter_by(id=session_id, college_id=teacher.college_id).first_or_404()
 
     if session.teacher_id != teacher.id:
         flash('Unauthorised.', 'danger')
         return redirect(url_for('teacher.sessions'))
 
-    records = AttendanceRecord.query.filter_by(session_id=session_id).all()
+    records = AttendanceRecord.query.filter_by(college_id=teacher.college_id, session_id=session_id).all()
     students_info = []
     for r in records:
         students_info.append({
@@ -204,7 +247,7 @@ def live_attendance(session_id):
 @teacher_required
 def process_frame(session_id):
     """Receive a webcam frame, run face recognition + liveness, mark attendance."""
-    session = AttendanceSession.query.get_or_404(session_id)
+    session = AttendanceSession.query.filter_by(id=session_id, college_id=current_user.college_id).first_or_404()
     if not _teacher_owns_session(session):
         return jsonify({'error': 'Unauthorised'}), 403
     if session.status != 'active':
@@ -221,6 +264,7 @@ def process_frame(session_id):
     # Load enrolled students for this session's subject
     subject = session.subject
     students = Student.query.filter_by(
+        college_id=subject.college_id,
         department_id=subject.department_id,
         semester=subject.semester
     ).all()
@@ -256,6 +300,7 @@ def process_frame(session_id):
             verified = True
 
         record = AttendanceRecord.query.filter_by(
+            college_id=subject.college_id,
             session_id=session_id, student_id=student_id
         ).first()
 
@@ -285,7 +330,7 @@ def process_frame(session_id):
 @teacher_required
 def manual_mark(session_id):
     """Teacher manually toggles a student present/absent."""
-    session = AttendanceSession.query.get_or_404(session_id)
+    session = AttendanceSession.query.filter_by(id=session_id, college_id=_current_teacher().college_id).first_or_404()
     if session.teacher_id != _current_teacher().id:
         return jsonify({'error': 'Unauthorised'}), 403
 
@@ -297,7 +342,7 @@ def manual_mark(session_id):
         return jsonify({'error': 'Invalid status'}), 400
 
     record = AttendanceRecord.query.filter_by(
-        session_id=session_id, student_id=student_id
+        college_id=_current_teacher().college_id, session_id=session_id, student_id=student_id
     ).first_or_404()
 
     record.status = new_status
@@ -318,7 +363,7 @@ def manual_mark(session_id):
 @teacher_required
 def cancel_session(session_id):
     teacher = _current_teacher()
-    session = AttendanceSession.query.get_or_404(session_id)
+    session = AttendanceSession.query.filter_by(id=session_id, college_id=teacher.college_id).first_or_404()
 
     if session.teacher_id != teacher.id:
         flash('Unauthorised.', 'danger')
@@ -342,7 +387,7 @@ def cancel_session(session_id):
 @teacher_required
 def complete_session(session_id):
     teacher = _current_teacher()
-    session = AttendanceSession.query.get_or_404(session_id)
+    session = AttendanceSession.query.filter_by(id=session_id, college_id=teacher.college_id).first_or_404()
 
     if session.teacher_id != teacher.id:
         flash('Unauthorised.', 'danger')
@@ -382,7 +427,7 @@ def complete_session(session_id):
 @login_required
 @teacher_required
 def session_status(session_id):
-    session = AttendanceSession.query.get_or_404(session_id)
+    session = AttendanceSession.query.filter_by(id=session_id, college_id=current_user.college_id).first_or_404()
     if not _teacher_owns_session(session):
         return jsonify({'error': 'Unauthorised'}), 403
     records = []
@@ -433,6 +478,7 @@ def reports():
     sessions_list = []
     if selected_subject_id:
         sessions_list = AttendanceSession.query.filter_by(
+            college_id=teacher.college_id,
             subject_id=selected_subject_id,
             teacher_id=teacher.id,
             status='completed'
@@ -515,13 +561,13 @@ def update_status():
         flash('Invalid status value.', 'danger')
         return redirect(url_for('teacher.dashboard'))
 
-    ts = TeacherStatus.query.filter_by(teacher_id=teacher.id).first()
+    ts = TeacherStatus.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id).first()
     if ts:
         ts.status = status
         ts.note = note or None
         ts.updated_at = utc_now_naive()
     else:
-        ts = TeacherStatus(teacher_id=teacher.id, status=status,
+        ts = TeacherStatus(college_id=teacher.college_id, teacher_id=teacher.id, status=status,
                            note=note or None)
         db.session.add(ts)
     db.session.commit()
@@ -551,12 +597,49 @@ def _content_upload(teacher_id):
     return build_content_relpath(fname)
 
 
+def _submission_upload(student_id):
+    from werkzeug.utils import secure_filename
+
+    f = request.files.get('submission_file')
+    if not f or not f.filename:
+        return None
+    if not is_allowed_content_upload(f.filename):
+        flash(
+            'Unsupported submission type. Allowed: PDF, Office docs, spreadsheets, text, and safe images.',
+            'danger',
+        )
+        return False
+
+    upload_dir = current_app.config['ASSIGNMENT_UPLOAD_FOLDER']
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = os.path.splitext(secure_filename(f.filename))[1].lower()
+    fname = f'{student_id}_{utc_now_naive().strftime("%Y%m%d%H%M%S%f")}{ext}'
+    f.save(os.path.join(upload_dir, fname))
+    return build_submission_relpath(fname)
+
+
+def _assignment_stats(item: TeacherContent) -> dict:
+    total_students = Student.query.filter_by(
+        college_id=item.college_id,
+        department_id=item.department_id,
+        semester=item.semester,
+    ).count()
+    submitted = AssignmentSubmission.query.filter_by(college_id=item.college_id, content_id=item.id).count()
+    reviewed = AssignmentSubmission.query.filter_by(college_id=item.college_id, content_id=item.id, status='reviewed').count()
+    return {
+        'total': total_students,
+        'submitted': submitted,
+        'pending': max(total_students - submitted, 0),
+        'reviewed': reviewed,
+    }
+
+
 @teacher_bp.route('/content/<int:cid>/file')
 @login_required
 @teacher_required
 def content_file(cid):
     teacher = _current_teacher()
-    item = TeacherContent.query.filter_by(id=cid, teacher_id=teacher.id).first_or_404()
+    item = TeacherContent.query.filter_by(id=cid, college_id=teacher.college_id, teacher_id=teacher.id).first_or_404()
     if not item.file_path:
         abort(404)
 
@@ -583,7 +666,7 @@ def content_list():
     q            = request.args.get('q', '').strip()
     page         = request.args.get('page', 1, type=int)
 
-    query = TeacherContent.query.filter_by(teacher_id=teacher.id)
+    query = TeacherContent.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id)
     if type_filter in ('note', 'assignment', 'lab', 'question'):
         query = query.filter_by(content_type=type_filter)
     if subj_filter:
@@ -599,7 +682,7 @@ def content_list():
         page=page, per_page=10, error_out=False)
 
     subjects = Subject.query.filter_by(teacher_id=teacher.id).order_by(Subject.name).all()
-    base_q   = TeacherContent.query.filter_by(teacher_id=teacher.id)
+    base_q   = TeacherContent.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id)
     counts   = {
         'all':        base_q.count(),
         'note':       base_q.filter_by(content_type='note').count(),
@@ -607,11 +690,17 @@ def content_list():
         'lab':        base_q.filter_by(content_type='lab').count(),
         'question':   base_q.filter_by(content_type='question').count(),
     }
+    assignment_stats = {
+        item.id: _assignment_stats(item)
+        for item in pagination.items
+        if item.content_type == 'assignment'
+    }
     return render_template('teacher/content.html',
                            pagination=pagination, items=pagination.items,
                            subjects=subjects, counts=counts,
                            type_filter=type_filter, subj_filter=subj_filter,
-                           pub_filter=pub_filter, q=q)
+                           pub_filter=pub_filter, q=q,
+                           assignment_stats=assignment_stats)
 
 
 @teacher_bp.route('/content/new', methods=['GET', 'POST'])
@@ -619,7 +708,7 @@ def content_list():
 @teacher_required
 def content_create():
     teacher  = _current_teacher()
-    subjects = Subject.query.filter_by(teacher_id=teacher.id).order_by(Subject.name).all()
+    subjects = Subject.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id).order_by(Subject.name).all()
 
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
@@ -635,7 +724,7 @@ def content_create():
         marks_s  = request.form.get('marks', '').strip()
 
         if subj_id:
-            subject = Subject.query.filter_by(id=subj_id, teacher_id=teacher.id).first()
+            subject = Subject.query.filter_by(id=subj_id, college_id=teacher.college_id, teacher_id=teacher.id).first()
             if not subject:
                 flash('Invalid subject selection.', 'danger')
                 return redirect(request.url)
@@ -647,8 +736,16 @@ def content_create():
                 from datetime import date as _date
                 due_date = _date.fromisoformat(due_str)
             except ValueError:
-                pass
+                flash('Invalid due date.', 'danger')
+                return redirect(request.url)
 
+        if ctype == 'assignment' and not due_date:
+            flash('Assignments must have a due date.', 'danger')
+            return redirect(request.url)
+
+        if marks_s and not marks_s.isdigit():
+            flash('Marks must be a whole number.', 'danger')
+            return redirect(request.url)
         marks = int(marks_s) if marks_s.isdigit() else None
 
         file_path = _content_upload(teacher.id)
@@ -656,6 +753,7 @@ def content_create():
             return redirect(request.url)
 
         item = TeacherContent(
+            college_id    = teacher.college_id,
             teacher_id    = teacher.id,
             subject_id    = subj_id,
             department_id = teacher.department_id,
@@ -683,8 +781,8 @@ def content_create():
 @teacher_required
 def content_edit(cid):
     teacher  = _current_teacher()
-    item     = TeacherContent.query.filter_by(id=cid, teacher_id=teacher.id).first_or_404()
-    subjects = Subject.query.filter_by(teacher_id=teacher.id).order_by(Subject.name).all()
+    item     = TeacherContent.query.filter_by(id=cid, college_id=teacher.college_id, teacher_id=teacher.id).first_or_404()
+    subjects = Subject.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id).order_by(Subject.name).all()
 
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
@@ -696,7 +794,7 @@ def content_edit(cid):
         item.content_type = request.form.get('content_type', item.content_type)
         subj_id           = request.form.get('subject_id') or None
         if subj_id:
-            subject = Subject.query.filter_by(id=subj_id, teacher_id=teacher.id).first()
+            subject = Subject.query.filter_by(id=subj_id, college_id=teacher.college_id, teacher_id=teacher.id).first()
             if not subject:
                 flash('Invalid subject selection.', 'danger')
                 return redirect(request.url)
@@ -714,11 +812,19 @@ def content_edit(cid):
                 from datetime import date as _date
                 item.due_date = _date.fromisoformat(due_str)
             except ValueError:
-                pass
+                flash('Invalid due date.', 'danger')
+                return redirect(request.url)
         else:
             item.due_date = None
 
+        if item.content_type == 'assignment' and not item.due_date:
+            flash('Assignments must have a due date.', 'danger')
+            return redirect(request.url)
+
         marks_s = request.form.get('marks', '').strip()
+        if marks_s and not marks_s.isdigit():
+            flash('Marks must be a whole number.', 'danger')
+            return redirect(request.url)
         item.marks = int(marks_s) if marks_s.isdigit() else None
 
         new_fp = _content_upload(teacher.id)
@@ -741,7 +847,7 @@ def content_edit(cid):
 @teacher_required
 def content_delete(cid):
     teacher = _current_teacher()
-    item    = TeacherContent.query.filter_by(id=cid, teacher_id=teacher.id).first_or_404()
+    item    = TeacherContent.query.filter_by(id=cid, college_id=teacher.college_id, teacher_id=teacher.id).first_or_404()
     db.session.delete(item)
     db.session.commit()
     flash('Content deleted.', 'info')
@@ -753,7 +859,7 @@ def content_delete(cid):
 @teacher_required
 def content_toggle(cid):
     teacher = _current_teacher()
-    item    = TeacherContent.query.filter_by(id=cid, teacher_id=teacher.id).first_or_404()
+    item    = TeacherContent.query.filter_by(id=cid, college_id=teacher.college_id, teacher_id=teacher.id).first_or_404()
     item.is_published = not item.is_published
     db.session.commit()
     return jsonify(published=item.is_published,
@@ -765,13 +871,18 @@ def content_toggle(cid):
 @teacher_required
 def content_preview(cid):
     import html
-    from utils.file_preview import pptx_to_html, docx_to_html, preview_exception_message
+    from utils.file_preview import (
+        pptx_to_html,
+        docx_to_html,
+        preview_exception_message,
+        infer_preview_type,
+    )
 
     teacher = _current_teacher()
-    item    = TeacherContent.query.filter_by(id=cid, teacher_id=teacher.id).first_or_404()
+    item    = TeacherContent.query.filter_by(id=cid, college_id=teacher.college_id, teacher_id=teacher.id).first_or_404()
 
-    ext = content_extension(item.file_path)
     abs_path = resolve_content_path(current_app, item.file_path) if item.file_path else None
+    ext = infer_preview_type(item.file_path, abs_path)
     file_url = url_for('teacher.content_file', cid=item.id, download=0) if item.file_path else None
     download_url = url_for('teacher.content_file', cid=item.id) if item.file_path else None
 
@@ -807,3 +918,213 @@ def content_preview(cid):
                            preview_html=preview_html, error=error,
                            back_url=url_for('teacher.content_list'),
                            show_note_body=show_note_body)
+
+
+@teacher_bp.route('/assignments/<int:cid>')
+@login_required
+@teacher_required
+def assignment_review(cid):
+    teacher = _current_teacher()
+    item = _assignment_for_teacher(cid, teacher)
+    students = Student.query.filter_by(
+        college_id=item.college_id,
+        department_id=item.department_id,
+        semester=item.semester,
+    ).order_by(Student.roll_number).all()
+    submissions = AssignmentSubmission.query.filter_by(college_id=item.college_id, content_id=item.id).all()
+    submission_map = {submission.student_id: submission for submission in submissions}
+
+    rows = []
+    late_count = 0
+    for student in students:
+        submission = submission_map.get(student.id)
+        if submission and submission.is_late:
+            late_count += 1
+        rows.append({
+            'student': student,
+            'submission': submission,
+            'score_pct': (
+                round((submission.marks_awarded / item.marks) * 100, 1)
+                if submission and submission.marks_awarded is not None and item.marks
+                else None
+            ),
+        })
+
+    stats = _assignment_stats(item)
+    stats['late'] = late_count
+    stats['awaiting_review'] = AssignmentSubmission.query.filter_by(
+        college_id=item.college_id,
+        content_id=item.id,
+        status='submitted',
+    ).count()
+    first_unreviewed_submission_id = _next_unreviewed_submission_id(item.id)
+
+    return render_template(
+        'teacher/assignment_submissions.html',
+        item=item,
+        rows=rows,
+        stats=stats,
+        first_unreviewed_submission_id=first_unreviewed_submission_id,
+    )
+
+
+@teacher_bp.route('/assignments/submissions/<int:sid>/file')
+@login_required
+@teacher_required
+def assignment_submission_file(sid):
+    teacher = _current_teacher()
+    submission = (
+        AssignmentSubmission.query
+        .join(TeacherContent, TeacherContent.id == AssignmentSubmission.content_id)
+        .filter(
+            AssignmentSubmission.college_id == teacher.college_id,
+            AssignmentSubmission.id == sid,
+            TeacherContent.college_id == teacher.college_id,
+            TeacherContent.teacher_id == teacher.id,
+        )
+        .first_or_404()
+    )
+    if not submission.file_path:
+        abort(404)
+
+    abs_path = resolve_submission_path(current_app, submission.file_path)
+    if not abs_path or not os.path.isfile(abs_path):
+        abort(404)
+
+    return send_file(
+        abs_path,
+        as_attachment=request.args.get('download', '1') != '0',
+        download_name=os.path.basename(submission.file_path),
+        conditional=True,
+    )
+
+
+@teacher_bp.route('/assignments/submissions/<int:sid>/preview')
+@login_required
+@teacher_required
+def assignment_submission_preview(sid):
+    import html
+    from utils.file_preview import (
+        pptx_to_html,
+        docx_to_html,
+        preview_exception_message,
+        infer_preview_type,
+    )
+
+    teacher = _current_teacher()
+    submission = (
+        AssignmentSubmission.query
+        .join(TeacherContent, TeacherContent.id == AssignmentSubmission.content_id)
+        .filter(
+            AssignmentSubmission.college_id == teacher.college_id,
+            AssignmentSubmission.id == sid,
+            TeacherContent.college_id == teacher.college_id,
+            TeacherContent.teacher_id == teacher.id,
+        )
+        .first_or_404()
+    )
+
+    abs_path = resolve_submission_path(current_app, submission.file_path) if submission.file_path else None
+    ext = infer_preview_type(submission.file_path, abs_path)
+    file_url = url_for('teacher.assignment_submission_file', sid=submission.id, download=0) if submission.file_path else None
+    download_url = url_for('teacher.assignment_submission_file', sid=submission.id) if submission.file_path else None
+
+    preview_type = ext if submission.file_path else 'content'
+    preview_html = None
+    error = None
+
+    if submission.file_path:
+        if not abs_path or not os.path.isfile(abs_path):
+            error = 'Submitted file is missing from the server.'
+        elif ext == 'pptx':
+            try:
+                preview_html = pptx_to_html(abs_path)
+            except Exception as e:
+                error = preview_exception_message(ext, e)
+        elif ext in ('docx', 'doc'):
+            try:
+                preview_html = docx_to_html(abs_path)
+            except Exception as e:
+                error = preview_exception_message(ext, e)
+        elif ext in ('txt', 'csv'):
+            try:
+                with open(abs_path, 'r', encoding='utf-8', errors='replace') as fh:
+                    preview_html = f"<pre class=\"text-file-preview mb-0\">{html.escape(fh.read())}</pre>"
+            except Exception as e:
+                error = preview_exception_message(ext, e)
+
+    next_submission_id = _next_unreviewed_submission_id(submission.content_id, submission.id)
+
+    return render_template(
+        'student/content_preview.html',
+        item=submission.content,
+        preview_type=preview_type,
+        file_url=file_url,
+        download_url=download_url,
+        preview_html=preview_html,
+        error=error,
+        back_url=url_for('teacher.assignment_review', cid=submission.content_id),
+        show_note_body=False,
+        submission=submission,
+        preview_heading='Student Submission Preview',
+        grade_action_url=url_for('teacher.assignment_grade', sid=submission.id),
+        next_submission_id=next_submission_id,
+    )
+
+
+@teacher_bp.route('/assignments/submissions/<int:sid>/grade', methods=['POST'])
+@login_required
+@teacher_required
+def assignment_grade(sid):
+    teacher = _current_teacher()
+    submission = (
+        AssignmentSubmission.query
+        .join(TeacherContent, TeacherContent.id == AssignmentSubmission.content_id)
+        .filter(
+            AssignmentSubmission.college_id == teacher.college_id,
+            AssignmentSubmission.id == sid,
+            TeacherContent.college_id == teacher.college_id,
+            TeacherContent.teacher_id == teacher.id,
+    )
+        .first_or_404()
+    )
+    return_to_preview = request.form.get('return_to_preview') == '1'
+    next_submission_id = request.form.get('next_submission_id', type=int)
+    go_next = request.form.get('go_next') == '1'
+
+    marks_raw = request.form.get('marks_awarded', '').strip()
+    feedback = request.form.get('feedback', '').strip()
+
+    if marks_raw:
+        if not marks_raw.isdigit():
+            flash('Awarded marks must be a whole number.', 'danger')
+            if return_to_preview:
+                return redirect(url_for('teacher.assignment_submission_preview', sid=submission.id))
+            return redirect(url_for('teacher.assignment_review', cid=submission.content_id))
+        marks_awarded = int(marks_raw)
+        if submission.content.marks is not None and marks_awarded > submission.content.marks:
+            flash('Awarded marks cannot exceed total marks.', 'danger')
+            if return_to_preview:
+                return redirect(url_for('teacher.assignment_submission_preview', sid=submission.id))
+            return redirect(url_for('teacher.assignment_review', cid=submission.content_id))
+        submission.marks_awarded = marks_awarded
+    else:
+        submission.marks_awarded = None
+
+    submission.feedback = feedback or None
+    submission.status = 'reviewed'
+    submission.graded_at = utc_now_naive()
+    submission.updated_at = utc_now_naive()
+    db.session.commit()
+
+    if return_to_preview and go_next and next_submission_id:
+        flash(
+            f'Review saved for {submission.student.user.name}. Opening the next unreviewed submission.',
+            'success',
+        )
+        return redirect(url_for('teacher.assignment_submission_preview', sid=next_submission_id))
+
+    flash(f'Review saved for {submission.student.user.name}.', 'success')
+    if return_to_preview:
+        return redirect(url_for('teacher.assignment_submission_preview', sid=submission.id))
+    return redirect(url_for('teacher.assignment_review', cid=submission.content_id))

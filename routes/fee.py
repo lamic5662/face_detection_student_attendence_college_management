@@ -5,14 +5,20 @@ from models.fee import FeeStructure, FeePayment
 from models.student import Student
 from models.department import Department
 from utils.decorators import admin_required, student_required
+from utils.tenancy import current_college_id
 from datetime import date, datetime
 import random, string
 
 fee_bp = Blueprint('fee', __name__)
 
 
-def _generate_receipt():
-    return 'RCT-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+def _generate_receipt(college):
+    prefix = f"RCT-{(college.code or 'MAIN').upper()}-"
+    while True:
+        candidate = prefix + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        exists = FeePayment.query.filter_by(college_id=college.id, receipt_no=candidate).first()
+        if not exists:
+            return candidate
 
 
 # ── Admin ─────────────────────────────────────────────────────────────────────
@@ -24,9 +30,9 @@ def admin_fees():
     page       = request.args.get('page', 1, type=int)
     dept_id    = request.args.get('department_id', type=int)
     year       = request.args.get('year', '')
-    departments = Department.query.order_by(Department.name).all()
+    departments = Department.query.filter_by(college_id=current_college_id()).order_by(Department.name).all()
 
-    query = FeeStructure.query
+    query = FeeStructure.query.filter_by(college_id=current_college_id())
     if dept_id:
         query = query.filter(db.or_(
             FeeStructure.department_id == dept_id,
@@ -38,7 +44,12 @@ def admin_fees():
     pagination = query.order_by(FeeStructure.academic_year.desc(), FeeStructure.id.desc()).paginate(
         page=page, per_page=15, error_out=False
     )
-    years = db.session.query(FeeStructure.academic_year).distinct().all()
+    years = (
+        db.session.query(FeeStructure.academic_year)
+        .filter(FeeStructure.college_id == current_college_id())
+        .distinct()
+        .all()
+    )
     return render_template('fee/admin_structures.html',
                            pagination=pagination, structures=pagination.items,
                            departments=departments,
@@ -71,7 +82,7 @@ def create_structure():
             return redirect(url_for('fee.admin_fees'))
     else:
         due = None
-    fs = FeeStructure(title=title, department_id=dept_id, semester=semester,
+    fs = FeeStructure(college_id=current_college_id(), title=title, department_id=dept_id, semester=semester,
                       academic_year=year, amount=amount, due_date=due,
                       description=description)
     db.session.add(fs)
@@ -84,7 +95,7 @@ def create_structure():
 @login_required
 @admin_required
 def delete_structure(fid):
-    fs = FeeStructure.query.get_or_404(fid)
+    fs = FeeStructure.query.filter_by(id=fid, college_id=current_college_id()).first_or_404()
     db.session.delete(fs)
     db.session.commit()
     flash('Fee structure deleted.', 'info')
@@ -95,14 +106,14 @@ def delete_structure(fid):
 @login_required
 @admin_required
 def structure_payments(fid):
-    fs = FeeStructure.query.get_or_404(fid)
+    fs = FeeStructure.query.filter_by(id=fid, college_id=current_college_id()).first_or_404()
     page = request.args.get('page', 1, type=int)
     dept_id  = request.args.get('department_id', type=int)
     semester = request.args.get('semester', type=int)
-    departments = Department.query.order_by(Department.name).all()
+    departments = Department.query.filter_by(college_id=current_college_id()).order_by(Department.name).all()
 
     # All relevant students
-    student_q = Student.query
+    student_q = Student.query.filter_by(college_id=current_college_id())
     if fs.department_id:
         student_q = student_q.filter_by(department_id=fs.department_id)
     elif dept_id:
@@ -113,7 +124,10 @@ def structure_payments(fid):
         student_q = student_q.filter_by(semester=semester)
 
     all_students = student_q.order_by(Student.roll_number).all()
-    paid_map = {p.student_id: p for p in FeePayment.query.filter_by(fee_structure_id=fid).all()}
+    paid_map = {
+        p.student_id: p
+        for p in FeePayment.query.filter_by(college_id=current_college_id(), fee_structure_id=fid).all()
+    }
 
     students_data = []
     for s in all_students:
@@ -136,7 +150,7 @@ def structure_payments(fid):
 @login_required
 @admin_required
 def record_payment(fid):
-    fs = FeeStructure.query.get_or_404(fid)
+    fs = FeeStructure.query.filter_by(id=fid, college_id=current_college_id()).first_or_404()
     student_id     = request.form.get('student_id', type=int)
     amount_paid    = request.form.get('amount_paid', type=float)
     method         = request.form.get('payment_method', 'cash')
@@ -150,7 +164,7 @@ def record_payment(fid):
         return redirect(url_for('fee.structure_payments', fid=fid))
 
     existing = FeePayment.query.filter_by(
-        student_id=student_id, fee_structure_id=fid
+        college_id=current_college_id(), student_id=student_id, fee_structure_id=fid
     ).first()
     if payment_date_s:
         try:
@@ -171,11 +185,12 @@ def record_payment(fid):
         existing.recorded_by    = current_user.id
     else:
         payment = FeePayment(
+            college_id=current_college_id(),
             student_id=student_id, fee_structure_id=fid,
             amount_paid=amount_paid, payment_method=method,
             transaction_id=transaction_id, remarks=remarks,
             payment_date=pdate, status=status,
-            receipt_no=_generate_receipt(),
+            receipt_no=_generate_receipt(current_user.college),
             recorded_by=current_user.id
         )
         db.session.add(payment)
@@ -193,6 +208,7 @@ def record_payment(fid):
 def student_fees():
     student = current_user.student_profile
     structures = FeeStructure.query.filter(
+        FeeStructure.college_id == student.college_id,
         db.or_(
             FeeStructure.department_id == student.department_id,
             FeeStructure.department_id == None
@@ -205,7 +221,7 @@ def student_fees():
     ).order_by(FeeStructure.academic_year.desc()).all()
 
     paid_map = {p.fee_structure_id: p for p in
-                FeePayment.query.filter_by(student_id=student.id).all()}
+                FeePayment.query.filter_by(college_id=student.college_id, student_id=student.id).all()}
 
     fee_data = []
     total_due = total_paid = 0

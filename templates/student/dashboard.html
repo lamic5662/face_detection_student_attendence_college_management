@@ -3,6 +3,10 @@
 {% block page_title %}<i class="bi bi-speedometer2 me-2"></i>My Dashboard{% endblock %}
 
 {% block content %}
+{% set visible_widgets = dashboard_prefs.visible_widget_keys if dashboard_prefs else [] %}
+{% include "partials/dashboard_customize.html" %}
+
+{% if 'profile_banner' in visible_widgets %}
 <!-- Profile Banner -->
 <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#0d6efd,#0dcaf0)">
   <div class="card-body px-4 py-4 text-white d-flex align-items-center gap-4">
@@ -31,7 +35,9 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if 'location_sharing' in visible_widgets %}
 <!-- Location Sharing Widget -->
 <div class="card border-0 shadow-sm mb-4" id="loc-card">
   <div class="card-body px-4 py-3 d-flex flex-wrap align-items-center gap-3">
@@ -335,10 +341,11 @@ window.doRequestPermission = function () {
 })();
 </script>
 {% endif %}
+{% endif %}
 
 <!-- Low Attendance Alert -->
 {% set low_subjects = subject_attendance|selectattr('low')|list %}
-{% if low_subjects %}
+{% if 'low_attendance_alert' in visible_widgets and low_subjects %}
 <div class="alert alert-danger border-0 shadow-sm mb-4">
   <i class="bi bi-exclamation-triangle-fill me-2"></i>
   <strong>Low Attendance Warning!</strong> You are below {{ threshold }}% in
@@ -348,6 +355,7 @@ window.doRequestPermission = function () {
 {% endif %}
 
 <!-- Subject Cards -->
+{% if 'subject_attendance' in visible_widgets %}
 <h6 class="fw-semibold mb-3">Subject-wise Attendance</h6>
 <div class="row g-3 mb-4">
   {% for s in subject_attendance %}
@@ -389,11 +397,13 @@ window.doRequestPermission = function () {
   </div>
   {% endfor %}
 </div>
+{% endif %}
 
 <!-- Quick Info Row: Upcoming Exams / Fee Status / Notices -->
+{% if 'upcoming_exams' in visible_widgets or 'fee_status' in visible_widgets or 'notices' in visible_widgets %}
 <div class="row g-3 mb-4">
   <!-- Upcoming Exams -->
-  {% if upcoming_exams %}
+  {% if 'upcoming_exams' in visible_widgets and upcoming_exams %}
   <div class="col-12">
     <div class="card border-0 shadow-sm">
       <div class="card-header border-0 px-4 py-3 d-flex align-items-center justify-content-between"
@@ -484,7 +494,7 @@ window.doRequestPermission = function () {
   {% endif %}
 
   <!-- Fee Alert -->
-  {% if total_fee_due > 0 %}
+  {% if 'fee_status' in visible_widgets and total_fee_due > 0 %}
   <div class="col-md-6">
     <div class="card border-0 shadow-sm border-start border-danger border-4">
       <div class="card-body px-3 py-3 d-flex align-items-center gap-3">
@@ -499,7 +509,7 @@ window.doRequestPermission = function () {
       </div>
     </div>
   </div>
-  {% else %}
+  {% elif 'fee_status' in visible_widgets %}
   <div class="col-md-6">
     <div class="card border-0 shadow-sm border-start border-success border-4">
       <div class="card-body px-3 py-3 d-flex align-items-center gap-3">
@@ -516,7 +526,7 @@ window.doRequestPermission = function () {
   {% endif %}
 
   <!-- Notices -->
-  {% if notices %}
+  {% if 'notices' in visible_widgets and notices %}
   <div class="col-md-6">
     <div class="card border-0 shadow-sm h-100">
       <div class="card-body px-3 py-3">
@@ -535,8 +545,10 @@ window.doRequestPermission = function () {
   </div>
   {% endif %}
 </div>
+{% endif %}
 
 <!-- Recent Activity -->
+{% if 'recent_attendance' in visible_widgets %}
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-transparent border-0 pt-4 px-4">
     <h6 class="fw-semibold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent Attendance</h6>
@@ -578,6 +590,7 @@ window.doRequestPermission = function () {
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

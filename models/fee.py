@@ -4,8 +4,16 @@ from utils.time import utc_now_naive, utc_today
 
 class FeeStructure(db.Model):
     __tablename__ = 'fee_structures'
+    __table_args__ = (
+        db.Index(
+            'ix_fee_structures_college_department_semester_year',
+            'college_id', 'department_id', 'semester', 'academic_year'
+        ),
+        db.Index('ix_fee_structures_college_active_due', 'college_id', 'is_active', 'due_date'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     title = db.Column(db.String(150), nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
     semester = db.Column(db.Integer, nullable=True)
@@ -27,6 +35,7 @@ class FeePayment(db.Model):
     __tablename__ = 'fee_payments'
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
     fee_structure_id = db.Column(db.Integer, db.ForeignKey('fee_structures.id'), nullable=False)
     amount_paid = db.Column(db.Float, nullable=False)
@@ -47,6 +56,9 @@ class FeePayment(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('student_id', 'fee_structure_id', name='uq_fee_payment'),
+        db.UniqueConstraint('college_id', 'receipt_no', name='uq_fee_payments_college_receipt_no'),
+        db.Index('ix_fee_payments_college_student_status', 'college_id', 'student_id', 'status'),
+        db.Index('ix_fee_payments_college_structure_status', 'college_id', 'fee_structure_id', 'status'),
     )
 
     def __repr__(self):

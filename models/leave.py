@@ -7,14 +7,21 @@ LEAVE_TYPES = ('student_subject', 'student_fullday', 'teacher')
 
 class LeaveRequest(db.Model):
     __tablename__ = 'leave_requests'
+    __table_args__ = (
+        db.UniqueConstraint('college_id', 'ref_number', name='uq_leave_requests_college_ref_number'),
+        db.Index('ix_leave_requests_college_status_created', 'college_id', 'status', 'created_at'),
+        db.Index('ix_leave_requests_college_student_status', 'college_id', 'student_id', 'status'),
+        db.Index('ix_leave_requests_college_teacher_status', 'college_id', 'teacher_id', 'status'),
+    )
 
     id          = db.Column(db.Integer, primary_key=True)
+    college_id  = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     leave_type  = db.Column(db.Enum(*LEAVE_TYPES), nullable=False, default='student_subject')
     student_id  = db.Column(db.Integer, db.ForeignKey('students.id'),  nullable=True)
     subject_id  = db.Column(db.Integer, db.ForeignKey('subjects.id'),  nullable=True)
     teacher_id  = db.Column(db.Integer, db.ForeignKey('teachers.id'),  nullable=True)
     approver_id = db.Column(db.Integer, db.ForeignKey('users.id'),     nullable=True)
-    ref_number  = db.Column(db.String(30), unique=True, nullable=True)
+    ref_number  = db.Column(db.String(30), nullable=True)
     from_date   = db.Column(db.Date, nullable=False)
     to_date     = db.Column(db.Date, nullable=False)
     reason      = db.Column(db.String(500), nullable=False)
@@ -41,10 +48,15 @@ class LeaveRequest(db.Model):
         return self.teacher_remark
 
     @staticmethod
-    def generate_ref():
+    def generate_ref(college):
         year = utc_now_naive().year
+        college_code = (getattr(college, 'code', None) or 'MAIN').upper()
+        prefix = f'LV-{college_code}-{year}-'
         last = (LeaveRequest.query
-                .filter(LeaveRequest.ref_number.like(f'LV-{year}-%'))
+                .filter(
+                    LeaveRequest.college_id == college.id,
+                    LeaveRequest.ref_number.like(f'{prefix}%')
+                )
                 .order_by(LeaveRequest.id.desc())
                 .first())
         seq = 1
@@ -53,7 +65,7 @@ class LeaveRequest(db.Model):
                 seq = int(last.ref_number.split('-')[-1]) + 1
             except ValueError:
                 pass
-        return f'LV-{year}-{seq:05d}'
+        return f'{prefix}{seq:05d}'
 
     @property
     def applicant_name(self):

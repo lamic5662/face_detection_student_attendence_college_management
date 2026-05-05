@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, send_file, current_app, abort
 from flask_login import login_required, current_user
 from extensions import db, limiter
 import urllib.request
@@ -22,30 +22,73 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
 import csv, io, os
-from utils.content_storage import is_valid_content_relpath, resolve_content_path
+from utils.content_storage import is_valid_content_relpath, resolve_content_path, content_storage_dirs
+from utils.dashboard import build_dashboard_preferences
+from utils.system_setup import evaluate_production_setup
+from utils.tenancy import current_college_id
 from utils.time import utc_now_naive
 
 admin_bp = Blueprint('admin', __name__)
+
+
+def _admin_college_id() -> int:
+    return current_user.college_id
+
+
+def _scoped_model_or_404(model, object_id):
+    obj = db.session.get(model, object_id)
+    if obj is None or getattr(obj, 'college_id', None) != _admin_college_id():
+        abort(404)
+    return obj
+
+
+def _scoped_department_query():
+    return Department.query.filter_by(college_id=_admin_college_id())
+
+
+def _scoped_student_query():
+    return Student.query.filter_by(college_id=_admin_college_id())
+
+
+def _scoped_teacher_query():
+    return Teacher.query.filter_by(college_id=_admin_college_id())
+
+
+def _scoped_subject_query():
+    return Subject.query.filter_by(college_id=_admin_college_id())
+
+
+def _scoped_user_query():
+    return User.query.filter_by(college_id=_admin_college_id())
 
 
 @admin_bp.route('/dashboard')
 @login_required
 @admin_required
 def dashboard():
+    dashboard_prefs = build_dashboard_preferences(current_user)
+    setup_report = evaluate_production_setup(current_app, current_user.college)
     stats = {
-        'total_students': Student.query.count(),
-        'total_teachers': Teacher.query.count(),
-        'total_subjects': Subject.query.count(),
-        'total_sessions': AttendanceSession.query.count(),
-        'active_sessions': AttendanceSession.query.filter_by(status='active').count(),
-        'departments': Department.query.count(),
+        'total_students': _scoped_student_query().count(),
+        'total_teachers': _scoped_teacher_query().count(),
+        'total_subjects': _scoped_subject_query().count(),
+        'total_sessions': AttendanceSession.query.join(Subject).filter(Subject.college_id == _admin_college_id()).count(),
+        'active_sessions': AttendanceSession.query.join(Subject).filter(
+            Subject.college_id == _admin_college_id(),
+            AttendanceSession.status == 'active',
+        ).count(),
+        'departments': _scoped_department_query().count(),
     }
 
     # Last 7 days attendance trend
     trend = []
     for i in range(6, -1, -1):
         day = date.today() - timedelta(days=i)
-        sessions = AttendanceSession.query.filter_by(date=day, status='completed').all()
+        sessions = AttendanceSession.query.join(Subject).filter(
+            Subject.college_id == _admin_college_id(),
+            AttendanceSession.date == day,
+            AttendanceSession.status == 'completed',
+        ).all()
         total = sum(s.total_students for s in sessions)
         present = sum(s.present_count for s in sessions)
         trend.append({
@@ -57,8 +100,8 @@ def dashboard():
 
     # Department-wise attendance
     dept_stats = []
-    for dept in Department.query.all():
-        students = Student.query.filter_by(department_id=dept.id).all()
+    for dept in _scoped_department_query().all():
+        students = _scoped_student_query().filter_by(department_id=dept.id).all()
         if not students:
             continue
         rates = [s.get_attendance_percentage() for s in students]
@@ -69,31 +112,73 @@ def dashboard():
             'student_count': len(students),
         })
 
-    recent_sessions = AttendanceSession.query.order_by(
-        AttendanceSession.created_at.desc()
-    ).limit(10).all()
+    recent_sessions = (
+        AttendanceSession.query
+        .join(Subject)
+        .filter(Subject.college_id == _admin_college_id())
+        .order_by(AttendanceSession.created_at.desc())
+        .limit(10)
+        .all()
+    )
 
     # Recent notices (pinned first)
     recent_notices = Notice.query.filter(
+        Notice.college_id == _admin_college_id(),
         db.or_(Notice.expires_at == None, Notice.expires_at > utc_now_naive())
     ).order_by(Notice.is_pinned.desc(), Notice.created_at.desc()).limit(5).all()
 
     # Upcoming exams (next 7 days)
     today = date.today()
-    upcoming_exams = Exam.query.filter(
-        Exam.exam_date >= today,
-        Exam.exam_date <= today + timedelta(days=7)
-    ).order_by(Exam.exam_date).limit(5).all()
+    upcoming_exams = (
+        Exam.query
+        .join(Subject)
+        .filter(
+            Subject.college_id == _admin_college_id(),
+            Exam.exam_date >= today,
+            Exam.exam_date <= today + timedelta(days=7),
+        )
+        .order_by(Exam.exam_date)
+        .limit(5)
+        .all()
+    )
 
     # Fee collection summary
-    total_fee_expected = db.session.query(func.sum(FeeStructure.amount)).scalar() or 0
-    total_fee_collected = db.session.query(func.sum(FeePayment.amount_paid)).filter(
-        FeePayment.status.in_(['paid', 'partial'])
-    ).scalar() or 0
+    total_fee_expected = (
+        db.session.query(func.sum(FeeStructure.amount))
+        .outerjoin(Department, FeeStructure.department_id == Department.id)
+        .filter(
+            db.or_(
+                FeeStructure.department_id.is_(None),
+                Department.college_id == _admin_college_id(),
+            )
+        )
+        .scalar()
+        or 0
+    )
+    total_fee_collected = (
+        db.session.query(func.sum(FeePayment.amount_paid))
+        .join(Student, FeePayment.student_id == Student.id)
+        .filter(
+            Student.college_id == _admin_college_id(),
+            FeePayment.status.in_(['paid', 'partial'])
+        )
+        .scalar()
+        or 0
+    )
     from models.leave import LeaveRequest
-    pending_leaves = LeaveRequest.query.filter_by(status='pending').count()
+    pending_leaves = (
+        LeaveRequest.query
+        .join(Student, LeaveRequest.student_id == Student.id)
+        .filter(
+            Student.college_id == _admin_college_id(),
+            LeaveRequest.status == 'pending',
+        )
+        .count()
+    )
 
     return render_template('admin/dashboard.html',
+                           dashboard_prefs=dashboard_prefs,
+                           setup_report=setup_report,
                            stats=stats, trend=trend,
                            dept_stats=dept_stats,
                            recent_sessions=recent_sessions,
@@ -115,7 +200,7 @@ def users():
     role   = request.args.get('role', '')
     search = request.args.get('q', '').strip()
 
-    query = User.query
+    query = _scoped_user_query()
     if role:
         query = query.filter_by(role=role)
     if search:
@@ -138,7 +223,7 @@ def users():
 @login_required
 @admin_required
 def toggle_user(uid):
-    user = User.query.get_or_404(uid)
+    user = _scoped_model_or_404(User, uid)
     if user.role == 'admin':
         flash('Cannot deactivate admin accounts.', 'warning')
     else:
@@ -152,7 +237,7 @@ def toggle_user(uid):
 @login_required
 @admin_required
 def reset_user_password(uid):
-    user = User.query.get_or_404(uid)
+    user = _scoped_model_or_404(User, uid)
     new_pw = request.form.get('new_password', '').strip()
     if len(new_pw) < 6:
         flash('Password must be at least 6 characters.', 'danger')
@@ -174,27 +259,27 @@ def departments():
         code = request.form.get('code', '').strip().upper()
         if not name or not code:
             flash('Name and code are required.', 'danger')
-        elif Department.query.filter_by(code=code).first():
+        elif _scoped_department_query().filter_by(code=code).first():
             flash('Department code already exists.', 'danger')
         else:
-            db.session.add(Department(name=name, code=code))
+            db.session.add(Department(college_id=_admin_college_id(), name=name, code=code))
             db.session.commit()
             flash(f'Department {code} added.', 'success')
     return render_template('admin/departments.html',
-                           departments=Department.query.all())
+                           departments=_scoped_department_query().all())
 
 
 @admin_bp.route('/departments/edit/<int:did>', methods=['POST'])
 @login_required
 @admin_required
 def edit_department(did):
-    dept = Department.query.get_or_404(did)
+    dept = _scoped_model_or_404(Department, did)
     name = request.form.get('name', '').strip()
     code = request.form.get('code', '').strip().upper()
     if not name or not code:
         flash('Name and code are required.', 'danger')
         return redirect(url_for('admin.departments'))
-    if code != dept.code and Department.query.filter_by(code=code).first():
+    if code != dept.code and _scoped_department_query().filter_by(code=code).first():
         flash('Department code already exists.', 'danger')
         return redirect(url_for('admin.departments'))
     dept.name = name
@@ -208,7 +293,7 @@ def edit_department(did):
 @login_required
 @admin_required
 def delete_department(did):
-    dept = Department.query.get_or_404(did)
+    dept = _scoped_model_or_404(Department, did)
     db.session.delete(dept)
     db.session.commit()
     flash('Department deleted.', 'success')
@@ -226,7 +311,7 @@ def students():
     semester   = request.args.get('semester', type=int)
     search     = request.args.get('q', '').strip()
 
-    query = Student.query.join(User)
+    query = Student.query.join(User).filter(Student.college_id == _admin_college_id())
     if dept_id:
         query = query.filter(Student.department_id == dept_id)
     if semester:
@@ -240,7 +325,7 @@ def students():
     pagination = query.order_by(Student.roll_number).paginate(
         page=page, per_page=15, error_out=False
     )
-    departments = Department.query.order_by(Department.name).all()
+    departments = _scoped_department_query().order_by(Department.name).all()
     return render_template('admin/students.html',
                            pagination=pagination,
                            students=pagination.items,
@@ -265,21 +350,28 @@ def add_student():
         flash('All fields are required.', 'danger')
         return redirect(url_for('admin.students'))
 
-    if User.query.filter_by(email=email).first():
+    if _scoped_user_query().filter_by(email=email).first():
         flash('Email already registered.', 'danger')
         return redirect(url_for('admin.students'))
 
-    if Student.query.filter_by(roll_number=roll).first():
+    if _scoped_student_query().filter_by(roll_number=roll).first():
         flash('Roll number already exists.', 'danger')
         return redirect(url_for('admin.students'))
 
-    user = User(name=name, email=email, role='student')
+    department = _scoped_model_or_404(Department, dept_id)
+
+    user = User(college_id=_admin_college_id(), name=name, email=email, role='student')
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
 
-    student = Student(user_id=user.id, roll_number=roll,
-                      department_id=dept_id, semester=semester)
+    student = Student(
+        college_id=_admin_college_id(),
+        user_id=user.id,
+        roll_number=roll,
+        department_id=department.id,
+        semester=semester,
+    )
     db.session.add(student)
     db.session.commit()
     flash(f'Student {roll} added successfully.', 'success')
@@ -290,7 +382,7 @@ def add_student():
 @login_required
 @admin_required
 def edit_student(sid):
-    student = Student.query.get_or_404(sid)
+    student = _scoped_model_or_404(Student, sid)
     student.user.name  = request.form.get('name', student.user.name).strip()
     student.semester   = request.form.get('semester', student.semester, type=int)
     dept_id = request.form.get('department_id', type=int)
@@ -298,7 +390,7 @@ def edit_student(sid):
         student.department_id = dept_id
     new_email = request.form.get('email', '').strip().lower()
     if new_email and new_email != student.user.email:
-        if User.query.filter(User.email == new_email, User.id != student.user_id).first():
+        if _scoped_user_query().filter(User.email == new_email, User.id != student.user_id).first():
             flash('Email already in use.', 'danger')
             return redirect(url_for('admin.students'))
         student.user.email = new_email
@@ -336,22 +428,27 @@ def import_students():
                 errors += 1
                 continue
 
-            if User.query.filter_by(email=email).first() or \
-               Student.query.filter_by(roll_number=roll).first():
+            if _scoped_user_query().filter_by(email=email).first() or \
+               _scoped_student_query().filter_by(roll_number=roll).first():
                 skipped += 1
                 continue
 
-            dept = Department.query.filter_by(code=dept_code).first()
+            dept = _scoped_department_query().filter_by(code=dept_code).first()
             if not dept:
                 errors += 1
                 continue
 
-            u = User(name=name, email=email, role='student')
+            u = User(college_id=_admin_college_id(), name=name, email=email, role='student')
             u.set_password(password)
             db.session.add(u)
             db.session.flush()
-            db.session.add(Student(user_id=u.id, roll_number=roll,
-                                   department_id=dept.id, semester=semester))
+            db.session.add(Student(
+                college_id=_admin_college_id(),
+                user_id=u.id,
+                roll_number=roll,
+                department_id=dept.id,
+                semester=semester,
+            ))
             added += 1
         except Exception:
             errors += 1
@@ -365,7 +462,7 @@ def import_students():
 @login_required
 @admin_required
 def export_students():
-    students = Student.query.join(User).order_by(Student.roll_number).all()
+    students = Student.query.join(User).filter(Student.college_id == _admin_college_id()).order_by(Student.roll_number).all()
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(['name', 'email', 'roll_number', 'department_code', 'semester'])
@@ -382,7 +479,7 @@ def export_students():
 @login_required
 @admin_required
 def student_attendance(sid):
-    student = Student.query.get_or_404(sid)
+    student = _scoped_model_or_404(Student, sid)
     subjects = Subject.query.filter_by(
         department_id=student.department_id,
         semester=student.semester
@@ -427,7 +524,7 @@ def student_attendance(sid):
 @login_required
 @admin_required
 def delete_student(sid):
-    student = Student.query.get_or_404(sid)
+    student = _scoped_model_or_404(Student, sid)
     db.session.delete(student.user)
     db.session.commit()
     flash('Student removed.', 'success')
@@ -444,7 +541,7 @@ def teachers():
     dept_id = request.args.get('department_id', type=int)
     search  = request.args.get('q', '').strip()
 
-    query = Teacher.query.join(User)
+    query = Teacher.query.join(User).filter(Teacher.college_id == _admin_college_id())
     if dept_id:
         query = query.filter(Teacher.department_id == dept_id)
     if search:
@@ -456,7 +553,7 @@ def teachers():
     pagination = query.order_by(Teacher.employee_id).paginate(
         page=page, per_page=15, error_out=False
     )
-    departments = Department.query.order_by(Department.name).all()
+    departments = _scoped_department_query().order_by(Department.name).all()
     return render_template('admin/teachers.html',
                            pagination=pagination,
                            teachers=pagination.items,
@@ -479,20 +576,27 @@ def add_teacher():
         flash('All fields are required.', 'danger')
         return redirect(url_for('admin.teachers'))
 
-    if User.query.filter_by(email=email).first():
+    if _scoped_user_query().filter_by(email=email).first():
         flash('Email already registered.', 'danger')
         return redirect(url_for('admin.teachers'))
 
-    if Teacher.query.filter_by(employee_id=emp_id).first():
+    if _scoped_teacher_query().filter_by(employee_id=emp_id).first():
         flash('Employee ID already exists.', 'danger')
         return redirect(url_for('admin.teachers'))
 
-    user = User(name=name, email=email, role='teacher')
+    department = _scoped_model_or_404(Department, dept_id)
+
+    user = User(college_id=_admin_college_id(), name=name, email=email, role='teacher')
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
 
-    teacher = Teacher(user_id=user.id, employee_id=emp_id, department_id=dept_id)
+    teacher = Teacher(
+        college_id=_admin_college_id(),
+        user_id=user.id,
+        employee_id=emp_id,
+        department_id=department.id,
+    )
     db.session.add(teacher)
     db.session.commit()
     flash(f'Teacher {emp_id} added.', 'success')
@@ -503,14 +607,14 @@ def add_teacher():
 @login_required
 @admin_required
 def edit_teacher(tid):
-    teacher = Teacher.query.get_or_404(tid)
+    teacher = _scoped_model_or_404(Teacher, tid)
     teacher.user.name = request.form.get('name', teacher.user.name).strip()
     dept_id = request.form.get('department_id', type=int)
     if dept_id:
         teacher.department_id = dept_id
     new_email = request.form.get('email', '').strip().lower()
     if new_email and new_email != teacher.user.email:
-        if User.query.filter(User.email == new_email, User.id != teacher.user_id).first():
+        if _scoped_user_query().filter(User.email == new_email, User.id != teacher.user_id).first():
             flash('Email already in use.', 'danger')
             return redirect(url_for('admin.teachers'))
         teacher.user.email = new_email
@@ -523,7 +627,7 @@ def edit_teacher(tid):
 @login_required
 @admin_required
 def delete_teacher(tid):
-    teacher = Teacher.query.get_or_404(tid)
+    teacher = _scoped_model_or_404(Teacher, tid)
     db.session.delete(teacher.user)
     db.session.commit()
     flash('Teacher removed.', 'success')
@@ -544,11 +648,14 @@ def subjects():
         semester = request.form.get('semester', type=int)
         credits = request.form.get('credit_hours', 3, type=int)
 
-        if Subject.query.filter_by(code=code).first():
+        department = _scoped_model_or_404(Department, dept_id)
+        teacher = _scoped_model_or_404(Teacher, teacher_id)
+
+        if _scoped_subject_query().filter_by(code=code).first():
             flash('Subject code already exists.', 'danger')
         else:
-            db.session.add(Subject(name=name, code=code, department_id=dept_id,
-                                   teacher_id=teacher_id, semester=semester,
+            db.session.add(Subject(college_id=_admin_college_id(), name=name, code=code, department_id=department.id,
+                                   teacher_id=teacher.id, semester=semester,
                                    credit_hours=credits))
             db.session.commit()
             flash(f'Subject {code} added.', 'success')
@@ -559,15 +666,15 @@ def subjects():
     selected_dept = request.args.get('department_id', type=int)
     selected_sem  = request.args.get('semester', type=int)
 
-    query = Subject.query
+    query = _scoped_subject_query()
     if selected_dept:
         query = query.filter_by(department_id=selected_dept)
     if selected_sem:
         query = query.filter_by(semester=selected_sem)
     all_subjects = query.order_by(Subject.department_id, Subject.semester, Subject.name).all()
 
-    departments = Department.query.order_by(Department.name).all()
-    teachers = Teacher.query.join(User).order_by(User.name).all()
+    departments = _scoped_department_query().order_by(Department.name).all()
+    teachers = Teacher.query.join(User).filter(Teacher.college_id == _admin_college_id()).order_by(User.name).all()
     return render_template('admin/subjects.html',
                            subjects=all_subjects,
                            departments=departments,
@@ -580,11 +687,11 @@ def subjects():
 @login_required
 @admin_required
 def edit_subject(sid):
-    subject = Subject.query.get_or_404(sid)
+    subject = _scoped_model_or_404(Subject, sid)
     subject.name = request.form.get('name', subject.name).strip()
     new_code = request.form.get('code', '').strip().upper()
     if new_code and new_code != subject.code:
-        if Subject.query.filter(Subject.code == new_code, Subject.id != sid).first():
+        if _scoped_subject_query().filter(Subject.code == new_code, Subject.id != sid).first():
             flash('Subject code already in use.', 'danger')
             return redirect(url_for('admin.subjects'))
         subject.code = new_code
@@ -609,7 +716,7 @@ def edit_subject(sid):
 @login_required
 @admin_required
 def delete_subject(sid):
-    subject = Subject.query.get_or_404(sid)
+    subject = _scoped_model_or_404(Subject, sid)
     db.session.delete(subject)
     db.session.commit()
     flash('Subject deleted.', 'success')
@@ -627,7 +734,7 @@ def sessions():
     date_from = request.args.get('date_from', '')
     date_to   = request.args.get('date_to', '')
 
-    query = AttendanceSession.query
+    query = AttendanceSession.query.join(Subject).filter(Subject.college_id == _admin_college_id())
     if subject_id:
         query = query.filter_by(subject_id=subject_id)
     if status_filter:
@@ -647,7 +754,7 @@ def sessions():
     pagination = query.order_by(
         AttendanceSession.date.desc(), AttendanceSession.start_time.desc()
     ).paginate(page=page, per_page=15, error_out=False)
-    subjects = Subject.query.all()
+    subjects = _scoped_subject_query().all()
     return render_template('admin/sessions.html',
                            pagination=pagination,
                            sessions=pagination.items,
@@ -661,7 +768,9 @@ def sessions():
 @login_required
 @admin_required
 def cancel_session(sid):
-    session = AttendanceSession.query.get_or_404(sid)
+    session = db.session.get(AttendanceSession, sid)
+    if session is None or session.subject.college_id != _admin_college_id():
+        abort(404)
     if session.status != 'active':
         flash('Only active sessions can be cancelled.', 'warning')
     else:
@@ -678,14 +787,16 @@ def cancel_session(sid):
 @login_required
 @admin_required
 def analytics():
-    departments = Department.query.all()
-    subjects = Subject.query.all()
+    departments = _scoped_department_query().all()
+    subjects = _scoped_subject_query().all()
 
     # Overall stats
-    total_records = AttendanceRecord.query.join(AttendanceSession).filter(
+    total_records = AttendanceRecord.query.join(AttendanceSession).join(Subject).filter(
+        Subject.college_id == _admin_college_id(),
         AttendanceSession.status == 'completed'
     ).count()
-    present_records = AttendanceRecord.query.join(AttendanceSession).filter(
+    present_records = AttendanceRecord.query.join(AttendanceSession).join(Subject).filter(
+        Subject.college_id == _admin_college_id(),
         AttendanceSession.status == 'completed',
         AttendanceRecord.status == 'present'
     ).count()
@@ -694,7 +805,7 @@ def analytics():
     # Students below threshold
     threshold = 75
     low_attendance_students = []
-    for student in Student.query.all():
+    for student in _scoped_student_query().all():
         pct = student.get_attendance_percentage()
         if pct < threshold:
             low_attendance_students.append({
@@ -710,7 +821,8 @@ def analytics():
     for i in range(5, -1, -1):
         month_start = date.today().replace(day=1) - timedelta(days=i * 30)
         month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
-        sessions = AttendanceSession.query.filter(
+        sessions = AttendanceSession.query.join(Subject).filter(
+            Subject.college_id == _admin_college_id(),
             AttendanceSession.date >= month_start,
             AttendanceSession.date < month_end,
             AttendanceSession.status == 'completed'
@@ -737,9 +849,14 @@ def analytics():
 @login_required
 @admin_required
 def parents():
-    parents_list = User.query.filter_by(role='parent', is_active=True).all()
-    students = Student.query.order_by(Student.roll_number).all()
-    links = ParentStudent.query.all()
+    parents_list = _scoped_user_query().filter_by(role='parent', is_active=True).all()
+    students = _scoped_student_query().order_by(Student.roll_number).all()
+    links = (
+        ParentStudent.query
+        .join(Student, ParentStudent.student_id == Student.id)
+        .filter(Student.college_id == _admin_college_id())
+        .all()
+    )
     # Map parent_id -> list of (link, student)
     parent_children = {}
     for link in links:
@@ -764,21 +881,21 @@ def add_parent():
         flash('Name, email, password and student are required.', 'danger')
         return redirect(url_for('admin.parents'))
 
-    if User.query.filter_by(email=email).first():
+    if _scoped_user_query().filter_by(email=email).first():
         flash(f'Email {email} is already registered.', 'danger')
         return redirect(url_for('admin.parents'))
 
     student = db.session.get(Student, student_id)
-    if not student:
+    if not student or student.college_id != _admin_college_id():
         flash('Student not found.', 'danger')
         return redirect(url_for('admin.parents'))
 
-    user = User(name=name, email=email, role='parent', is_active=True)
+    user = User(college_id=_admin_college_id(), name=name, email=email, role='parent', is_active=True)
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
 
-    link = ParentStudent(parent_id=user.id, student_id=student_id,
+    link = ParentStudent(college_id=_admin_college_id(), parent_id=user.id, student_id=student_id,
                          relationship=relationship)
     db.session.add(link)
     db.session.commit()
@@ -790,7 +907,7 @@ def add_parent():
 @login_required
 @admin_required
 def link_parent_child(parent_id):
-    parent_user = User.query.filter_by(id=parent_id, role='parent').first_or_404()
+    parent_user = _scoped_user_query().filter_by(id=parent_id, role='parent').first_or_404()
     student_id = request.form.get('student_id', type=int)
     relationship = request.form.get('relationship', 'guardian')
 
@@ -798,17 +915,16 @@ def link_parent_child(parent_id):
         flash('Select a student to link.', 'danger')
         return redirect(url_for('admin.parents'))
 
-    if ParentStudent.query.filter_by(parent_id=parent_id,
-                                      student_id=student_id).first():
+    if ParentStudent.query.filter_by(parent_id=parent_id, student_id=student_id).first():
         flash('This child is already linked to this parent.', 'warning')
         return redirect(url_for('admin.parents'))
 
     student = db.session.get(Student, student_id)
-    if not student:
+    if not student or student.college_id != _admin_college_id():
         flash('Student not found.', 'danger')
         return redirect(url_for('admin.parents'))
 
-    db.session.add(ParentStudent(parent_id=parent_id, student_id=student_id,
+    db.session.add(ParentStudent(college_id=_admin_college_id(), parent_id=parent_id, student_id=student_id,
                                   relationship=relationship))
     db.session.commit()
     flash(f'Linked {student.user.name} to {parent_user.name}.', 'success')
@@ -820,6 +936,8 @@ def link_parent_child(parent_id):
 @admin_required
 def unlink_parent_child(link_id):
     link = ParentStudent.query.get_or_404(link_id)
+    if link.student.college_id != _admin_college_id():
+        abort(404)
     child_name = link.student.user.name
     db.session.delete(link)
     db.session.commit()
@@ -831,7 +949,7 @@ def unlink_parent_child(link_id):
 @login_required
 @admin_required
 def delete_parent(parent_id):
-    user = User.query.filter_by(id=parent_id, role='parent').first_or_404()
+    user = _scoped_user_query().filter_by(id=parent_id, role='parent').first_or_404()
     ParentStudent.query.filter_by(parent_id=parent_id).delete()
     db.session.delete(user)
     db.session.commit()
@@ -856,9 +974,16 @@ def trigger_class_alerts():
     today_dow = today.weekday()
     cutoff = now.replace(second=0, microsecond=0)
 
-    slots = TimetableSlot.query.filter_by(
-        day_of_week=today_dow, slot_type='class'
-    ).all()
+    slots = (
+        TimetableSlot.query
+        .join(Department, TimetableSlot.department_id == Department.id)
+        .filter(
+            Department.college_id == _admin_college_id(),
+            TimetableSlot.day_of_week == today_dow,
+            TimetableSlot.slot_type == 'class',
+        )
+        .all()
+    )
 
     total_sent = 0
     for slot in slots:
@@ -907,7 +1032,7 @@ def trigger_class_alerts():
             department=dept_name,
             semester=slot.semester or 0,
         )
-        db.session.add(ClassAlert(slot_id=slot.id, alert_date=today,
+        db.session.add(ClassAlert(college_id=_admin_college_id(), slot_id=slot.id, alert_date=today,
                                    recipient_count=sent, triggered_by='manual'))
         db.session.commit()
         total_sent += sent
@@ -923,7 +1048,16 @@ def trigger_class_alerts():
 @admin_required
 def settings():
     cs = CollegeSetting.get()
-    return render_template('admin/settings.html', cs=cs)
+    setup_report = evaluate_production_setup(current_app, current_user.college)
+    return render_template('admin/settings.html', cs=cs, setup_report=setup_report)
+
+
+@admin_bp.route('/system-setup', methods=['GET'])
+@login_required
+@admin_required
+def system_setup():
+    setup_report = evaluate_production_setup(current_app, current_user.college)
+    return render_template('admin/system_setup.html', setup_report=setup_report)
 
 
 @admin_bp.route('/settings/save', methods=['POST'])
@@ -1022,17 +1156,21 @@ def _id_template_dir():
     return _ID_TEMPLATE_DIR
 
 
-def _save_template_file(file_obj, filename):
-    path = os.path.join(_id_template_dir(), secure_filename(filename))
+def _save_template_file(file_obj, filename, college):
+    college_slug = secure_filename((college.code or f'college-{college.id}').lower()) or f'college-{college.id}'
+    rel_dir = os.path.join('uploads', 'id_templates', college_slug)
+    abs_dir = os.path.join(current_app.root_path, 'static', rel_dir)
+    os.makedirs(abs_dir, exist_ok=True)
+    path = os.path.join(abs_dir, secure_filename(filename))
     file_obj.save(path)
-    return 'uploads/id_templates/' + secure_filename(filename)
+    return f"{rel_dir}/{secure_filename(filename)}"
 
 
 @admin_bp.route('/id-card-template', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def id_card_template():
-    tpl = IDCardTemplate.get()
+    tpl = IDCardTemplate.get(current_user.college)
     if request.method == 'POST':
         tpl.principal_name  = request.form.get('principal_name', '').strip() or tpl.principal_name
         tpl.principal_title = request.form.get('principal_title', 'Principal').strip()
@@ -1052,15 +1190,15 @@ def id_card_template():
 
         logo = request.files.get('logo')
         if logo and logo.filename:
-            tpl.logo_path = _save_template_file(logo, 'logo.png')
+            tpl.logo_path = _save_template_file(logo, 'logo.png', current_user.college)
 
         sig = request.files.get('principal_signature')
         if sig and sig.filename:
-            tpl.principal_signature_path = _save_template_file(sig, 'signature.png')
+            tpl.principal_signature_path = _save_template_file(sig, 'signature.png', current_user.college)
 
         college_img = request.files.get('college_image')
         if college_img and college_img.filename:
-            tpl.college_image_path = _save_template_file(college_img, 'college_image.jpg')
+            tpl.college_image_path = _save_template_file(college_img, 'college_image.jpg', current_user.college)
 
         tpl.updated_at = utc_now_naive()
         db.session.commit()
@@ -1082,6 +1220,7 @@ def id_cards():
     q             = request.args.get('q', '').strip()
 
     query = (StudentIDCard.query
+             .filter(StudentIDCard.college_id == _admin_college_id())
              .join(Student)
              .join(User, Student.user_id == User.id)
              .join(Department, Student.department_id == Department.id)
@@ -1114,14 +1253,23 @@ def id_cards():
 
     pagination  = query.paginate(page=page, per_page=per_page, error_out=False)
     cards       = pagination.items
-    departments = Department.query.order_by(Department.name).all()
-    tpl         = IDCardTemplate.get()
+    departments = _scoped_department_query().order_by(Department.name).all()
+    tpl         = IDCardTemplate.get(current_user.college)
     cs          = CollegeSetting.get()
     counts = {
-        'all':      StudentIDCard.query.count(),
-        'pending':  StudentIDCard.query.filter_by(status='pending').count(),
-        'approved': StudentIDCard.query.filter_by(status='approved').count(),
-        'rejected': StudentIDCard.query.filter_by(status='rejected').count(),
+        'all': StudentIDCard.query.join(Student).filter(Student.college_id == _admin_college_id()).count(),
+        'pending': StudentIDCard.query.join(Student).filter(
+            Student.college_id == _admin_college_id(),
+            StudentIDCard.status == 'pending',
+        ).count(),
+        'approved': StudentIDCard.query.join(Student).filter(
+            Student.college_id == _admin_college_id(),
+            StudentIDCard.status == 'approved',
+        ).count(),
+        'rejected': StudentIDCard.query.join(Student).filter(
+            Student.college_id == _admin_college_id(),
+            StudentIDCard.status == 'rejected',
+        ).count(),
     }
     return render_template('admin/id_cards.html',
                            cards=cards, pagination=pagination,
@@ -1135,14 +1283,14 @@ def id_cards():
 @login_required
 @admin_required
 def approve_id_card(cid):
-    card = StudentIDCard.query.get_or_404(cid)
+    card = _scoped_model_or_404(StudentIDCard, cid)
     card.status      = 'approved'
     card.reviewed_at = utc_now_naive()
     card.reviewed_by = current_user.id
     card.rejection_note = None
     if not card.card_number:
         s = card.student
-        card.card_number = f"{s.department.code}-{s.roll_number}"
+        card.card_number = f"{current_user.college.code}-{s.department.code}-{s.roll_number}"
     db.session.commit()
     flash(f'ID card approved for {card.student.user.name}.', 'success')
     return redirect(url_for('admin.id_cards', status='pending'))
@@ -1152,7 +1300,7 @@ def approve_id_card(cid):
 @login_required
 @admin_required
 def reject_id_card(cid):
-    card = StudentIDCard.query.get_or_404(cid)
+    card = _scoped_model_or_404(StudentIDCard, cid)
     card.status         = 'rejected'
     card.reviewed_at    = utc_now_naive()
     card.reviewed_by    = current_user.id
@@ -1167,8 +1315,8 @@ def reject_id_card(cid):
 @admin_required
 def view_id_card(cid):
     from utils.qr_utils import make_id_card_qr, get_map_tile_b64
-    card    = StudentIDCard.query.get_or_404(cid)
-    tpl     = IDCardTemplate.get()
+    card    = _scoped_model_or_404(StudentIDCard, cid)
+    tpl     = IDCardTemplate.get(current_user.college)
     cs      = CollegeSetting.get()
     qr_img  = make_id_card_qr(card.student, card)
     map_url = (get_map_tile_b64(tpl.map_lat, tpl.map_lng)
@@ -1195,42 +1343,48 @@ def _fmt_size(n):
 @admin_required
 def file_manager():
     from models.content import TeacherContent
-    upload_dir = current_app.config['CONTENT_UPLOAD_FOLDER']
-    os.makedirs(upload_dir, exist_ok=True)
+    for upload_dir in content_storage_dirs(current_app):
+        os.makedirs(upload_dir, exist_ok=True)
 
     # Build a lookup: rel_path → content record
-    all_content = TeacherContent.query.all()
+    all_content = TeacherContent.query.filter_by(college_id=_admin_college_id()).all()
     path_map    = {c.file_path: c for c in all_content if c.file_path}
 
     type_filter = request.args.get('type', '')
     q           = request.args.get('q', '').strip().lower()
 
     files = []
-    for fname in sorted(os.listdir(upload_dir)):
-        fpath = os.path.join(upload_dir, fname)
-        if not os.path.isfile(fpath):
-            continue
-        rel   = f'uploads/content/{fname}'
-        ext   = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
-        size  = os.path.getsize(fpath)
-        mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
-        ct    = path_map.get(rel)
+    seen = set()
+    for upload_dir in content_storage_dirs(current_app):
+        for fname in sorted(os.listdir(upload_dir)):
+            if fname in seen:
+                continue
+            fpath = os.path.join(upload_dir, fname)
+            if not os.path.isfile(fpath):
+                continue
+            seen.add(fname)
+            rel   = f'uploads/content/{fname}'
+            ext   = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+            size  = os.path.getsize(fpath)
+            mtime = datetime.fromtimestamp(os.path.getmtime(fpath))
+            ct    = path_map.get(rel)
 
-        if type_filter and ext != type_filter:
-            continue
-        if q and q not in fname.lower() and (not ct or q not in ct.title.lower()):
-            continue
+            if type_filter and ext != type_filter:
+                continue
+            if q and q not in fname.lower() and (not ct or q not in ct.title.lower()):
+                continue
 
-        files.append({
-            'name':    fname,
-            'rel':     rel,
-            'ext':     ext,
-            'size':    size,
-            'size_str': _fmt_size(size),
-            'mtime':   mtime,
-            'content': ct,
-            'orphan':  ct is None,
-        })
+            files.append({
+                'name':    fname,
+                'rel':     rel,
+                'ext':     ext,
+                'size':    size,
+                'size_str': _fmt_size(size),
+                'mtime':   mtime,
+                'content': ct,
+                'orphan':  ct is None,
+                'location': 'private' if os.path.abspath(upload_dir) == os.path.abspath(current_app.config['CONTENT_UPLOAD_FOLDER']) else 'legacy',
+            })
 
     total_size  = sum(f['size'] for f in files)
     orphan_count = sum(1 for f in files if f['orphan'])
@@ -1261,10 +1415,10 @@ def delete_file():
     abs_path = resolve_content_path(current_app, rel)
 
     # Clear DB reference
-    TeacherContent.query.filter_by(file_path=rel).update({'file_path': None})
+    TeacherContent.query.filter_by(college_id=_admin_college_id(), file_path=rel).update({'file_path': None})
 
     # Remove physical file
-    if os.path.isfile(abs_path):
+    if abs_path and os.path.isfile(abs_path):
         os.remove(abs_path)
         flash(f'Deleted: {os.path.basename(rel)}', 'info')
     else:
@@ -1284,13 +1438,17 @@ def bulk_delete_files():
 
     if scope == 'orphans':
         # Collect all files on disk that have no matching content record
-        upload_dir  = current_app.config['CONTENT_UPLOAD_FOLDER']
-        linked      = {c.file_path for c in TeacherContent.query.all() if c.file_path}
+        linked      = {c.file_path for c in TeacherContent.query.filter_by(college_id=_admin_college_id()).all() if c.file_path}
         rels = []
-        for fname in os.listdir(upload_dir):
-            rel = 'uploads/content/' + fname
-            if rel not in linked:
-                rels.append(rel)
+        seen = set()
+        for upload_dir in content_storage_dirs(current_app):
+            for fname in os.listdir(upload_dir):
+                if fname in seen:
+                    continue
+                rel = 'uploads/content/' + fname
+                if rel not in linked:
+                    rels.append(rel)
+                seen.add(fname)
 
     if not rels:
         flash('No files to delete.', 'warning')
@@ -1301,8 +1459,8 @@ def bulk_delete_files():
         if not is_valid_content_relpath(rel):
             continue
         abs_path = resolve_content_path(current_app, rel)
-        TeacherContent.query.filter_by(file_path=rel).update({'file_path': None})
-        if os.path.isfile(abs_path):
+        TeacherContent.query.filter_by(college_id=_admin_college_id(), file_path=rel).update({'file_path': None})
+        if abs_path and os.path.isfile(abs_path):
             os.remove(abs_path)
             deleted += 1
 
@@ -1329,6 +1487,78 @@ def view_file():
     )
 
 
+@admin_bp.route('/files/preview')
+@login_required
+@admin_required
+def preview_file():
+    import html
+    from types import SimpleNamespace
+    from utils.file_preview import (
+        pptx_to_html,
+        docx_to_html,
+        preview_exception_message,
+        infer_preview_type,
+    )
+    from models.content import TeacherContent
+
+    rel = request.args.get('rel', '').strip()
+    if not is_valid_content_relpath(rel):
+        flash('Invalid file path.', 'danger')
+        return redirect(url_for('admin.file_manager'))
+
+    abs_path = resolve_content_path(current_app, rel)
+    if not abs_path or not os.path.isfile(abs_path):
+        flash('File not found.', 'warning')
+        return redirect(url_for('admin.file_manager'))
+
+    item = TeacherContent.query.filter_by(college_id=_admin_college_id(), file_path=rel).first()
+    ext = infer_preview_type(rel, abs_path)
+    file_url = url_for('admin.view_file', rel=rel, download=0)
+    download_url = url_for('admin.view_file', rel=rel)
+    preview_type = ext or 'content'
+    preview_html = None
+    error = None
+
+    if ext == 'pptx':
+        try:
+            preview_html = pptx_to_html(abs_path)
+        except Exception as e:
+            error = preview_exception_message(ext, e)
+    elif ext in ('docx', 'doc'):
+        try:
+            preview_html = docx_to_html(abs_path)
+        except Exception as e:
+            error = preview_exception_message(ext, e)
+    elif ext in ('txt', 'csv'):
+        try:
+            with open(abs_path, 'r', encoding='utf-8', errors='replace') as fh:
+                preview_html = f"<pre class=\"text-file-preview mb-0\">{html.escape(fh.read())}</pre>"
+        except Exception as e:
+            error = preview_exception_message(ext, e)
+
+    preview_item = SimpleNamespace(
+        title=item.title if item else os.path.basename(abs_path),
+        content_type=item.content_type if item else 'note',
+        subject=item.subject if item else None,
+        due_date=getattr(item, 'due_date', None) if item else None,
+        marks=getattr(item, 'marks', None) if item else None,
+        body=item.body if item else None,
+    )
+
+    return render_template(
+        'student/content_preview.html',
+        item=preview_item,
+        preview_type=preview_type,
+        file_url=file_url,
+        download_url=download_url,
+        preview_html=preview_html,
+        error=error,
+        back_url=url_for('admin.file_manager'),
+        show_note_body=False,
+        preview_heading='Admin File Preview',
+    )
+
+
 # ── Admin: marksheet management ───────────────────────────────────────────────
 
 @admin_bp.route('/marksheets')
@@ -1339,7 +1569,7 @@ def marksheet_list():
     dept_id = request.args.get('dept_id', type=int)
     sem     = request.args.get('sem', type=int)
 
-    query = Student.query.join(User, Student.user_id == User.id)
+    query = Student.query.join(User, Student.user_id == User.id).filter(Student.college_id == _admin_college_id())
     if q:
         query = query.filter(
             db.or_(User.name.ilike(f'%{q}%'), Student.roll_number.ilike(f'%{q}%'))
@@ -1350,8 +1580,8 @@ def marksheet_list():
         query = query.filter(Student.semester == sem)
 
     students    = query.order_by(Student.roll_number).all()
-    departments = Department.query.order_by(Department.name).all()
-    semesters   = sorted({s.semester for s in Student.query.all()})
+    departments = _scoped_department_query().order_by(Department.name).all()
+    semesters   = sorted({s.semester for s in _scoped_student_query().all()})
 
     return render_template('admin/marksheets.html',
                            students=students, departments=departments,
@@ -1364,7 +1594,7 @@ def marksheet_list():
 @admin_required
 def admin_marksheet(student_id):
     from routes.exam import build_marksheet_data
-    student = Student.query.get_or_404(student_id)
+    student = _scoped_model_or_404(Student, student_id)
     data    = build_marksheet_data(student)
     return render_template('exam/marksheet.html', **data, is_admin=True, is_parent=False)
 
@@ -1377,10 +1607,10 @@ def admin_marksheet(student_id):
 def marksheet_signatures():
     from models.marksheet_signature import MarksheetSignature
 
-    departments = Department.query.order_by(Department.name).all()
-    principal   = MarksheetSignature.query.filter_by(role='principal').first()
+    departments = _scoped_department_query().order_by(Department.name).all()
+    principal   = MarksheetSignature.query.filter_by(college_id=_admin_college_id(), role='principal').first()
     hod_map   = {s.department_id: s for s in
-                 MarksheetSignature.query.filter_by(role='hod').all()}
+                 MarksheetSignature.query.filter_by(college_id=_admin_college_id(), role='hod').all()}
 
     return render_template('admin/marksheet_signatures.html',
                            departments=departments,
@@ -1415,10 +1645,10 @@ def save_marksheet_signature():
 
     # Upsert
     sig = MarksheetSignature.query.filter_by(
-        role=role, department_id=dept_id, semester=None
+        college_id=_admin_college_id(), role=role, department_id=dept_id, semester=None
     ).first()
     if not sig:
-        sig = MarksheetSignature(role=role, department_id=dept_id, semester=None)
+        sig = MarksheetSignature(college_id=_admin_college_id(), role=role, department_id=dept_id, semester=None)
         db.session.add(sig)
 
     sig.teacher_id  = None
@@ -1446,7 +1676,7 @@ def save_marksheet_signature():
 @admin_required
 def delete_marksheet_signature(sig_id):
     from models.marksheet_signature import MarksheetSignature
-    sig = MarksheetSignature.query.get_or_404(sig_id)
+    sig = MarksheetSignature.query.filter_by(id=sig_id, college_id=_admin_college_id()).first_or_404()
 
     if sig.sign_path:
         abs_path = os.path.join(current_app.static_folder, sig.sign_path)

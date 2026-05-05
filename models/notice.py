@@ -4,8 +4,13 @@ from utils.time import utc_now_naive
 
 class Notice(db.Model):
     __tablename__ = 'notices'
+    __table_args__ = (
+        db.Index('ix_notices_college_role_pinned_created', 'college_id', 'target_role', 'is_pinned', 'created_at'),
+        db.Index('ix_notices_college_expires_at', 'college_id', 'expires_at'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     category = db.Column(

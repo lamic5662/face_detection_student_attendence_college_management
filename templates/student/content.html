@@ -123,12 +123,32 @@
           {% endif %}
         </div>
 
+        {% set submission = submission_map.get(item.id) if submission_map is defined else None %}
+        {% if item.content_type == 'assignment' %}
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% if submission %}
+          <span class="badge {% if submission.status == 'reviewed' %}bg-success-subtle text-success{% else %}bg-primary-subtle text-primary{% endif %}">
+            <i class="bi bi-{% if submission.status == 'reviewed' %}check2-circle{% else %}cloud-check{% endif %} me-1"></i>
+            {{ 'Reviewed' if submission.status == 'reviewed' else 'Submitted' }}
+          </span>
+          {% if submission.is_late %}
+          <span class="badge bg-danger-subtle text-danger"><i class="bi bi-clock-history me-1"></i>Late</span>
+          {% endif %}
+          {% if submission.marks_awarded is not none %}
+          <span class="badge bg-warning-subtle text-warning"><i class="bi bi-star-fill me-1"></i>{{ submission.marks_awarded }}{% if item.marks %}/{{ item.marks }}{% endif %}</span>
+          {% endif %}
+          {% else %}
+          <span class="badge bg-secondary-subtle text-secondary"><i class="bi bi-hourglass-split me-1"></i>Not submitted</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
         {# attachment buttons #}
         <div class="d-flex gap-2 mt-auto">
           <a href="{{ url_for('student.content_preview', cid=item.id) }}"
              class="btn btn-sm btn-primary flex-fill">
-            <i class="bi bi-{% if item.content_type == 'note' %}journal-text{% else %}eye-fill{% endif %} me-1"></i>
-            {% if item.content_type == 'note' %}Read Note{% else %}View{% endif %}
+            <i class="bi bi-{% if item.content_type == 'note' %}journal-text{% elif item.content_type == 'assignment' %}clipboard-check{% else %}eye-fill{% endif %} me-1"></i>
+            {% if item.content_type == 'note' %}Read Note{% elif item.content_type == 'assignment' %}Open Assignment{% else %}View{% endif %}
           </a>
           {% if item.file_path %}
           <a href="{{ url_for('student.content_file', cid=item.id) }}"

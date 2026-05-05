@@ -8,6 +8,9 @@
 {% endblock %}
 
 {% block content %}
+{% set visible_widgets = dashboard_prefs.visible_widget_keys if dashboard_prefs else [] %}
+{% include "partials/dashboard_customize.html" %}
+
 {% if not children_data %}
 <div class="card border-0 shadow-sm text-center py-5">
   <i class="bi bi-person-plus fs-1 mb-3 d-block text-muted opacity-25"></i>
@@ -16,6 +19,7 @@
 </div>
 {% else %}
 
+{% if 'children_overview' in visible_widgets %}
 {% for item in children_data %}
 {% set student = item.student %}
 <!-- Child Card -->
@@ -64,6 +68,10 @@
              class="btn btn-light fw-semibold">
             <i class="bi bi-eye-fill me-1"></i>Full Report
           </a>
+          <a href="{{ url_for('parent.parent_assignments', child_id=student.id) }}"
+             class="btn btn-outline-light fw-semibold">
+            <i class="bi bi-clipboard-check me-1"></i>Assignments
+          </a>
           <a href="{{ url_for('parent.parent_marksheet', student_id=student.id) }}"
              class="btn btn-outline-light fw-semibold">
             <i class="bi bi-award-fill me-1"></i>Marksheet
@@ -94,6 +102,21 @@
         <span class="badge bg-info text-dark ms-1">{{ e.title }} — {{ e.exam_date.strftime('%d %b') }}</span>
         {% endfor %}
       </span>
+    </div>
+    {% endif %}
+
+    {% if item.assignment_rows %}
+    <div class="alert alert-secondary border-0 py-2 px-3 mb-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+      <div>
+        <i class="bi bi-clipboard-check me-2"></i>
+        <strong>Assignments:</strong>
+        <span class="badge bg-secondary-subtle text-secondary ms-1">{{ item.assignment_summary.pending }} pending</span>
+        <span class="badge bg-primary-subtle text-primary ms-1">{{ item.assignment_summary.submitted }} submitted</span>
+        <span class="badge bg-success-subtle text-success ms-1">{{ item.assignment_summary.reviewed }} reviewed</span>
+      </div>
+      <a href="{{ url_for('parent.parent_assignments', child_id=student.id) }}" class="btn btn-sm btn-outline-secondary">
+        View Work
+      </a>
     </div>
     {% endif %}
 
@@ -167,9 +190,10 @@
   </div>
 </div>
 {% endfor %}
+{% endif %}
 
 <!-- Notices -->
-{% if notices %}
+{% if 'college_notices' in visible_widgets and notices %}
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
     <h6 class="fw-semibold mb-0"><i class="bi bi-megaphone-fill text-warning me-2"></i>College Notices</h6>

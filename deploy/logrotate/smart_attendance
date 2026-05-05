@@ -1,0 +1,10 @@
+/opt/smart_attendance/shared/logs/*.log {
+    daily
+    missingok
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    copytruncate
+    create 0640 www-data www-data
+}

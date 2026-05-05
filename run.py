@@ -1,27 +1,32 @@
 import os
 from app import create_app
 from extensions import db
+from utils.system_setup import evaluate_production_setup
 from utils.time import utc_now_naive
 
 # Import all models so Flask-Migrate can detect them
 from models import (  # noqa: F401
-    User, Department, Student, Teacher, Subject,
+    College, User, Department, Student, Teacher, Subject,
     AttendanceSession, AttendanceRecord, LeaveRequest,
     Notice, TimetableSlot, Exam, Mark, FeeStructure, FeePayment,
 )
 from models.parent import ParentStudent, TeacherStatus, ClassAlert  # noqa: F401
 from models.location import StudentLocation  # noqa: F401
 from models.setting import CollegeSetting   # noqa: F401
+from models.academic_calendar import AcademicCalendarEvent  # noqa: F401
 
 app = create_app()
 
 
 @app.cli.command('init-db')
 def init_db():
-    """Create all tables and seed default departments."""
+    """Create all tables and seed a default college with departments."""
     with app.app_context():
         db.create_all()
         print('Tables created.')
+
+        college = College.ensure_default()
+        print(f'Using college: {college.name} [{college.code}]')
 
         depts = [
             ('Bachelor of Computer Applications', 'BCA'),
@@ -31,32 +36,75 @@ def init_db():
             ('Bachelor of Engineering', 'BE'),
         ]
         for name, code in depts:
-            if not Department.query.filter_by(code=code).first():
-                db.session.add(Department(name=name, code=code))
+            if not Department.query.filter_by(college_id=college.id, code=code).first():
+                db.session.add(Department(college_id=college.id, name=name, code=code))
 
         db.session.commit()
         print('Default departments seeded.')
-        if not User.query.filter_by(role='admin').first():
+        if not User.query.filter_by(college_id=college.id, role='admin').first():
             print('No admin account exists yet. Run: flask create-admin')
         else:
             print('Admin account already exists.')
+
+
+@app.cli.command('create-college')
+def create_college():
+    """Create a new college tenant."""
+    with app.app_context():
+        name = input('College name: ').strip()
+        code = input('College code: ').strip().upper()
+        subdomain = input('Subdomain (optional): ').strip().lower() or None
+
+        if not name or not code:
+            print('College name and code are required.')
+            return
+        if College.query.filter_by(code=code).first():
+            print(f'College code {code} already exists.')
+            return
+        if subdomain and College.query.filter_by(subdomain=subdomain).first():
+            print(f'Subdomain {subdomain} already exists.')
+            return
+
+        college = College(name=name, code=code, subdomain=subdomain)
+        db.session.add(college)
+        db.session.flush()
+        db.session.add(CollegeSetting(college_id=college.id, college_name=name))
+        db.session.commit()
+        print(f'College {name} [{code}] created.')
 
 
 @app.cli.command('create-admin')
 def create_admin():
     """Interactively create a new admin user."""
     with app.app_context():
+        colleges = College.query.filter_by(is_active=True).order_by(College.name).all()
+        if not colleges:
+            print('No active college exists. Run: flask create-college')
+            return
+
+        if len(colleges) == 1:
+            college = colleges[0]
+        else:
+            print('Available colleges:')
+            for college_option in colleges:
+                print(f'  - {college_option.code}: {college_option.name}')
+            college_code = input('College code: ').strip().upper()
+            college = College.query.filter_by(code=college_code, is_active=True).first()
+            if college is None:
+                print(f'College {college_code} not found.')
+                return
+
         email = input('Admin email: ').strip().lower()
         name  = input('Full name: ').strip()
         pw    = input('Password: ').strip()
-        if User.query.filter_by(email=email).first():
-            print(f'User {email} already exists.')
+        if User.query.filter_by(college_id=college.id, email=email).first():
+            print(f'User {email} already exists in {college.code}.')
             return
-        u = User(name=name, email=email, role='admin', is_active=True)
+        u = User(college_id=college.id, name=name, email=email, role='admin', is_active=True)
         u.set_password(pw)
         db.session.add(u)
         db.session.commit()
-        print(f'Admin {email} created.')
+        print(f'Admin {email} created for {college.name}.')
 
 
 @app.cli.command('check-classes')
@@ -136,6 +184,7 @@ def check_classes():
             )
 
             alert = ClassAlert(
+                college_id=slot.department.college_id,
                 slot_id=slot.id,
                 alert_date=today,
                 recipient_count=sent,
@@ -147,6 +196,32 @@ def check_classes():
             print(f'  Alert sent: {slot.subject.name} @ {slot_time} — {sent} recipients')
 
         print(f'check-classes done. Total notifications sent: {total_sent}')
+
+
+@app.cli.command('doctor')
+def doctor():
+    """Run deployment-readiness checks."""
+    with app.app_context():
+        report = evaluate_production_setup(app)
+
+    print('Production doctor report')
+    print('------------------------')
+    if report['failures']:
+        print('FAIL')
+        for item in report['checks']:
+            if item['status'] == 'fail':
+                print(f"  - {item['label']}: {item['detail']}")
+    else:
+        print('PASS')
+
+    if report['warnings']:
+        print('Warnings')
+        for item in report['checks']:
+            if item['status'] == 'warning':
+                print(f"  - {item['label']}: {item['detail']}")
+
+    if report['failures']:
+        raise SystemExit(1)
 
 
 if __name__ == '__main__':

@@ -4,8 +4,13 @@ from utils.time import utc_now_naive
 
 class Exam(db.Model):
     __tablename__ = 'exams'
+    __table_args__ = (
+        db.Index('ix_exams_college_subject_date', 'college_id', 'subject_id', 'exam_date'),
+        db.Index('ix_exams_college_creator_date', 'college_id', 'created_by', 'exam_date'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     subject_id = db.Column(db.Integer, db.ForeignKey('subjects.id'), nullable=False)
     title = db.Column(db.String(150), nullable=False)
     exam_type = db.Column(
@@ -50,6 +55,7 @@ class Mark(db.Model):
     __tablename__ = 'marks'
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     exam_id = db.Column(db.Integer, db.ForeignKey('exams.id'), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey('students.id'), nullable=False)
     marks_obtained = db.Column(db.Float, nullable=True)
@@ -64,6 +70,8 @@ class Mark(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('exam_id', 'student_id', name='uq_exam_student'),
+        db.Index('ix_marks_college_student', 'college_id', 'student_id'),
+        db.Index('ix_marks_college_exam', 'college_id', 'exam_id'),
     )
 
     @property

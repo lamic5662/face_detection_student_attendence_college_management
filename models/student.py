@@ -6,10 +6,15 @@ from utils.time import utc_now_naive
 
 class Student(db.Model):
     __tablename__ = 'students'
+    __table_args__ = (
+        db.UniqueConstraint('college_id', 'roll_number', name='uq_students_college_roll_number'),
+        db.Index('ix_students_college_department_semester', 'college_id', 'department_id', 'semester'),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
-    roll_number = db.Column(db.String(20), unique=True, nullable=False)
+    roll_number = db.Column(db.String(20), nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=False)
     semester = db.Column(db.Integer, nullable=False)
     # Extended profile

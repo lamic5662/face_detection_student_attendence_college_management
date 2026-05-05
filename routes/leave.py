@@ -37,6 +37,7 @@ def _auto_notify_teacher_leave(lr: LeaveRequest):
     dept_name  = teacher.department.name if teacher.department else 'your department'
 
     notice = Notice(
+        college_id   = current_user.college_id,
         title      = f'Class Cancellation — {teacher.user.name} on Leave',
         content    = (
             f'{teacher.user.name} ({teacher.designation or "Faculty"}, {dept_name}) '
@@ -64,11 +65,12 @@ def _auto_notify_teacher_leave(lr: LeaveRequest):
 def student_leaves():
     student  = _current_student()
     subjects = Subject.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester
     ).all()
     leaves = (LeaveRequest.query
-              .filter_by(student_id=student.id)
+              .filter_by(college_id=student.college_id, student_id=student.id)
               .order_by(LeaveRequest.created_at.desc())
               .all())
     return render_template('student/leaves.html',
@@ -112,13 +114,14 @@ def apply_leave():
         subject_id = None
 
     lr = LeaveRequest(
+        college_id = student.college_id,
         leave_type = leave_type,
         student_id = student.id,
         subject_id = subject_id,
         from_date  = fd,
         to_date    = td,
         reason     = reason,
-        ref_number = LeaveRequest.generate_ref(),
+        ref_number = LeaveRequest.generate_ref(student.college),
     )
     db.session.add(lr)
     db.session.commit()
@@ -130,7 +133,7 @@ def apply_leave():
 @login_required
 @student_required
 def cancel_leave(lid):
-    lr = LeaveRequest.query.get_or_404(lid)
+    lr = LeaveRequest.query.filter_by(id=lid, college_id=_current_student().college_id).first_or_404()
     if lr.student_id != _current_student().id:
         abort(403)
     if lr.status != 'pending':
@@ -155,13 +158,15 @@ def teacher_leaves():
 
     # Student subject-leave requests waiting for this teacher
     stu_pending  = (LeaveRequest.query
-                    .filter(LeaveRequest.subject_id.in_(subject_ids),
+                    .filter(LeaveRequest.college_id == teacher.college_id,
+                            LeaveRequest.subject_id.in_(subject_ids),
                             LeaveRequest.leave_type == 'student_subject',
                             LeaveRequest.status     == 'pending')
                     .order_by(LeaveRequest.created_at.asc()).all())
 
     stu_reviewed = (LeaveRequest.query
-                    .filter(LeaveRequest.subject_id.in_(subject_ids),
+                    .filter(LeaveRequest.college_id == teacher.college_id,
+                            LeaveRequest.subject_id.in_(subject_ids),
                             LeaveRequest.leave_type == 'student_subject',
                             LeaveRequest.status     != 'pending')
                     .order_by(LeaveRequest.reviewed_at.desc())
@@ -169,7 +174,7 @@ def teacher_leaves():
 
     # Teacher's own leave applications to admin
     own_leaves = (LeaveRequest.query
-                  .filter_by(teacher_id=teacher.id, leave_type='teacher')
+                  .filter_by(college_id=teacher.college_id, teacher_id=teacher.id, leave_type='teacher')
                   .order_by(LeaveRequest.created_at.desc()).all())
 
     subjects = teacher.subjects
@@ -204,12 +209,13 @@ def teacher_apply_leave():
         return redirect(url_for('leave.teacher_leaves'))
 
     lr = LeaveRequest(
+        college_id = teacher.college_id,
         leave_type = 'teacher',
         teacher_id = teacher.id,
         from_date  = fd,
         to_date    = td,
         reason     = reason,
-        ref_number = LeaveRequest.generate_ref(),
+        ref_number = LeaveRequest.generate_ref(teacher.college),
     )
     db.session.add(lr)
     db.session.commit()
@@ -221,7 +227,7 @@ def teacher_apply_leave():
 @login_required
 @teacher_required
 def review_leave(lid):
-    lr = LeaveRequest.query.get_or_404(lid)
+    lr = LeaveRequest.query.filter_by(id=lid, college_id=_current_teacher().college_id).first_or_404()
     if (lr.leave_type != 'student_subject'
             or lr.subject.teacher_id != _current_teacher().id):
         abort(403)
@@ -266,19 +272,19 @@ def admin_leaves():
     tab = request.args.get('tab', 'student')  # 'student' | 'teacher'
 
     stu_pending  = (LeaveRequest.query
-                    .filter_by(leave_type='student_fullday', status='pending')
+                    .filter_by(college_id=current_user.college_id, leave_type='student_fullday', status='pending')
                     .order_by(LeaveRequest.created_at.asc()).all())
     stu_reviewed = (LeaveRequest.query
-                    .filter_by(leave_type='student_fullday')
+                    .filter_by(college_id=current_user.college_id, leave_type='student_fullday')
                     .filter(LeaveRequest.status != 'pending')
                     .order_by(LeaveRequest.reviewed_at.desc())
                     .limit(50).all())
 
     tch_pending  = (LeaveRequest.query
-                    .filter_by(leave_type='teacher', status='pending')
+                    .filter_by(college_id=current_user.college_id, leave_type='teacher', status='pending')
                     .order_by(LeaveRequest.created_at.asc()).all())
     tch_reviewed = (LeaveRequest.query
-                    .filter_by(leave_type='teacher')
+                    .filter_by(college_id=current_user.college_id, leave_type='teacher')
                     .filter(LeaveRequest.status != 'pending')
                     .order_by(LeaveRequest.reviewed_at.desc())
                     .limit(50).all())
@@ -293,7 +299,7 @@ def admin_leaves():
 @login_required
 @admin_required
 def admin_review_leave(lid):
-    lr     = LeaveRequest.query.get_or_404(lid)
+    lr     = LeaveRequest.query.filter_by(id=lid, college_id=current_user.college_id).first_or_404()
     action = request.form.get('action')
     remark = request.form.get('remark', '').strip()
     tab    = 'teacher' if lr.leave_type == 'teacher' else 'student'
@@ -323,7 +329,7 @@ def admin_review_leave(lid):
 @login_required
 @admin_required
 def admin_delete_leave(lid):
-    lr  = LeaveRequest.query.get_or_404(lid)
+    lr  = LeaveRequest.query.filter_by(id=lid, college_id=current_user.college_id).first_or_404()
     tab = 'teacher' if lr.leave_type == 'teacher' else 'student'
     db.session.delete(lr)
     db.session.commit()
@@ -339,7 +345,7 @@ def admin_bulk_delete_leaves():
     scope = request.form.get('scope', 'rejected')   # 'rejected' | 'all_reviewed'
     leave_type = 'teacher' if tab == 'teacher' else 'student_fullday'
 
-    q = LeaveRequest.query.filter_by(leave_type=leave_type)
+    q = LeaveRequest.query.filter_by(college_id=current_user.college_id, leave_type=leave_type)
     if scope == 'rejected':
         q = q.filter_by(status='rejected')
     else:
@@ -359,7 +365,7 @@ def admin_bulk_delete_leaves():
 @leave_bp.route('/leave/<int:lid>/letter')
 @login_required
 def view_letter(lid):
-    lr = LeaveRequest.query.get_or_404(lid)
+    lr = LeaveRequest.query.filter_by(id=lid, college_id=current_user.college_id).first_or_404()
 
     # Permission check
     if current_user.role == 'student':
@@ -376,7 +382,7 @@ def view_letter(lid):
         abort(403)
 
     from models.setting import CollegeSetting
-    cs        = CollegeSetting.get()
+    cs        = CollegeSetting.get(current_user.college)
     back_url  = _back_url_for(lr)
     return render_template('leave/letter.html',
                            lr=lr, cs=cs, back_url=back_url)

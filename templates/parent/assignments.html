@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Assignments{% endblock %}
+{% block page_title %}<i class="bi bi-clipboard-check-fill me-2"></i>Assignments{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+  <div>
+    <h3 class="fw-bold mb-1">Child Assignment Tracker</h3>
+    <div class="text-muted">See pending work, submissions, review status, and scores for linked children.</div>
+  </div>
+  <a href="{{ url_for('parent.dashboard') }}" class="btn btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+  </a>
+</div>
+
+{% if not students %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-person-plus fs-1 d-block mb-3 opacity-25"></i>
+    No linked children found.
+  </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-4">
+    <form method="GET" class="row g-3 align-items-end">
+      <div class="col-lg-5">
+        <label class="form-label fw-semibold">Child</label>
+        <select name="child_id" class="form-select" onchange="this.form.submit()">
+          {% for student in students %}
+          <option value="{{ student.id }}" {% if selected_student and selected_student.id == student.id %}selected{% endif %}>
+            {{ student.user.name }} • {{ student.roll_number }} • Semester {{ student.semester }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-lg-7">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="rounded-4 border bg-light p-3">
+              <div class="small text-uppercase text-secondary fw-semibold">Pending</div>
+              <div class="fs-3 fw-bold">{{ summary.pending }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="rounded-4 border bg-light p-3">
+              <div class="small text-uppercase text-secondary fw-semibold">Submitted</div>
+              <div class="fs-3 fw-bold text-primary">{{ summary.submitted }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="rounded-4 border bg-light p-3">
+              <div class="small text-uppercase text-secondary fw-semibold">Reviewed</div>
+              <div class="fs-3 fw-bold text-success">{{ summary.reviewed }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Assignment</th>
+            <th>Subject</th>
+            <th>Due</th>
+            <th>Status</th>
+            <th>Score</th>
+            <th>Submitted</th>
+            <th class="text-end pe-4">File</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in assignment_rows %}
+          {% set assignment = row.assignment %}
+          {% set submission = row.submission %}
+          <tr>
+            <td class="px-4">
+              <div class="fw-semibold">{{ assignment.title }}</div>
+              {% if assignment.body %}
+              <div class="text-muted small">{{ assignment.body | truncate(120) }}</div>
+              {% endif %}
+            </td>
+            <td class="text-muted small">{{ assignment.subject.name if assignment.subject else '—' }}</td>
+            <td class="small">{% if assignment.due_date %}{{ assignment.due_date.strftime('%d %b %Y') }}{% else %}Open{% endif %}</td>
+            <td>
+              {% if not submission %}
+              <span class="badge bg-secondary-subtle text-secondary">Pending</span>
+              {% elif submission.status == 'reviewed' %}
+              <span class="badge bg-success-subtle text-success">Reviewed</span>
+              {% else %}
+              <span class="badge bg-primary-subtle text-primary">Submitted</span>
+              {% endif %}
+              {% if submission and submission.is_late %}
+              <span class="badge bg-danger-subtle text-danger ms-1">Late</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if submission and submission.marks_awarded is not none %}
+              <span class="fw-semibold">{{ submission.marks_awarded }}{% if assignment.marks %}/{{ assignment.marks }}{% endif %}</span>
+              {% if row.score_pct is not none %}
+              <div class="small text-muted">{{ row.score_pct }}%</div>
+              {% endif %}
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="small text-muted">
+              {% if submission %}
+              {{ submission.submitted_at.strftime('%d %b %Y %H:%M') }}
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              {% if submission and submission.file_path %}
+              <a href="{{ url_for('parent.parent_submission_file', sid=submission.id) }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-download me-1"></i>Work
+              </a>
+              {% else %}
+              <span class="text-muted small">No file</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center text-muted py-5">No assignments available for this child yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

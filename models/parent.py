@@ -7,6 +7,7 @@ class ParentStudent(db.Model):
     __tablename__ = 'parent_students'
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     parent_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     student_id = db.Column(db.Integer, db.ForeignKey('students.id', ondelete='CASCADE'), nullable=False)
     relationship = db.Column(
@@ -20,6 +21,8 @@ class ParentStudent(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('parent_id', 'student_id', name='uq_parent_student'),
+        db.Index('ix_parent_students_college_parent', 'college_id', 'parent_id'),
+        db.Index('ix_parent_students_college_student', 'college_id', 'student_id'),
     )
 
 
@@ -28,6 +31,7 @@ class TeacherStatus(db.Model):
     __tablename__ = 'teacher_statuses'
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     teacher_id = db.Column(db.Integer, db.ForeignKey('teachers.id', ondelete='CASCADE'),
                            unique=True, nullable=False)
     status = db.Column(
@@ -38,6 +42,10 @@ class TeacherStatus(db.Model):
     updated_at = db.Column(db.DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
     teacher = db.relationship('Teacher', backref=db.backref('status_record', uselist=False))
+
+    __table_args__ = (
+        db.Index('ix_teacher_statuses_college_status', 'college_id', 'status'),
+    )
 
     STATUS_LABELS = {
         'on_campus':   ('On Campus',   'success'),
@@ -60,6 +68,7 @@ class ClassAlert(db.Model):
     __tablename__ = 'class_alerts'
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     slot_id = db.Column(db.Integer, db.ForeignKey('timetable_slots.id', ondelete='CASCADE'),
                         nullable=False)
     alert_date = db.Column(db.Date, nullable=False)
@@ -71,4 +80,5 @@ class ClassAlert(db.Model):
 
     __table_args__ = (
         db.UniqueConstraint('slot_id', 'alert_date', name='uq_alert_per_day'),
+        db.Index('ix_class_alerts_college_date', 'college_id', 'alert_date'),
     )

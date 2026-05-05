@@ -156,6 +156,9 @@
                     <div class="fw-semibold small" style="font-size:12px; word-break:break-all">
                       {{ f.name }}
                     </div>
+                    <div class="text-muted" style="font-size:11px">
+                      <span class="badge bg-light text-secondary border">{{ f.location.title() }}</span>
+                    </div>
                     {% if f.orphan %}
                     <span class="badge bg-warning text-dark" style="font-size:10px">
                       <i class="bi bi-exclamation-triangle me-1"></i>Orphaned
@@ -189,9 +192,13 @@
               <td class="text-muted small">{{ f.mtime.strftime('%d %b %Y %H:%M') }}</td>
               <td>
                 <div class="d-flex gap-1">
-                  <a href="{{ url_for('admin.view_file', rel=f.rel, download=0) }}" target="_blank"
-                     class="btn btn-sm btn-outline-secondary py-1 px-2" title="View / Download">
+                  <a href="{{ url_for('admin.preview_file', rel=f.rel) }}"
+                     class="btn btn-sm btn-outline-secondary py-1 px-2" title="Preview in app">
                     <i class="bi bi-eye-fill"></i>
+                  </a>
+                  <a href="{{ url_for('admin.view_file', rel=f.rel) }}"
+                     class="btn btn-sm btn-outline-info py-1 px-2" title="Download file">
+                    <i class="bi bi-download"></i>
                   </a>
                   {% if f.content %}
                   <a href="{{ url_for('teacher.content_edit', cid=f.content.id) }}"

@@ -1,12 +1,36 @@
 import os
 import logging
 from logging.handlers import RotatingFileHandler
+from datetime import timedelta
 from flask import Flask, render_template, jsonify, request
+from flask_login import current_user
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import get_config
 from extensions import db, login_manager, mail, csrf, migrate, compress, limiter
 from services.liveness_service import liveness_manager
 from utils.content_storage import resolve_content_path
+from utils.assignment_storage import resolve_submission_path
 from utils.file_preview import get_missing_preview_dependencies
+from utils.navigation import build_sidebar_navigation
+from utils.tenancy import get_current_college, load_request_college
+from utils.time import utc_now_naive
+
+
+def _host_is_allowed(host: str, allowed_hosts: list[str]) -> bool:
+    host = (host or '').split(':', 1)[0].lower()
+    if not host:
+        return False
+    for allowed in allowed_hosts:
+        candidate = allowed.lower()
+        if candidate == '*':
+            return True
+        if candidate.startswith('.'):
+            suffix = candidate[1:]
+            if host == suffix or host.endswith(f'.{suffix}'):
+                return True
+        elif host == candidate:
+            return True
+    return False
 
 
 def _configure_logging(app: Flask) -> None:
@@ -62,6 +86,7 @@ def _register_blueprints(app: Flask) -> None:
     from routes.leave import leave_bp
     from routes.notice import notice_bp
     from routes.timetable import timetable_bp
+    from routes.calendar import calendar_bp
     from routes.exam import exam_bp
     from routes.fee import fee_bp
     from routes.parent import parent_bp
@@ -75,6 +100,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(leave_bp)
     app.register_blueprint(notice_bp)
     app.register_blueprint(timetable_bp)
+    app.register_blueprint(calendar_bp)
     app.register_blueprint(exam_bp)
     app.register_blueprint(fee_bp)
     app.register_blueprint(parent_bp)
@@ -175,9 +201,12 @@ def _add_health_check(app: Flask) -> None:
 def _validate_runtime_config(app: Flask) -> None:
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(app.config['CONTENT_UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(app.config['ASSIGNMENT_UPLOAD_FOLDER'], exist_ok=True)
 
     if resolve_content_path(app, 'uploads/content/check.txt') is None:
         raise RuntimeError('CONTENT_UPLOAD_FOLDER is invalid or unsafe.')
+    if resolve_submission_path(app, 'uploads/submissions/check.txt') is None:
+        raise RuntimeError('ASSIGNMENT_UPLOAD_FOLDER is invalid or unsafe.')
 
     if not app.debug and not app.testing:
         if not app.config.get('SESSION_COOKIE_SECURE'):
@@ -187,18 +216,46 @@ def _validate_runtime_config(app: Flask) -> None:
 
         storage_uri = app.config.get('RATELIMIT_STORAGE_URI', 'memory://')
         if storage_uri.startswith('memory://'):
-            app.logger.warning(
-                'Rate limiting is using in-memory storage. Use RATELIMIT_STORAGE_URI with Redis or another shared backend in production.'
+            raise RuntimeError(
+                'RATELIMIT_STORAGE_URI must use a shared backend such as Redis in production.'
             )
 
         content_dir = os.path.abspath(app.config['CONTENT_UPLOAD_FOLDER'])
+        assignment_dir = os.path.abspath(app.config['ASSIGNMENT_UPLOAD_FOLDER'])
         static_dir = os.path.abspath(app.static_folder or '')
         if os.path.commonpath([content_dir, static_dir]) == static_dir:
             raise RuntimeError('CONTENT_UPLOAD_FOLDER must not be inside the public static directory.')
+        if os.path.commonpath([assignment_dir, static_dir]) == static_dir:
+            raise RuntimeError('ASSIGNMENT_UPLOAD_FOLDER must not be inside the public static directory.')
+
+        if not app.config.get('ALLOWED_HOSTS'):
+            raise RuntimeError('ALLOWED_HOSTS must be configured in production.')
+
+    root_domain = (app.config.get('MULTI_COLLEGE_ROOT_DOMAIN') or '').strip()
+    if root_domain and ('://' in root_domain or '/' in root_domain):
+        raise RuntimeError('MULTI_COLLEGE_ROOT_DOMAIN must be a bare domain such as example.com.')
+
+    college_code = (app.config.get('DEFAULT_COLLEGE_CODE') or '').strip()
+    if not college_code:
+        raise RuntimeError('DEFAULT_COLLEGE_CODE must not be empty.')
 
 
 def _configure_runtime_services(app: Flask) -> None:
     liveness_manager.configure(app.config.get('LIVENESS_STATE_TTL_SECONDS', 600))
+
+
+def _apply_proxy_fix(app: Flask) -> None:
+    if app.config.get('TRUST_PROXY_HEADERS', True):
+        hops = max(int(app.config.get('TRUSTED_PROXY_HOPS', 1)), 0)
+        if hops > 0:
+            app.wsgi_app = ProxyFix(  # type: ignore[assignment]
+                app.wsgi_app,
+                x_for=hops,
+                x_proto=hops,
+                x_host=hops,
+                x_port=hops,
+                x_prefix=hops,
+            )
 
 
 def create_app(config_override=None) -> Flask:
@@ -206,6 +263,7 @@ def create_app(config_override=None) -> Flask:
 
     cfg = config_override or get_config()
     app.config.from_object(cfg)
+    _apply_proxy_fix(app)
 
     # Extensions
     db.init_app(app)
@@ -228,19 +286,85 @@ def create_app(config_override=None) -> Flask:
     # Exempt AJAX endpoints from CSRF (they send JSON, protected by same-origin)
     @app.before_request
     def _csrf_exempt_ajax():
-        pass  # handled per-route via @csrf.exempt where needed
+        load_request_college()
+        if not app.debug and not app.testing:
+            allowed_hosts = app.config.get('ALLOWED_HOSTS', [])
+            if allowed_hosts and not _host_is_allowed(request.host, allowed_hosts):
+                return render_template('errors/400.html'), 400
 
     @app.context_processor
     def inject_globals():
         from datetime import datetime as _dt
         try:
+            college = get_current_college(optional=True)
             from models.setting import CollegeSetting
-            cs = CollegeSetting.get()
+            from models.notice import Notice
+            from models.notice_read import NoticeRead
+            cs = CollegeSetting.get(college=college) if college is not None else None
+            notification_items = []
+            notification_count = 0
+            sidebar_navigation = None
+
+            if current_user.is_authenticated:
+                notice_query = Notice.query.filter(
+                    Notice.college_id == current_user.college_id,
+                    db.or_(Notice.expires_at == None, Notice.expires_at > utc_now_naive())
+                )
+                if current_user.role == 'student':
+                    notice_query = notice_query.filter(Notice.target_role.in_(['all', 'student']))
+                elif current_user.role == 'teacher':
+                    notice_query = notice_query.filter(Notice.target_role.in_(['all', 'teacher']))
+                elif current_user.role == 'parent':
+                    notice_query = notice_query.filter(Notice.target_role.in_(['all', 'student']))
+
+                recent_cutoff = utc_now_naive() - timedelta(days=7)
+                scoped_query = notice_query.filter(
+                    db.or_(
+                        Notice.is_pinned == True,
+                        Notice.created_at >= recent_cutoff,
+                    )
+                )
+                scoped_query = scoped_query.filter(
+                    ~Notice.read_receipts.any(
+                        db.and_(
+                            NoticeRead.user_id == current_user.id,
+                            NoticeRead.dismissed_at.isnot(None),
+                        )
+                    )
+                )
+                notification_items = (
+                    scoped_query
+                    .order_by(Notice.is_pinned.desc(), Notice.created_at.desc())
+                    .limit(6)
+                    .all()
+                )
+                if notification_items:
+                    read_notice_ids = {
+                        notice_id
+                        for (notice_id,) in db.session.query(NoticeRead.notice_id).filter(
+                            NoticeRead.user_id == current_user.id,
+                            NoticeRead.notice_id.in_([notice.id for notice in notification_items]),
+                        ).all()
+                    }
+                else:
+                    read_notice_ids = set()
+                for notice in notification_items:
+                    notice.is_read_for_current_user = notice.id in read_notice_ids
+
+                notification_count = scoped_query.filter(
+                    ~Notice.read_receipts.any(NoticeRead.user_id == current_user.id)
+                ).count()
+                sidebar_navigation = build_sidebar_navigation(current_user, request.endpoint)
+
             return dict(
-                college_name=cs.college_name,
-                college_lat=cs.latitude if cs.latitude is not None else app.config['COLLEGE_LAT'],
-                college_lng=cs.longitude if cs.longitude is not None else app.config['COLLEGE_LNG'],
+                college_name=cs.college_name if cs is not None else app.config.get('COLLEGE_NAME', 'College'),
+                college_lat=(cs.latitude if cs is not None and cs.latitude is not None else app.config['COLLEGE_LAT']),
+                college_lng=(cs.longitude if cs is not None and cs.longitude is not None else app.config['COLLEGE_LNG']),
                 now=_dt.now,
+                notification_items=notification_items,
+                notification_count=notification_count,
+                sidebar_navigation=sidebar_navigation,
+                current_college=college,
             )
         except Exception:
             return dict(
@@ -248,6 +372,10 @@ def create_app(config_override=None) -> Flask:
                 college_lat=app.config.get('COLLEGE_LAT', 27.7172),
                 college_lng=app.config.get('COLLEGE_LNG', 85.3240),
                 now=_dt.now,
+                notification_items=[],
+                notification_count=0,
+                sidebar_navigation=None,
+                current_college=None,
             )
 
     return app

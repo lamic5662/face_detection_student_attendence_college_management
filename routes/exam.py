@@ -19,13 +19,18 @@ def build_marksheet_data(student):
     from models.setting import CollegeSetting
     from models.attendance import AttendanceSession, AttendanceRecord
     from models.marksheet_signature import MarksheetSignature
-    college = CollegeSetting.get()
+    college = CollegeSetting.get(student.college)
 
-    principal_sig = MarksheetSignature.query.filter_by(role='principal').first()
+    principal_sig = MarksheetSignature.query.filter_by(
+        college_id=student.college_id,
+        role='principal',
+    ).first()
     hod_sig       = MarksheetSignature.query.filter_by(
+                        college_id=student.college_id,
                         role='hod', department_id=student.department_id).first()
 
     subjects = Subject.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id,
         semester=student.semester
     ).order_by(Subject.name).all()
@@ -35,13 +40,13 @@ def build_marksheet_data(student):
     grand_total_all    = 0.0
 
     for subject in subjects:
-        exams = Exam.query.filter_by(subject_id=subject.id).order_by(Exam.exam_date).all()
+        exams = Exam.query.filter_by(college_id=student.college_id, subject_id=subject.id).order_by(Exam.exam_date).all()
         exam_rows  = []
         sub_obtained = 0.0
         sub_total    = 0.0
 
         for exam in exams:
-            mark    = Mark.query.filter_by(exam_id=exam.id, student_id=student.id).first()
+            mark    = Mark.query.filter_by(college_id=student.college_id, exam_id=exam.id, student_id=student.id).first()
             obtained = None
             grade    = '—'
             pct      = None
@@ -85,11 +90,13 @@ def build_marksheet_data(student):
 
         # Attendance for this subject
         total_classes = (AttendanceSession.query
-                         .filter_by(subject_id=subject.id, status='completed')
+                         .filter_by(college_id=student.college_id, subject_id=subject.id, status='completed')
                          .count())
         present_count = (AttendanceRecord.query
                          .join(AttendanceSession)
-                         .filter(AttendanceSession.subject_id == subject.id,
+                         .filter(AttendanceRecord.college_id == student.college_id,
+                                 AttendanceSession.college_id == student.college_id,
+                                 AttendanceSession.subject_id == subject.id,
                                  AttendanceSession.status == 'completed',
                                  AttendanceRecord.student_id == student.id,
                                  AttendanceRecord.status == 'present')
@@ -144,9 +151,10 @@ def build_marksheet_data(student):
 
 def get_upcoming_exams_for_student(student):
     subject_ids = [s.id for s in Subject.query.filter_by(
-        department_id=student.department_id, semester=student.semester
+        college_id=student.college_id, department_id=student.department_id, semester=student.semester
     ).all()]
     return Exam.query.filter(
+        Exam.college_id == student.college_id,
         Exam.subject_id.in_(subject_ids),
         Exam.exam_date >= date.today()
     ).order_by(Exam.exam_date).limit(5).all()
@@ -163,10 +171,13 @@ def teacher_exams():
     subjects = teacher.subjects
     exams = []
     if subject_id:
-        exams = Exam.query.filter_by(subject_id=subject_id).order_by(Exam.exam_date.desc()).all()
+        exams = Exam.query.filter_by(college_id=teacher.college_id, subject_id=subject_id).order_by(Exam.exam_date.desc()).all()
     else:
         sub_ids = [s.id for s in subjects]
-        exams = Exam.query.filter(Exam.subject_id.in_(sub_ids)).order_by(Exam.exam_date.desc()).all()
+        exams = Exam.query.filter(
+            Exam.college_id == teacher.college_id,
+            Exam.subject_id.in_(sub_ids)
+        ).order_by(Exam.exam_date.desc()).all()
     return render_template('exam/teacher_list.html',
                            exams=exams, subjects=subjects,
                            selected_subject=subject_id)
@@ -193,7 +204,7 @@ def create_exam():
             flash('Subject, title, and date are required.', 'danger')
             return redirect(url_for('exam.create_exam'))
 
-        sub = Subject.query.get_or_404(subject_id)
+        sub = Subject.query.filter_by(id=subject_id, college_id=teacher.college_id).first_or_404()
         if sub.teacher_id != teacher.id:
             flash('Unauthorised subject.', 'danger')
             return redirect(url_for('exam.teacher_exams'))
@@ -213,6 +224,7 @@ def create_exam():
                 return redirect(url_for('exam.create_exam'))
 
         exam = Exam(
+            college_id=sub.college_id,
             subject_id=subject_id, title=title, exam_type=exam_type,
             exam_date=exam_date,
             start_time=start_time,
@@ -224,10 +236,11 @@ def create_exam():
 
         # Pre-populate mark rows for all students in subject's dept+sem
         students = Student.query.filter_by(
+            college_id=sub.college_id,
             department_id=sub.department_id, semester=sub.semester
         ).all()
         for s in students:
-            db.session.add(Mark(exam_id=exam.id, student_id=s.id))
+            db.session.add(Mark(college_id=s.college_id, exam_id=exam.id, student_id=s.id))
 
         db.session.commit()
 
@@ -252,6 +265,7 @@ def create_exam():
             parts.append(f"\nInstructions: {exam.instructions}")
 
         notice = Notice(
+            college_id=sub.college_id,
             title=f"Exam Scheduled: {title}",
             content="\n".join(parts),
             category='exam',
@@ -272,7 +286,7 @@ def create_exam():
 @login_required
 @teacher_required
 def enter_marks(exam_id):
-    exam = Exam.query.get_or_404(exam_id)
+    exam = Exam.query.filter_by(id=exam_id, college_id=teacher.college_id).first_or_404()
     teacher = current_user.teacher_profile
     if exam.subject.teacher_id != teacher.id:
         flash('Unauthorised.', 'danger')
@@ -300,12 +314,13 @@ def enter_marks(exam_id):
 @login_required
 @teacher_required
 def delete_exam(exam_id):
-    exam = Exam.query.get_or_404(exam_id)
+    exam = Exam.query.filter_by(id=exam_id, college_id=current_user.teacher_profile.college_id).first_or_404()
     if exam.subject.teacher_id != current_user.teacher_profile.id:
         flash('Unauthorised.', 'danger')
     else:
         # Remove the auto-generated exam notice so students don't see stale info
         Notice.query.filter_by(
+            college_id=current_user.college_id,
             title=f"Exam Scheduled: {exam.title}",
             category='exam',
             author_id=current_user.id
@@ -325,14 +340,15 @@ def student_results():
     student = current_user.student_profile
     subject_id = request.args.get('subject_id', type=int)
     subjects = Subject.query.filter_by(
+        college_id=student.college_id,
         department_id=student.department_id, semester=student.semester
     ).all()
 
     results = []
     if subject_id:
-        exams = Exam.query.filter_by(subject_id=subject_id).order_by(Exam.exam_date).all()
+        exams = Exam.query.filter_by(college_id=student.college_id, subject_id=subject_id).order_by(Exam.exam_date).all()
         for exam in exams:
-            mark = Mark.query.filter_by(exam_id=exam.id, student_id=student.id).first()
+            mark = Mark.query.filter_by(college_id=student.college_id, exam_id=exam.id, student_id=student.id).first()
             results.append({'exam': exam, 'mark': mark})
 
     upcoming = get_upcoming_exams_for_student(student)
@@ -356,14 +372,14 @@ def admin_exams():
     subject_id = request.args.get('subject_id', type=int)
 
     from models.department import Department
-    departments = Department.query.order_by(Department.name).all()
-    subjects = Subject.query.all()
+    departments = Department.query.filter_by(college_id=current_user.college_id).order_by(Department.name).all()
+    subjects = Subject.query.filter_by(college_id=current_user.college_id).all()
 
-    query = Exam.query
+    query = Exam.query.filter_by(college_id=current_user.college_id)
     if subject_id:
         query = query.filter_by(subject_id=subject_id)
     elif dept_id:
-        sub_ids = [s.id for s in Subject.query.filter_by(department_id=dept_id).all()]
+        sub_ids = [s.id for s in Subject.query.filter_by(college_id=current_user.college_id, department_id=dept_id).all()]
         query = query.filter(Exam.subject_id.in_(sub_ids))
 
     page = request.args.get('page', 1, type=int)

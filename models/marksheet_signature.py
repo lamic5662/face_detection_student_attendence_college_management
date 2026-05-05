@@ -6,6 +6,7 @@ class MarksheetSignature(db.Model):
     __tablename__ = 'marksheet_signatures'
 
     id            = db.Column(db.Integer, primary_key=True)
+    college_id    = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     role          = db.Column(db.Enum('principal', 'hod', 'class_teacher'), nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=True)
     semester      = db.Column(db.Integer, nullable=True)
@@ -19,7 +20,7 @@ class MarksheetSignature(db.Model):
     teacher    = db.relationship('Teacher', backref='class_teacher_sigs', lazy=True)
 
     __table_args__ = (
-        db.UniqueConstraint('role', 'department_id', 'semester', name='uq_ms_signature'),
+        db.UniqueConstraint('college_id', 'role', 'department_id', 'semester', name='uq_ms_signature'),
     )
 
     @property

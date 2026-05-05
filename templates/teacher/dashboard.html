@@ -3,6 +3,11 @@
 {% block page_title %}<i class="bi bi-speedometer2 me-2"></i>Dashboard{% endblock %}
 
 {% block content %}
+{% set visible_widgets = dashboard_prefs.visible_widget_keys if dashboard_prefs else [] %}
+{% set ordered_optional = dashboard_prefs.selected_optional_keys if dashboard_prefs else [] %}
+{% include "partials/dashboard_customize.html" %}
+
+{% if 'teacher_status' in visible_widgets %}
 <!-- Teacher Status Widget -->
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body px-4 py-3 d-flex flex-wrap align-items-center gap-3">
@@ -83,7 +88,9 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if 'active_session' in visible_widgets and active_session %}
 {% if active_session %}
 <div class="alert alert-success alert-dismissible d-flex align-items-center gap-3 border-0 shadow-sm">
   <div class="rounded-circle bg-success d-flex align-items-center justify-content-center" style="width:40px;height:40px;flex-shrink:0">
@@ -99,8 +106,10 @@
   </a>
 </div>
 {% endif %}
+{% endif %}
 
 <!-- Stats -->
+{% if 'stats_overview' in visible_widgets %}
 <div class="row g-4 mb-4">
   <div class="col-md-4">
     <div class="stat-card stat-card-blue">
@@ -124,9 +133,11 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if 'start_session' in visible_widgets or 'recent_sessions' in visible_widgets %}
 <div class="row g-4">
-  <!-- Start New Session -->
+  {% if 'start_session' in visible_widgets %}
   <div class="col-lg-5">
     <div class="card shadow-sm border-0">
       <div class="card-header bg-transparent border-0 pt-4 px-4">
@@ -159,8 +170,9 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
-  <!-- Recent Sessions -->
+  {% if 'recent_sessions' in visible_widgets %}
   <div class="col-lg-7">
     <div class="card shadow-sm border-0">
       <div class="card-header bg-transparent border-0 pt-4 px-4">
@@ -201,12 +213,17 @@
       </div>
     </div>
   </div>
+  {% endif %}
 </div>
+{% endif %}
 
 <!-- Notices + Upcoming Exams -->
+{% if ordered_optional %}
 <div class="row g-4 mt-0">
-  <!-- Notices -->
+  {% for widget_key in ordered_optional %}
+  {% if widget_key in ('notice_board', 'upcoming_exams') %}
   <div class="col-lg-6">
+    {% if widget_key == 'notice_board' %}
     <div class="card shadow-sm border-0 h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
         <h6 class="fw-semibold mb-0"><i class="bi bi-megaphone-fill text-warning me-2"></i>Notice Board</h6>
@@ -229,10 +246,7 @@
         {% endfor %}
       </div>
     </div>
-  </div>
-
-  <!-- Upcoming Exams -->
-  <div class="col-lg-6">
+    {% elif widget_key == 'upcoming_exams' %}
     <div class="card shadow-sm border-0 h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
         <h6 class="fw-semibold mb-0"><i class="bi bi-journals text-info me-2"></i>Your Upcoming Exams</h6>
@@ -262,6 +276,10 @@
       </div>
       {% endif %}
     </div>
+    {% endif %}
   </div>
+  {% endif %}
+  {% endfor %}
 </div>
+{% endif %}
 {% endblock %}

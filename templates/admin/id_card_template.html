@@ -153,68 +153,42 @@
       <div class="card-body px-4 pb-4 d-flex flex-column align-items-center gap-3">
 
         <div id="pvCard" class="pv-card">
+          <div class="pv-slot"></div>
+          <div class="pv-chip">Student ID</div>
 
-          <!-- Gradient header -->
-          <div class="pv-top" id="pvTop">
-            <div class="pv-blob pv-blob-1"></div>
-            <div class="pv-blob pv-blob-2"></div>
-
-            <div class="pv-badge-wrap">
-              <span class="pv-badge" id="pvBadge"><i class="bi bi-person-badge-fill"></i> IDENTITY CARD</span>
-            </div>
-
-            <div class="pv-college-row">
-              {% if tpl.logo_path %}
-              <img src="{{ url_for('static', filename=tpl.logo_path) }}" class="pv-logo">
-              {% else %}
-              <div class="pv-logo-ph"><i class="bi bi-building"></i></div>
-              {% endif %}
-              <div>
-                <div class="pv-cname">{{ cs.college_name }}</div>
-                <div class="pv-caddr">{{ cs.address or 'College Address' }}</div>
-              </div>
-            </div>
-
-            <div class="pv-identity-row">
-              <div class="pv-ring" id="pvRing">
-                <div class="pv-ring-in"><i class="bi bi-person-fill pv-ph-icon"></i></div>
-              </div>
-              <div class="pv-identity-text">
-                <div class="pv-sname">Student Full Name</div>
-                <div class="pv-dept" id="pvDept">Computer Science</div>
-                <div class="pv-sem">5th Semester</div>
-              </div>
+          <div class="pv-brand">
+            {% if tpl.logo_path %}
+            <img src="{{ url_for('static', filename=tpl.logo_path) }}" class="pv-logo">
+            {% else %}
+            <div class="pv-logo-ph"><i class="bi bi-building"></i></div>
+            {% endif %}
+            <div class="pv-brand-copy">
+              <div class="pv-cname">{{ cs.college_name|upper }}</div>
+              <div class="pv-caddr">{{ cs.address or 'Kathmandu, Nepal' }}</div>
             </div>
           </div>
 
-          <!-- White info body -->
-          <div class="pv-body" id="pvBody">
-            <div class="pv-row"><i class="bi bi-hash pv-ri"></i><span class="pv-lbl">Roll Number</span><span class="pv-val">BCA2024001</span></div>
-            <div class="pv-row"><i class="bi bi-mortarboard-fill pv-ri"></i><span class="pv-lbl">Faculty</span><span class="pv-val">BCA</span></div>
-            <div class="pv-row"><i class="bi bi-droplet-fill" style="color:#ef4444"></i><span class="pv-lbl">Blood Group</span><span class="pv-val" style="color:#dc2626;font-weight:800">B+</span></div>
-            <div class="pv-row"><i class="bi bi-calendar3 pv-ri"></i><span class="pv-lbl">Date of Birth</span><span class="pv-val">15 Aug 2002</span></div>
-            <div class="pv-row"><i class="bi bi-telephone-fill pv-ri"></i><span class="pv-lbl">Phone</span><span class="pv-val">+977-9800000000</span></div>
-            <div class="pv-row"><i class="bi bi-geo-alt-fill pv-ri"></i><span class="pv-lbl">Address</span><span class="pv-val">Kathmandu</span></div>
-          </div>
+          <div class="pv-waves"><span></span><span></span><span></span></div>
 
-          <!-- Gradient footer -->
-          <div class="pv-ftr" id="pvFtr">
-            <div>
-              <div class="pv-fline"><span class="pv-flbl">Card No</span><span class="pv-fval">BCA-2024001</span></div>
-              <div class="pv-fline"><span class="pv-flbl">Valid Till</span><span class="pv-fval" style="color:#86efac">2028</span></div>
-            </div>
-            <div class="pv-sig">
-              {% if tpl.principal_signature_path %}
-              <img src="{{ url_for('static', filename=tpl.principal_signature_path) }}" class="pv-sig-img">
-              {% else %}
-              <div class="pv-sig-line"></div>
-              {% endif %}
-              <div class="pv-sig-name">{{ tpl.principal_name or 'Principal Name' }}</div>
-              <div class="pv-sig-ttl">{{ tpl.principal_title or 'Principal' }}</div>
+          <div class="pv-photo-shell">
+            <div class="pv-photo-core">
+              <i class="bi bi-person-fill pv-ph-icon"></i>
             </div>
           </div>
 
-          <div class="pv-stripe" id="pvStripe"></div>
+          <div class="pv-content">
+            <div class="pv-sname">Student Full Name</div>
+            <div class="pv-grid">
+              <div class="pv-field pv-field-wide"><span class="pv-lbl">Student ID</span><span class="pv-val pv-hi">HU-2026-4582</span></div>
+              <div class="pv-field pv-field-wide"><span class="pv-lbl">Program</span><span class="pv-val">B.Sc. Computer Science</span></div>
+              <div class="pv-field"><span class="pv-lbl">Semester</span><span class="pv-val">4th</span></div>
+              <div class="pv-field"><span class="pv-lbl">Roll No</span><span class="pv-val">BCA2024001</span></div>
+              <div class="pv-field pv-field-wide"><span class="pv-lbl">Validity</span><span class="pv-val pv-hi">2026-2030</span></div>
+            </div>
+          </div>
+
+          <div class="pv-holo"><span class="bi bi-shield-check"></span></div>
+          <div class="pv-qr"><span class="bi bi-qr-code"></span></div>
         </div>
 
         <div class="text-muted small text-center">
@@ -230,91 +204,221 @@
 
 {% block scripts %}
 <style>
-/* ── Admin template live preview — matches v5 card design ── */
+/* ── Admin template live preview — premium campus card style ── */
 .pv-card {
-  --pv-cc: #1e3a5f; --pv-ac: #e63946;
-  width: 270px; height: 490px; border-radius: 18px; overflow: hidden;
-  font-family: 'Segoe UI', sans-serif;
-  box-shadow: 0 22px 60px rgba(0,0,0,.32), 0 6px 16px rgba(0,0,0,.16);
-  display: flex; flex-direction: column; position: relative;
+  --pv-cc: #1f2f86;
+  --pv-ac: #54e8ff;
+  width: 320px;
+  height: 510px;
+  border-radius: 34px;
+  overflow: hidden;
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, .32), 0 10px 22px rgba(15, 23, 42, .18);
+  position: relative;
+  color: #fff;
+  background:
+    radial-gradient(circle at 86% 20%, rgba(84, 232, 255, .28), transparent 28%),
+    radial-gradient(circle at 78% 52%, rgba(98, 124, 255, .3), transparent 26%),
+    linear-gradient(145deg, #13103e 0%, color-mix(in srgb, var(--pv-cc) 74%, #0a0f28) 48%, color-mix(in srgb, var(--pv-cc) 92%, #3758ff) 100%);
+}
+.pv-card::before,
+.pv-card::after {
+  content: "";
+  position: absolute;
+  inset: auto -8% 33% -8%;
+  height: 170px;
+  border-radius: 50%;
+}
+.pv-card::before {
+  border: 2px solid rgba(84, 232, 255, .46);
+  transform: rotate(-9deg);
+}
+.pv-card::after {
+  inset: auto -14% 39% -14%;
+  height: 180px;
+  border-top: 1px solid rgba(255, 255, 255, .14);
+  transform: rotate(4deg);
+}
+.pv-slot {
+  width: 102px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .78);
+  margin: 24px auto 16px;
+  box-shadow: inset 0 2px 6px rgba(15, 23, 42, .18);
+}
+.pv-chip {
+  position: absolute;
+  top: 22px;
+  right: 0;
+  padding: 10px 24px 10px 20px;
+  border-radius: 18px 0 0 18px;
+  background: rgba(7, 38, 84, .88);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: .04em;
+}
+.pv-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  position: relative;
+  z-index: 2;
+}
+.pv-logo,
+.pv-logo-ph {
+  width: 74px;
+  height: 74px;
+  border-radius: 18px;
+  flex-shrink: 0;
+}
+.pv-logo {
+  object-fit: contain;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .12);
+  padding: 8px;
+}
+.pv-logo-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, .08);
+  color: rgba(255, 255, 255, .6);
+  font-size: 2rem;
+}
+.pv-brand-copy { min-width: 0; }
+.pv-cname {
+  font-size: 1rem;
+  line-height: 1.05;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.pv-caddr {
+  margin-top: 6px;
+  font-size: .74rem;
+  color: rgba(255, 255, 255, .74);
+  font-weight: 600;
+}
+.pv-waves {
+  position: absolute;
+  left: -40px;
+  right: -10px;
+  top: 168px;
+  height: 122px;
+}
+.pv-waves span {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border-top: 2px solid rgba(84, 232, 255, .52);
+}
+.pv-waves span:nth-child(1) { transform: rotate(-7deg) translateY(24px); }
+.pv-waves span:nth-child(2) { transform: rotate(7deg) translateY(6px); border-top-color: rgba(138, 127, 255, .46); }
+.pv-waves span:nth-child(3) { transform: rotate(-14deg) translateY(42px); border-top-color: rgba(255, 255, 255, .14); }
+.pv-photo-shell {
+  width: 196px;
+  height: 196px;
+  margin: 34px auto 0;
+  border-radius: 50%;
+  padding: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(200,204,226,.88));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, .26);
+  position: relative;
+  z-index: 2;
+}
+.pv-photo-core {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
-/* Gradient header */
-.pv-top {
-  background: linear-gradient(145deg, #0b2040 0%, #172f4e 50%, #1e3a5f 100%);
-  padding: 14px 14px 16px; position: relative; overflow: hidden; flex-shrink: 0;
+.pv-ph-icon {
+  font-size: 5rem;
+  color: rgba(15, 23, 42, .12);
 }
-.pv-blob { position:absolute; border-radius:50%; background:rgba(255,255,255,.07); pointer-events:none; }
-.pv-blob-1 { width:170px; height:170px; top:-70px; right:-45px; }
-.pv-blob-2 { width:90px;  height:90px;  bottom:-30px; left:-25px; }
-
-.pv-badge-wrap { margin-bottom:10px; position:relative; z-index:1; }
-.pv-badge {
-  display:inline-flex; align-items:center; gap:5px;
-  background: var(--pv-ac); color:#fff;
-  font-size:6.5px; font-weight:800; letter-spacing:2.2px; text-transform:uppercase;
-  padding:4px 11px; border-radius:4px; box-shadow:0 3px 10px rgba(0,0,0,.3);
+.pv-content {
+  position: relative;
+  z-index: 2;
+  padding: 18px 20px 0;
 }
-.pv-badge i { font-size:9px; }
-
-.pv-college-row { display:flex; align-items:center; gap:9px; margin-bottom:13px; position:relative; z-index:1; }
-.pv-logo    { width:40px; height:40px; flex-shrink:0; object-fit:contain; border-radius:9px; background:rgba(255,255,255,.18); padding:3px; }
-.pv-logo-ph { width:40px; height:40px; flex-shrink:0; border-radius:9px; background:rgba(255,255,255,.14); display:flex; align-items:center; justify-content:center; font-size:18px; color:rgba(255,255,255,.45); }
-.pv-cname   { font-size:13.5px; font-weight:900; color:#fff; line-height:1.2; text-shadow:0 2px 6px rgba(0,0,0,.28); }
-.pv-caddr   { font-size:7.5px; color:rgba(255,255,255,.6); margin-top:3px; }
-
-.pv-identity-row { display:flex; align-items:center; gap:12px; position:relative; z-index:1; }
-.pv-ring {
-  width:76px; height:76px; flex-shrink:0; border-radius:50%; padding:3px;
-  background: conic-gradient(from 180deg, var(--pv-ac) 0%, rgba(255,255,255,.5) 40%, rgba(255,255,255,.8) 55%, rgba(255,255,255,.5) 70%, var(--pv-ac) 100%);
-  box-shadow: 0 0 0 3px rgba(255,255,255,.12), 0 8px 26px rgba(0,0,0,.45);
+.pv-sname {
+  font-size: 1.08rem;
+  font-weight: 900;
+  text-align: center;
+  margin-bottom: 14px;
 }
-.pv-ring-in { width:100%; height:100%; border-radius:50%; overflow:hidden; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; }
-.pv-ph-icon { font-size:36px; color:rgba(255,255,255,.28); }
-.pv-identity-text { flex:1; min-width:0; }
-.pv-sname { font-size:14px; font-weight:900; color:#fff; line-height:1.2; margin-bottom:5px; text-shadow:0 2px 8px rgba(0,0,0,.3); }
-.pv-dept  { font-size:7px; font-weight:700; color:var(--pv-cc); background:rgba(255,255,255,.92); padding:2px 9px; border-radius:3px; display:inline-block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-bottom:4px; }
-.pv-sem   { font-size:6.5px; font-weight:600; color:rgba(255,255,255,.7); }
-
-/* White info body */
-.pv-body {
-  background:#fff; flex:1; display:flex; flex-direction:column;
-  border-top: 3px solid var(--pv-ac); overflow:hidden;
+.pv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
 }
-.pv-row {
-  display:flex; align-items:center; gap:10px;
-  padding:0 14px; flex:1;
-  border-bottom:1px solid #f1f5f9; position:relative;
+.pv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.pv-row:last-child { border-bottom:none; }
-.pv-row::before {
-  content:''; position:absolute; left:0; top:22%; bottom:22%;
-  width:3px; border-radius:0 2px 2px 0;
-  background: var(--pv-ac);
+.pv-field-wide {
+  grid-column: 1 / -1;
 }
-.pv-row > i { font-size:9.5px; color:var(--pv-ac); width:14px; text-align:center; flex-shrink:0; }
-.pv-ri { color: var(--pv-ac) !important; }
-.pv-lbl { font-size:7.5px; color:#94a3b8; font-weight:600; flex:1; }
-.pv-val { font-size:8.5px; font-weight:700; color:#0f172a; text-align:right; max-width:125px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-
-/* Gradient footer */
-.pv-ftr { background:linear-gradient(135deg, #0b2040, #172f4e); padding:9px 14px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
-.pv-fline { display:flex; align-items:baseline; gap:5px; line-height:2; }
-.pv-flbl  { font-size:6.5px; font-weight:700; color:rgba(255,255,255,.45); text-transform:uppercase; letter-spacing:.6px; }
-.pv-fval  { font-size:8px; font-weight:700; color:rgba(255,255,255,.92); }
-.pv-sig   { text-align:center; }
-.pv-sig-img  { height:28px; display:block; margin:0 auto 2px; object-fit:contain; max-width:80px; }
-.pv-sig-line { width:70px; border-bottom:1px solid rgba(255,255,255,.28); height:22px; margin:0 auto 2px; }
-.pv-sig-name { font-size:7px; font-weight:700; color:#fff; white-space:nowrap; }
-.pv-sig-ttl  { font-size:6.5px; color:rgba(255,255,255,.5); }
-
-.pv-stripe { height:4px; flex-shrink:0; background:linear-gradient(90deg,#b91c1c,#e63946,#f97316,#e63946,#b91c1c); }
+.pv-lbl {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: rgba(255, 255, 255, .64);
+  font-weight: 700;
+}
+.pv-val {
+  font-size: .86rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.pv-hi {
+  color: var(--pv-ac);
+}
+.pv-holo {
+  position: absolute;
+  right: 36px;
+  bottom: 106px;
+  width: 62px;
+  height: 78px;
+  clip-path: polygon(50% 0, 88% 12%, 100% 48%, 83% 100%, 17% 100%, 0 48%, 12% 12%);
+  background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(113,250,255,.54), rgba(166,142,255,.62));
+  box-shadow: 0 0 0 2px rgba(255,255,255,.18), 0 12px 24px rgba(0,0,0,.24);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pv-holo span {
+  font-size: 1.8rem;
+  color: rgba(12, 42, 84, .75);
+}
+.pv-qr {
+  position: absolute;
+  right: 20px;
+  bottom: 22px;
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0f172a;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .26);
+}
+.pv-qr span {
+  font-size: 2.1rem;
+}
 </style>
 <script>
 function hexToRgb(h) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
-  return r ? [parseInt(r[1],16), parseInt(r[2],16), parseInt(r[3],16)] : [30,58,95];
+  return r ? [parseInt(r[1],16), parseInt(r[2],16), parseInt(r[3],16)] : [31,47,134];
 }
 function darken(rgb, f)  { return rgb.map(v => Math.max(0, Math.round(v * f))); }
 function lighten(rgb, f) { return rgb.map(v => Math.min(255, Math.round(v + (255-v)*f))); }
@@ -323,23 +427,19 @@ function toRgb(rgb)  { return `rgb(${rgb.join(',')})`; }
 function applyCardColor(hex) {
   document.getElementById('cardColorText').value = hex;
   const rgb = hexToRgb(hex);
-  const dk  = darken(rgb, .60);
-  const md  = darken(rgb, .80);
-  const lt  = lighten(rgb, .18);
-  document.getElementById('pvTop').style.background =
-    `linear-gradient(145deg, ${toRgb(dk)} 0%, ${toRgb(md)} 50%, ${toRgb(lt)} 100%)`;
-  document.getElementById('pvFtr').style.background =
-    `linear-gradient(135deg, ${toRgb(dk)}, ${toRgb(md)})`;
+  const dk  = darken(rgb, .62);
+  const md  = darken(rgb, .84);
+  const lt  = lighten(rgb, .16);
+  document.getElementById('pvCard').style.background =
+    `radial-gradient(circle at 86% 20%, rgba(84, 232, 255, .28), transparent 28%),
+     radial-gradient(circle at 78% 52%, rgba(98, 124, 255, .3), transparent 26%),
+     linear-gradient(145deg, ${toRgb(md)} 0%, ${toRgb(dk)} 48%, ${toRgb(lt)} 100%)`;
   document.getElementById('pvCard').style.setProperty('--pv-cc', hex);
 }
 
 function applyAccentColor(hex) {
   document.getElementById('accentColorText').value = hex;
-  const rgb = hexToRgb(hex);
-  const dk  = darken(rgb, .68);
   document.getElementById('pvCard').style.setProperty('--pv-ac', hex);
-  document.getElementById('pvStripe').style.background =
-    `linear-gradient(90deg, ${toRgb(dk)}, ${hex}, ${hex}, ${toRgb(dk)})`;
 }
 
 const ccIn = document.querySelector('input[name="card_color"]');

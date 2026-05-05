@@ -1,234 +1,218 @@
 {#
-  ID Card macro — v5 (split gradient/white · college image back)
+  Shared ID card component
   {{ id_card(student, card, tpl, cs, qr_img=qr_img) }}
   {{ id_card(student, card, tpl, cs, qr_img=qr_img, admin_preview=true) }}
 #}
 
 {% macro id_card(student, card, tpl, cs, qr_img=none, admin_preview=false, map_url=none) %}
-{% set cc = tpl.card_color   or '#1e3a5f' %}
-{% set ac = tpl.accent_color or '#e63946' %}
-{% set vy = tpl.valid_years  or 4 %}
-{% set admit_yr = student.admission_year if student.admission_year
-                  else (card.submitted_at.year if card and card.submitted_at else none) %}
+{% set cc = tpl.card_color or '#1f2f86' %}
+{% set ac = tpl.accent_color or '#54e8ff' %}
+{% set vy = tpl.valid_years or 4 %}
+{% set admit_yr = student.admission_year if student.admission_year else (card.submitted_at.year if card and card.submitted_at else none) %}
 {% set valid_until = (admit_yr + vy) if admit_yr else none %}
-{% set card_no = card.card_number if card and card.card_number
-                 else (student.department.code ~ '-' ~ student.roll_number) %}
-{% set sem = student.semester %}
-{% set sfx = 'st' if sem==1 else ('nd' if sem==2 else ('rd' if sem==3 else 'th')) %}
-{% set show_sig = (tpl.principal_signature_path) and
-                  (admin_preview or (card and card.status == 'approved')) %}
-{% set has_college_img = tpl.college_image_path %}
+{% set card_no = card.card_number if card and card.card_number else (student.department.code ~ '-' ~ student.roll_number) %}
+{% set validity_text = (admit_yr ~ '-' ~ valid_until) if admit_yr and valid_until else 'Active' %}
+{% set show_sig = tpl.principal_signature_path and (admin_preview or (card and card.status == 'approved')) %}
+{% set photo_path = card.photo_path if card and card.photo_path else none %}
+{% set college_name = (cs.college_name or 'College')|upper %}
+{% set city_line = cs.address if cs.address else 'Kathmandu, Nepal' %}
 
-<style>:root{--cc:{{ cc }};--ac:{{ ac }};}</style>
+<style>:root{--idc-primary:{{ cc }};--idc-accent:{{ ac }};}</style>
 
-<div class="idc-scene" id="idCardScene"
-     onclick="this.classList.toggle('flipped')" title="Click to flip">
+<div class="idc-scene" onclick="this.classList.toggle('flipped')" title="Click to flip">
   <div class="idc-inner">
-
-    {# ══════════════════ FRONT ══════════════════ #}
-    <div class="idc-face idc-front">
-
+    <section class="idc-face idc-front">
       {% if card and card.status != 'approved' %}
-      <div class="idc-watermark">
-        {{ 'PENDING' if card.status == 'pending' else 'REJECTED' }}
-      </div>
+      <div class="idc-status-mark">{{ 'PENDING' if card.status == 'pending' else 'REJECTED' }}</div>
       {% endif %}
 
-      {# ── Coloured header section ── #}
-      <div class="idc-top">
-        <div class="idc-top-deco1"></div>
-        <div class="idc-top-deco2"></div>
+      <div class="idc-front-slot"></div>
+      <div class="idc-front-chip">Student ID</div>
 
-        {# IDENTITY CARD badge #}
-        <div class="idc-badge-wrap">
-          <span class="idc-badge"><i class="bi bi-person-badge-fill"></i> IDENTITY CARD</span>
-        </div>
-
-        {# College logo + name #}
-        <div class="idc-college-row">
+      <div class="idc-front-brand">
+        <div class="idc-front-brand-logo">
           {% if tpl.logo_path %}
-          <img src="{{ url_for('static', filename=tpl.logo_path) }}" class="idc-logo" alt="">
+          <img src="{{ url_for('static', filename=tpl.logo_path) }}" alt="College logo">
           {% else %}
-          <div class="idc-logo-ph"><i class="bi bi-building"></i></div>
+          <span class="bi bi-mortarboard-fill"></span>
           {% endif %}
-          <div class="idc-college-info">
-            <div class="idc-cname">{{ cs.college_name }}</div>
-            {% if cs.address %}<div class="idc-caddr">{{ cs.address }}</div>{% endif %}
-          </div>
         </div>
+        <div class="idc-front-brand-copy">
+          <div class="idc-front-brand-name">{{ college_name }}</div>
+          <div class="idc-front-brand-sub">{{ student.department.name }}</div>
+        </div>
+      </div>
 
-        {# Photo + student name in header #}
-        <div class="idc-identity-row">
-          <div class="idc-photo-ring">
-            <div class="idc-photo-inner">
-              {% if card and card.photo_path %}
-              <img src="{{ url_for('static', filename=card.photo_path) }}" alt="">
-              {% else %}
-              <i class="bi bi-person-fill idc-no-photo"></i>
-              {% endif %}
-            </div>
-          </div>
-          <div class="idc-identity-text">
-            <div class="idc-sname">{{ student.user.name }}</div>
-            <div class="idc-dept-chip">{{ student.department.name }}</div>
-            <div class="idc-sem-chip">{{ sem }}{{ sfx }} Semester</div>
+      <div class="idc-front-waves">
+        <span></span><span></span><span></span>
+      </div>
+
+      <div class="idc-front-photo-wrap">
+        <div class="idc-front-photo-ring">
+          <div class="idc-front-photo-core">
+            {% if photo_path %}
+            <img src="{{ url_for('static', filename=photo_path) }}" alt="Student photo">
+            {% else %}
+            <span class="bi bi-person-fill idc-front-photo-placeholder"></span>
+            {% endif %}
           </div>
         </div>
       </div>
 
-      {# ── White info body ── #}
-      <div class="idc-body">
-        <div class="idc-row">
-          <i class="bi bi-hash"></i>
-          <span class="idc-lbl">Roll Number</span>
-          <span class="idc-val">{{ student.roll_number }}</span>
-        </div>
-        <div class="idc-row">
-          <i class="bi bi-mortarboard-fill"></i>
-          <span class="idc-lbl">Faculty</span>
-          <span class="idc-val">{{ student.department.code }}</span>
-        </div>
-        {% if student.blood_group %}
-        <div class="idc-row">
-          <i class="bi bi-droplet-fill idc-blood-i"></i>
-          <span class="idc-lbl">Blood Group</span>
-          <span class="idc-val idc-blood-v">{{ student.blood_group }}</span>
-        </div>
-        {% endif %}
-        {% if student.dob %}
-        <div class="idc-row">
-          <i class="bi bi-calendar3"></i>
-          <span class="idc-lbl">Date of Birth</span>
-          <span class="idc-val">{{ student.dob.strftime('%d %b %Y') }}</span>
-        </div>
-        {% endif %}
-        {% if student.phone %}
-        <div class="idc-row">
-          <i class="bi bi-telephone-fill"></i>
-          <span class="idc-lbl">Phone</span>
-          <span class="idc-val">{{ student.phone }}</span>
-        </div>
-        {% endif %}
-        {% if student.address %}
-        <div class="idc-row">
-          <i class="bi bi-geo-alt-fill"></i>
-          <span class="idc-lbl">Address</span>
-          <span class="idc-val">{{ student.address }}</span>
-        </div>
-        {% endif %}
-      </div>
+      <div class="idc-front-content">
+        <div class="idc-front-name">{{ student.user.name }}</div>
 
-      {# ── Gradient footer ── #}
-      <div class="idc-ftr">
-        <div>
-          <div class="idc-fline">
-            <span class="idc-flbl">Card No</span>
-            <span class="idc-fval">{{ card_no }}</span>
+        <div class="idc-front-details">
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Student ID:</span>
+            <span class="idc-front-detail-value idc-front-highlight">{{ card_no }}</span>
           </div>
-          <div class="idc-fline">
-            <span class="idc-flbl">Valid Till</span>
-            <span class="idc-fval idc-expiry">
-              {% if valid_until %}{{ valid_until }}{% else %}—{% endif %}
-            </span>
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Program:</span>
+            <span class="idc-front-detail-value">{{ student.department.name }}</span>
           </div>
-        </div>
-        <div class="idc-sig">
-          {% if show_sig %}
-          <img src="{{ url_for('static', filename=tpl.principal_signature_path) }}"
-               class="idc-sig-img" alt="">
-          {% else %}
-          <div class="idc-sig-line"></div>
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Semester:</span>
+            <span class="idc-front-detail-value">{{ student.semester }}th</span>
+          </div>
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Roll No:</span>
+            <span class="idc-front-detail-value">{{ student.roll_number }}</span>
+          </div>
+          {% if student.blood_group %}
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Blood Group:</span>
+            <span class="idc-front-detail-value">{{ student.blood_group }}</span>
+          </div>
           {% endif %}
-          <div class="idc-sig-name">{{ tpl.principal_name or '—————' }}</div>
-          <div class="idc-sig-ttl">{{ tpl.principal_title or 'Principal' }}</div>
+          {% if student.phone %}
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Phone:</span>
+            <span class="idc-front-detail-value">{{ student.phone }}</span>
+          </div>
+          {% endif %}
+          {% if student.dob %}
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">DOB:</span>
+            <span class="idc-front-detail-value">{{ student.dob.strftime('%d %b %Y') }}</span>
+          </div>
+          {% endif %}
+          {% if student.parent_name %}
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Guardian:</span>
+            <span class="idc-front-detail-value">{{ student.parent_name }}</span>
+          </div>
+          {% endif %}
+          {% if student.user.email %}
+          <div class="idc-front-detail-row idc-front-detail-row-compact">
+            <span class="idc-front-detail-label">Email:</span>
+            <span class="idc-front-detail-value">{{ student.user.email }}</span>
+          </div>
+          {% endif %}
+          <div class="idc-front-detail-row">
+            <span class="idc-front-detail-label">Validity:</span>
+            <span class="idc-front-detail-value idc-front-highlight">{{ validity_text }}</span>
+          </div>
+          {% if student.address %}
+          <div class="idc-front-detail-row idc-front-detail-row-compact">
+            <span class="idc-front-detail-label">Address:</span>
+            <span class="idc-front-detail-value">{{ student.address }}</span>
+          </div>
+          {% endif %}
         </div>
       </div>
 
-      <div class="idc-stripe"></div>
+      <div class="idc-front-holo">
+        <div class="idc-front-holo-core">
+          <span class="bi bi-shield-check"></span>
+        </div>
+      </div>
 
-      {% if card and card.status == 'approved' %}
-      <div class="idc-shimmer"></div>
-      {% endif %}
-    </div>
+      <div class="idc-front-qr">
+        {% if qr_img %}
+        <img src="{{ qr_img }}" alt="QR">
+        {% else %}
+        <span class="bi bi-qr-code"></span>
+        {% endif %}
+      </div>
+    </section>
 
-    {# ══════════════════ BACK ══════════════════ #}
-    <div class="idc-face idc-back"
-         {% if has_college_img %}style="background-image:url('{{ url_for('static', filename=tpl.college_image_path) }}')"{% endif %}>
-
+    <section class="idc-face idc-back" {% if tpl.college_image_path %}style="background-image:url('{{ url_for('static', filename=tpl.college_image_path) }}')"{% endif %}>
       <div class="idc-back-overlay"></div>
+      <div class="idc-back-watermark">
+        {% for _ in range(12) %}
+        <span>{{ college_name }}</span>
+        {% endfor %}
+      </div>
+      <div class="idc-back-shards">
+        <span></span><span></span><span></span><span></span>
+      </div>
 
-      {# Top: college branding #}
-      <div class="idc-bhdr">
-        {% if tpl.logo_path %}
-        <img src="{{ url_for('static', filename=tpl.logo_path) }}" class="idc-blogo" alt="">
-        {% endif %}
+      <div class="idc-back-barcode"></div>
+
+      <div class="idc-back-brand">
+        <div class="idc-back-logo">
+          {% if tpl.logo_path %}
+          <img src="{{ url_for('static', filename=tpl.logo_path) }}" alt="College logo">
+          {% else %}
+          <span class="bi bi-bank2"></span>
+          {% endif %}
+        </div>
         <div>
-          <div class="idc-bhname">{{ cs.college_name }}</div>
-          <div class="idc-bhsub">Student Identity Card</div>
+          <div class="idc-back-name">{{ college_name }}</div>
+          <div class="idc-back-sub">{{ city_line }}</div>
         </div>
       </div>
 
-      {# QR + key facts #}
-      <div class="idc-qr-panel">
-        <div class="idc-qr-card">
-          {% if qr_img %}
-          <img src="{{ qr_img }}" width="90" height="90" alt="QR">
-          {% else %}
-          <div class="idc-qr-ph"><i class="bi bi-qr-code"></i></div>
+      <div class="idc-back-body">
+        <div class="idc-back-facts">
+          {% if student.parent_phone %}
+          <div class="idc-back-fact">
+            <div class="idc-back-label">Emergency Contact</div>
+            <div class="idc-back-value">{{ student.parent_phone }}</div>
+          </div>
           {% endif %}
-          <div class="idc-qr-label">Scan to Verify</div>
-        </div>
-        <div class="idc-qr-facts">
-          <div class="idc-qf-name">{{ student.user.name }}</div>
-          <div class="idc-qf-row"><i class="bi bi-credit-card-fill"></i>{{ card_no }}</div>
-          {% if valid_until %}
-          <div class="idc-qf-row"><i class="bi bi-calendar-check-fill"></i>Valid {{ admit_yr }}–{{ valid_until }}</div>
+          {% if tpl.college_phone %}
+          <div class="idc-back-fact">
+            <div class="idc-back-label">College Contact</div>
+            <div class="idc-back-value">{{ tpl.college_phone }}</div>
+          </div>
           {% endif %}
           {% if student.blood_group %}
-          <div class="idc-qf-row idc-qf-blood"><i class="bi bi-droplet-fill"></i>{{ student.blood_group }}</div>
+          <div class="idc-back-fact">
+            <div class="idc-back-label">Blood Group</div>
+            <div class="idc-back-value">{{ student.blood_group }}</div>
+          </div>
           {% endif %}
-          <div class="idc-qf-row"><i class="bi bi-mortarboard-fill"></i>{{ student.department.code }}</div>
+          {% if student.address %}
+          <div class="idc-back-fact">
+            <div class="idc-back-label">Address</div>
+            <div class="idc-back-value">{{ student.address }}</div>
+          </div>
+          {% endif %}
         </div>
       </div>
 
-      {# Info glass panel #}
-      <div class="idc-bglass">
-        {% if student.parent_name or student.parent_phone %}
-        <div class="idc-bsec">Emergency Contact</div>
-        {% if student.parent_name %}
-        <div class="idc-brow"><i class="bi bi-person-fill"></i><span>{{ student.parent_name }}</span></div>
-        {% endif %}
-        {% if student.parent_phone %}
-        <div class="idc-brow"><i class="bi bi-telephone-fill"></i><span>{{ student.parent_phone }}</span></div>
-        {% endif %}
-        {% endif %}
-
-        <div class="idc-bsec">If Found, Return To</div>
-        <div class="idc-brow">
-          <i class="bi bi-building"></i>
-          <span>{{ cs.college_name }}{% if cs.address %}, {{ cs.address }}{% endif %}</span>
+      <div class="idc-back-lower">
+        <div class="idc-back-signature">
+          <div class="idc-back-sign-label">Principal Signature</div>
+          <div class="idc-back-sign-line">
+            {% if show_sig %}
+            <img src="{{ url_for('static', filename=tpl.principal_signature_path) }}" alt="Signature">
+            {% endif %}
+          </div>
+          <div class="idc-back-sign-meta">
+            {% if tpl.principal_name %}
+            <div class="idc-back-sign-name">{{ tpl.principal_name }}</div>
+            {% endif %}
+            <div>{{ tpl.principal_title or 'Principal' }}</div>
+            <div>Date: {% if card and card.reviewed_at %}{{ card.reviewed_at.strftime('%d %b %Y') }}{% else %}{{ 'Pending' if card and card.status == 'pending' else 'Approved' }}{% endif %}</div>
+          </div>
         </div>
-        {% if tpl.college_phone %}
-        <div class="idc-brow"><i class="bi bi-telephone"></i><span>{{ tpl.college_phone }}</span></div>
-        {% endif %}
-        {% if tpl.college_website %}
-        <div class="idc-brow"><i class="bi bi-globe2"></i><span>{{ tpl.college_website }}</span></div>
-        {% endif %}
-        {% if valid_until %}
-        <div class="idc-brow idc-brow-valid">
-          <i class="bi bi-calendar-check-fill"></i>
-          <span>Valid: {{ admit_yr }} – {{ valid_until }}</span>
-        </div>
-        {% endif %}
       </div>
 
-      <div class="idc-bfoot">
-        <i class="bi bi-shield-lock-fill me-1"></i>
-        Property of {{ cs.college_name }} · Not Transferable
-      </div>
-      <div class="idc-stripe"></div>
-    </div>
-
+      <div class="idc-back-note">This card is non-transferable.<br>Report loss immediately.</div>
+    </section>
   </div>
 </div>
 {% endmacro %}
@@ -236,340 +220,614 @@
 
 {% macro id_card_css() %}
 <style>
-/* ═══════════════════════════════════════════════════
-   ID CARD v5 — Split gradient/white · College image back
-   --cc  card colour   --ac  accent colour
-   ═══════════════════════════════════════════════════ */
-
 .idc-scene {
-  --cc-dk : color-mix(in srgb, var(--cc) 60%, #000);
-  --cc-md : color-mix(in srgb, var(--cc) 80%, #000);
-  --cc-lt : color-mix(in srgb, var(--cc) 75%, var(--ac));
-  --ac-dk : color-mix(in srgb, var(--ac) 65%, #000);
-  width: 270px; height: 490px;
-  perspective: 1200px; cursor: pointer; flex-shrink: 0; position: relative;
-}
-.idc-inner {
-  width: 100%; height: 100%;
-  position: relative; transform-style: preserve-3d;
-  transition: transform .7s cubic-bezier(.4,0,.2,1);
-}
-.idc-scene:hover .idc-inner,
-.idc-scene.flipped .idc-inner { transform: rotateY(180deg); }
-
-.idc-face {
-  position: absolute; inset: 0; backface-visibility: hidden;
-  border-radius: 18px; overflow: hidden;
-  box-shadow: 0 24px 60px rgba(0,0,0,.35), 0 6px 18px rgba(0,0,0,.18);
-  display: flex; flex-direction: column;
-  background: #fff;
-}
-.idc-back { transform: rotateY(180deg); }
-
-/* ══ FRONT ══════════════════════════════════════════ */
-
-/* Coloured header */
-.idc-top {
-  background: linear-gradient(145deg, var(--cc-dk) 0%, var(--cc-md) 50%, var(--cc-lt) 100%);
-  padding: 14px 14px 16px;
-  position: relative; overflow: hidden; flex-shrink: 0;
-}
-/* Subtle diagonal stripe texture */
-.idc-top::after {
-  content: '';
-  position: absolute; inset: 0; pointer-events: none;
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 1px,
-    transparent 1px, transparent 9px
-  );
-}
-.idc-top-deco1, .idc-top-deco2 {
-  position: absolute; border-radius: 50%;
-  background: rgba(255,255,255,.07); pointer-events: none;
-}
-.idc-top-deco1 { width:170px; height:170px; top:-70px; right:-45px; }
-.idc-top-deco2 { width: 90px; height: 90px; bottom:-30px; left:-25px; }
-
-/* IDENTITY CARD badge */
-.idc-badge-wrap { margin-bottom: 10px; position: relative; z-index: 1; }
-.idc-badge {
-  display: inline-flex; align-items: center; gap: 5px;
-  background: var(--ac); color: #fff;
-  font-size: 6.5px; font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;
-  padding: 4px 11px; border-radius: 4px;
-  box-shadow: 0 3px 10px rgba(0,0,0,.3);
-}
-.idc-badge i { font-size: 9px; }
-
-/* College row */
-.idc-college-row {
-  display: flex; align-items: center; gap: 9px;
-  margin-bottom: 13px; position: relative; z-index: 1;
-}
-.idc-logo {
-  width: 40px; height: 40px; flex-shrink: 0;
-  object-fit: contain; border-radius: 9px;
-  background: rgba(255,255,255,.18); padding: 3px;
-}
-.idc-logo-ph {
-  width: 40px; height: 40px; flex-shrink: 0;
-  border-radius: 9px; background: rgba(255,255,255,.14);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 18px; color: rgba(255,255,255,.45);
-}
-.idc-college-info { min-width: 0; }
-.idc-cname {
-  font-size: 14px; font-weight: 900; color: #fff;
-  line-height: 1.2; word-break: break-word;
-  text-shadow: 0 2px 6px rgba(0,0,0,.3);
-}
-.idc-caddr { font-size: 7.5px; color: rgba(255,255,255,.65); margin-top: 3px; }
-
-/* Identity row: photo circle left, name right */
-.idc-identity-row {
-  display: flex; align-items: center; gap: 12px;
-  position: relative; z-index: 1;
-}
-.idc-photo-ring {
-  width: 76px; height: 76px; flex-shrink: 0; border-radius: 50%;
-  padding: 3px;
-  background: conic-gradient(from 180deg,
-    var(--ac) 0%, rgba(255,255,255,.5) 40%,
-    rgba(255,255,255,.8) 55%, rgba(255,255,255,.5) 70%,
-    var(--ac) 100%);
-  box-shadow: 0 0 0 3px rgba(255,255,255,.12), 0 8px 26px rgba(0,0,0,.45);
-}
-.idc-photo-inner {
-  width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
-  background: rgba(255,255,255,.12);
-  display: flex; align-items: center; justify-content: center;
-}
-.idc-photo-inner img { width:100%; height:100%; object-fit:cover; }
-.idc-no-photo { font-size: 36px; color: rgba(255,255,255,.28); }
-
-.idc-identity-text { flex: 1; min-width: 0; }
-.idc-sname {
-  font-size: 14px; font-weight: 900; color: #fff;
-  line-height: 1.2; margin-bottom: 5px;
-  text-shadow: 0 2px 8px rgba(0,0,0,.3);
-  overflow: hidden; text-overflow: ellipsis;
-}
-.idc-dept-chip {
-  font-size: 7px; font-weight: 700; color: var(--cc-dk);
-  background: rgba(255,255,255,.92);
-  padding: 2px 9px; border-radius: 3px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  margin-bottom: 4px; display: inline-block; max-width: 100%;
-}
-.idc-sem-chip {
-  font-size: 6.5px; font-weight: 600; color: rgba(255,255,255,.7);
-}
-
-/* ── White info body ── */
-.idc-body {
-  background: #fff;
-  flex: 1; display: flex; flex-direction: column;
-  border-top: 3px solid var(--ac);
-  overflow: hidden;
-}
-.idc-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 14px;
-  flex: 1;
-  border-bottom: 1px solid #f1f5f9;
-  position: relative;
-}
-.idc-row:last-child { border-bottom: none; }
-.idc-row::before {
-  content: '';
-  position: absolute; left: 0; top: 22%; bottom: 22%;
-  width: 3px; border-radius: 0 2px 2px 0;
-  background: var(--ac);
-}
-.idc-row > i     { font-size: 9.5px; color: var(--ac); width: 14px; text-align: center; flex-shrink: 0; }
-.idc-lbl         { font-size: 7.5px; color: #94a3b8; font-weight: 600; flex: 1; }
-.idc-val         { font-size: 8.5px; font-weight: 700; color: #0f172a;
-                   text-align: right; max-width: 125px;
-                   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.idc-blood-i     { color: #ef4444 !important; }
-.idc-blood-v     { color: #dc2626 !important; font-weight: 800 !important; }
-
-/* ── Gradient footer ── */
-.idc-ftr {
-  background: linear-gradient(135deg, var(--cc-dk), var(--cc-md));
-  padding: 9px 14px;
-  display: flex; justify-content: space-between; align-items: center;
+  width: 320px;
+  height: 510px;
+  perspective: 1400px;
+  cursor: pointer;
   flex-shrink: 0;
 }
-.idc-fline     { display: flex; align-items: baseline; gap: 5px; line-height: 2; }
-.idc-flbl      { font-size: 6.5px; font-weight: 700; color: rgba(255,255,255,.45); text-transform: uppercase; letter-spacing: .6px; }
-.idc-fval      { font-size: 8px; font-weight: 700; color: rgba(255,255,255,.92); }
-.idc-expiry    { color: #86efac !important; }
-.idc-sig       { text-align: center; }
-.idc-sig-img   { height: 28px; display: block; margin: 0 auto 2px; object-fit: contain; max-width: 80px; }
-.idc-sig-line  { width: 70px; border-bottom: 1px solid rgba(255,255,255,.28); height: 22px; margin: 0 auto 2px; }
-.idc-sig-name  { font-size: 7px; font-weight: 700; color: #fff; white-space: nowrap; }
-.idc-sig-ttl   { font-size: 6.5px; color: rgba(255,255,255,.5); }
 
-/* Accent stripe */
-.idc-stripe {
-  height: 4px; flex-shrink: 0;
-  background: linear-gradient(90deg, var(--ac-dk), var(--ac),
-    color-mix(in srgb,var(--ac) 55%,var(--cc)), var(--ac), var(--ac-dk));
+.idc-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform .78s cubic-bezier(.22,.61,.36,1);
 }
 
-/* Watermark / shimmer */
-.idc-watermark {
-  position: absolute; top: 50%; left: 50%;
-  transform: translate(-50%,-50%) rotate(-28deg);
-  font-size: 22px; font-weight: 900; opacity: .06;
-  color: #000; pointer-events: none; z-index: 50;
-  white-space: nowrap; letter-spacing: 2px;
+.idc-scene:hover .idc-inner,
+.idc-scene.flipped .idc-inner {
+  transform: rotateY(180deg);
 }
-.idc-shimmer {
-  position: absolute; inset: 0; pointer-events: none; z-index: 40;
-  background: linear-gradient(108deg, transparent 34%, rgba(255,255,255,.13) 50%, transparent 66%);
-  background-size: 220% 100%;
-  animation: idcShimmer 4.5s ease-in-out infinite;
+
+.idc-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 34px;
+  overflow: hidden;
+  backface-visibility: hidden;
+  color: #fff;
+  font-family: "Segoe UI", "Trebuchet MS", sans-serif;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, .32), 0 10px 22px rgba(15, 23, 42, .18);
 }
-@keyframes idcShimmer { 0%{background-position:220% 0} 100%{background-position:-220% 0} }
 
-/* ══ BACK ════════════════════════════════════════════ */
-
-/* Back face — gradient is the default/fallback; inline bg-image overrides when college image set */
+.idc-front,
 .idc-back {
-  background: linear-gradient(145deg, var(--cc-dk) 0%, var(--cc-md) 50%, var(--cc-lt) 100%);
+  background:
+    radial-gradient(circle at 86% 20%, rgba(84, 232, 255, .28), transparent 28%),
+    radial-gradient(circle at 78% 52%, rgba(98, 124, 255, .3), transparent 26%),
+    linear-gradient(145deg, #13103e 0%, color-mix(in srgb, var(--idc-primary) 74%, #0a0f28) 48%, color-mix(in srgb, var(--idc-primary) 92%, #3758ff) 100%);
+}
+
+.idc-front {
+  padding: 16px 18px 16px;
+}
+
+.idc-front::before,
+.idc-front::after {
+  content: "";
+  position: absolute;
+  inset: auto -8% 33% -8%;
+  height: 170px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.idc-front::before {
+  border: 2px solid rgba(84, 232, 255, .46);
+  transform: rotate(-9deg);
+}
+
+.idc-front::after {
+  inset: auto -14% 39% -14%;
+  height: 180px;
+  border-top: 1px solid rgba(255, 255, 255, .2);
+  transform: rotate(4deg);
+}
+
+.idc-status-mark {
+  position: absolute;
+  inset: 48% auto auto 50%;
+  transform: translate(-50%, -50%) rotate(-16deg);
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: .2em;
+  color: rgba(255, 255, 255, .12);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.idc-front-slot {
+  width: 96px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .78);
+  margin: 2px auto 10px;
+  box-shadow: inset 0 2px 6px rgba(15, 23, 42, .18);
+}
+
+.idc-front-chip {
+  position: absolute;
+  top: 18px;
+  right: 0;
+  padding: 9px 20px 9px 18px;
+  border-radius: 18px 0 0 18px;
+  background: rgba(7, 38, 84, .88);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .04em;
+  box-shadow: 0 10px 24px rgba(7, 38, 84, .28);
+}
+
+.idc-front-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  position: relative;
+  z-index: 2;
+}
+
+.idc-front-brand-logo {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
+  flex-shrink: 0;
+}
+
+.idc-front-brand-logo img,
+.idc-back-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.idc-front-brand-logo span,
+.idc-back-logo span {
+  font-size: 2rem;
+  color: rgba(255, 255, 255, .7);
+}
+
+.idc-front-brand-copy {
+  min-width: 0;
+}
+
+.idc-front-brand-name {
+  font-size: .92rem;
+  line-height: 1.05;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, .32);
+  word-break: break-word;
+}
+
+.idc-front-brand-sub {
+  margin-top: 4px;
+  font-size: .66rem;
+  color: rgba(255, 255, 255, .72);
+  font-weight: 600;
+}
+
+.idc-front-waves {
+  position: absolute;
+  left: -40px;
+  right: -10px;
+  top: 142px;
+  height: 98px;
+  pointer-events: none;
+}
+
+.idc-front-waves span {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border-top: 2px solid rgba(84, 232, 255, .52);
+  transform-origin: center;
+}
+
+.idc-front-waves span:nth-child(1) { transform: rotate(-7deg) translateY(24px); }
+.idc-front-waves span:nth-child(2) { transform: rotate(7deg) translateY(6px); border-top-color: rgba(138, 127, 255, .46); }
+.idc-front-waves span:nth-child(3) { transform: rotate(-14deg) translateY(42px); border-top-color: rgba(255, 255, 255, .14); }
+
+.idc-front-photo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+  position: relative;
+  z-index: 2;
+}
+
+.idc-front-photo-ring {
+  width: 156px;
+  height: 156px;
+  border-radius: 50%;
+  padding: 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(200, 204, 226, .88));
+  box-shadow: 0 16px 34px rgba(0, 0, 0, .26);
+}
+
+.idc-front-photo-core {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.idc-front-photo-core img,
+.idc-back-photo-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.idc-front-photo-placeholder {
+  font-size: 5rem;
+  color: rgba(15, 23, 42, .12);
+}
+
+.idc-front-content {
+  position: relative;
+  z-index: 2;
+  margin-top: 10px;
+}
+
+.idc-front-name {
+  font-size: 1.04rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  margin-bottom: 8px;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, .35);
+}
+
+.idc-front-details {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 12px 10px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03));
+  border: 1px solid rgba(255, 255, 255, .1);
+  backdrop-filter: blur(6px);
+}
+
+.idc-front-detail-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+.idc-front-detail-label {
+  flex: 0 0 76px;
+  font-size: .64rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, .96);
+}
+
+.idc-front-detail-value {
+  flex: 1;
+  min-width: 0;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.16;
+  word-break: break-word;
+  color: rgba(255, 255, 255, .94);
+}
+
+.idc-front-detail-row-compact .idc-front-detail-value {
+  font-size: .68rem;
+}
+
+.idc-front-highlight {
+  color: var(--idc-accent);
+}
+
+.idc-front-holo {
+  position: absolute;
+  right: 30px;
+  bottom: 92px;
+  width: 54px;
+  height: 68px;
+  z-index: 2;
+}
+
+.idc-front-holo-core {
+  width: 100%;
+  height: 100%;
+  clip-path: polygon(50% 0, 88% 12%, 100% 48%, 83% 100%, 17% 100%, 0 48%, 12% 12%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, .94), rgba(113, 250, 255, .54), rgba(166, 142, 255, .62));
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, .18), 0 12px 24px rgba(0, 0, 0, .24);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.idc-front-holo-core span {
+  font-size: 1.55rem;
+  color: rgba(12, 42, 84, .75);
+}
+
+.idc-front-qr {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: 76px;
+  height: 76px;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .26);
+  z-index: 2;
+}
+
+.idc-front-qr img,
+.idc-back-qr img {
+  width: 66px;
+  height: 66px;
+  object-fit: contain;
+}
+
+.idc-front-qr span,
+.idc-back-qr span {
+  font-size: 2.1rem;
+  color: #0f172a;
+}
+
+.idc-back {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 18px 16px;
   background-size: cover;
   background-position: center;
 }
 
-/* Dark overlay sits over the background image/gradient */
 .idc-back-overlay {
-  position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(
-    to bottom,
-    rgba(0,0,0,.58) 0%,
-    rgba(0,0,0,.48) 40%,
-    rgba(0,0,0,.72) 100%
-  );
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(145deg, rgba(14, 12, 40, .92), rgba(28, 34, 91, .88)),
+    linear-gradient(135deg, rgba(84, 232, 255, .08), transparent 45%);
 }
 
-/* All back content above the overlay */
-.idc-bhdr,
-.idc-qr-panel,
-.idc-bglass,
-.idc-bfoot,
-.idc-stripe { position: relative; z-index: 2; }
-
-/* Back header */
-.idc-bhdr {
-  display: flex; align-items: center; gap: 9px;
-  padding: 14px 14px 10px;
-}
-.idc-blogo {
-  width: 36px; height: 36px; flex-shrink: 0;
-  object-fit: contain; border-radius: 8px;
-  background: rgba(255,255,255,.18); padding: 2px;
-}
-.idc-bhname { font-size: 12px; font-weight: 900; color: #fff; line-height: 1.2; }
-.idc-bhsub  { font-size:  7.5px; color: rgba(255,255,255,.6); margin-top: 2px; }
-
-/* QR + facts */
-.idc-qr-panel {
-  display: flex; align-items: flex-start; gap: 11px;
-  padding: 0 12px 10px;
-}
-.idc-qr-card {
-  flex-shrink: 0; background: #fff;
-  border-radius: 10px; padding: 5px 5px 3px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.4);
-  text-align: center;
-}
-.idc-qr-card img { display:block; width:90px; height:90px; border-radius:6px; }
-.idc-qr-ph {
-  width:90px; height:90px; border-radius:6px;
-  background:#e8edf5; display:flex; align-items:center; justify-content:center;
-  color:#aab; font-size:30px;
-}
-.idc-qr-label { font-size:6px; color:#94a3b8; padding:2px 0 1px; }
-
-.idc-qr-facts { flex: 1; padding-top: 2px; }
-.idc-qf-name  { font-size: 11px; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 7px; }
-.idc-qf-row   {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 7.5px; color: rgba(255,255,255,.75); margin-bottom: 5px; line-height: 1.3;
-}
-.idc-qf-row i  { font-size: 8px; color: var(--ac); flex-shrink: 0; }
-.idc-qf-blood  { color: #fca5a5 !important; }
-.idc-qf-blood i { color: #f87171 !important; }
-
-/* Back info glass panel */
-.idc-bglass {
-  margin: 0 12px;
-  padding: 8px 12px;
-  background: rgba(255,255,255,.12);
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,.22);
-  border-radius: 12px;
-  flex: 1; overflow: hidden;
-}
-.idc-bsec {
-  font-size: 6.5px; font-weight: 800; color: rgba(255,255,255,.5);
-  text-transform: uppercase; letter-spacing: 1px;
-  margin: 5px 0 4px; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 2px;
-}
-.idc-bsec:first-child { margin-top: 0; }
-.idc-brow {
-  display: flex; align-items: flex-start; gap: 6px;
-  font-size: 8px; color: rgba(255,255,255,.82); margin-bottom: 4px; line-height: 1.4;
-}
-.idc-brow i { color: var(--ac); font-size: 8px; flex-shrink: 0; margin-top: 1px; }
-.idc-brow-valid i    { color: #4ade80; }
-.idc-brow-valid span { color: #86efac; font-weight: 700; }
-
-/* Back footer */
-.idc-bfoot {
-  font-size: 6.5px; color: rgba(255,255,255,.35);
-  text-align: center; padding: 6px 14px 5px;
+.idc-back-watermark {
+  position: absolute;
+  inset: 0 0 64px 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px 14px;
+  align-content: start;
+  padding: 32px 18px 0 102px;
+  transform: rotate(-23deg);
+  opacity: .12;
+  pointer-events: none;
 }
 
-/* ══ PRINT ══════════════════════════════════════════ */
+.idc-back-watermark span {
+  font-size: .78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.idc-back-shards {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .82;
+}
+
+.idc-back-shards span {
+  position: absolute;
+  display: block;
+  background: linear-gradient(135deg, rgba(75, 226, 255, .92), rgba(91, 114, 255, .78));
+  clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%);
+}
+
+.idc-back-shards span:nth-child(1) {
+  width: 84px;
+  height: 116px;
+  top: -4px;
+  left: 118px;
+}
+
+.idc-back-shards span:nth-child(2) {
+  width: 82px;
+  height: 122px;
+  top: 0;
+  right: 28px;
+}
+
+.idc-back-shards span:nth-child(3) {
+  width: 78px;
+  height: 128px;
+  top: 126px;
+  right: -12px;
+  transform: rotate(12deg);
+}
+
+.idc-back-shards span:nth-child(4) {
+  width: 62px;
+  height: 108px;
+  bottom: -8px;
+  right: 18px;
+  transform: rotate(14deg);
+}
+
+.idc-back-barcode {
+  position: absolute;
+  top: 28px;
+  left: 16px;
+  bottom: 74px;
+  width: 44px;
+  border-radius: 6px;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, .98) 0 3px,
+      transparent 3px 6px,
+      rgba(255, 255, 255, .98) 6px 9px,
+      transparent 9px 13px
+    ),
+    linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.72));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+  z-index: 1;
+}
+
+.idc-back-brand,
+.idc-back-body,
+.idc-back-lower,
+.idc-back-note {
+  position: relative;
+  z-index: 2;
+}
+
+.idc-back-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 8px 72px;
+}
+
+.idc-back-logo {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.idc-back-name {
+  font-size: .98rem;
+  font-weight: 1000;
+  line-height: 1.04;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.idc-back-sub {
+  margin-top: 4px;
+  font-size: .76rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, .92);
+  line-height: 1.15;
+}
+
+.idc-back-body {
+  display: flex;
+  flex: 1;
+  margin: 18px 0 0 72px;
+  align-items: flex-start;
+}
+
+.idc-back-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 176px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  min-height: 0;
+}
+
+.idc-back-label {
+  font-size: .82rem;
+  font-weight: 800;
+  margin-bottom: 2px;
+  color: rgba(255, 255, 255, .98);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.idc-back-value {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: .86rem;
+  line-height: 1.15;
+  font-weight: 700;
+  color: rgba(255, 255, 255, .94);
+  word-break: break-word;
+}
+
+.idc-back-lower {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.idc-back-signature {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+  text-align: right;
+}
+
+.idc-back-sign-label {
+  font-size: .8rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, .96);
+}
+
+.idc-back-sign-line {
+  height: 28px;
+  border-bottom: 2px solid rgba(255, 255, 255, .78);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  margin-left: auto;
+  max-width: 162px;
+}
+
+.idc-back-sign-line img {
+  max-width: 118px;
+  max-height: 28px;
+  object-fit: contain;
+}
+
+.idc-back-sign-meta {
+  font-size: .72rem;
+  line-height: 1.24;
+  font-weight: 700;
+}
+
+.idc-back-sign-name {
+  font-weight: 900;
+}
+
+.idc-back-qr {
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
+  flex-shrink: 0;
+}
+
+.idc-back-note {
+  margin-top: 8px;
+  padding-left: 8px;
+  font-size: .74rem;
+  line-height: 1.12;
+  font-weight: 700;
+  color: rgba(255, 255, 255, .96);
+}
+
+@media (max-width: 575.98px) {
+  .idc-scene {
+    width: min(320px, 92vw);
+    height: calc(min(320px, 92vw) * 1.59375);
+  }
+
+  .idc-front-name,
+  .idc-back-name,
+  .idc-front-brand-name {
+    word-break: break-word;
+  }
+
+  .idc-back-body {
+    margin-left: 72px;
+  }
+}
+
 @media print {
-  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-
-  body * { visibility:hidden !important; }
-  #printArea, #printArea * { visibility:visible !important; }
-  #printArea { position:fixed !important; top:6mm; left:6mm; }
-
-  /* Flatten the flip scene into two side-by-side cards */
-  .idc-scene,
-  .idc-scene.flipped { perspective:none !important; cursor:default !important; width:auto !important; height:auto !important; }
-
-  .idc-inner,
-  .idc-scene.flipped .idc-inner {
-    position:static !important;
-    transform:none !important; transition:none !important;
-    transform-style:flat !important;
-    display:flex !important; flex-direction:row !important; gap:8mm !important;
-    width:auto !important; height:auto !important;
+  .idc-scene {
+    cursor: default;
+    width: 320px;
+    height: 510px;
   }
 
-  /* position:relative keeps .idc-face as a positioning context for its absolute children */
-  .idc-face {
-    position:relative !important;
-    transform:none !important;
-    backface-visibility:visible !important;
-    width:270px !important; height:490px !important;
-    flex-shrink:0 !important; overflow:hidden !important;
-    page-break-inside:avoid;
+  .idc-inner {
+    transform: none !important;
   }
-  .idc-back { transform:none !important; }
 
-  /* Overlay must still fill the back face */
-  .idc-back-overlay { position:absolute !important; inset:0 !important; }
-
-  .idc-shimmer, .idc-watermark { display:none !important; }
+  .idc-back {
+    display: none;
+  }
 }
 </style>
 {% endmacro %}

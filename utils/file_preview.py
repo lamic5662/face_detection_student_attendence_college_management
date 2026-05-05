@@ -4,6 +4,7 @@ import html as _html
 import base64
 import importlib.util
 import os
+from zipfile import ZipFile, BadZipFile
 
 PREVIEW_DEPENDENCIES = {
     'pptx': ('pptx', 'python-pptx'),
@@ -36,6 +37,35 @@ def preview_exception_message(ext: str, exc: Exception) -> str:
                 f'the optional dependency `{package_name}`.'
             )
     return str(exc)
+
+
+def infer_preview_type(filename: str | None, file_path: str | None = None) -> str:
+    if filename and '.' in filename:
+        ext = filename.rsplit('.', 1)[-1].lower()
+        if ext:
+            return ext
+    if not file_path or not os.path.isfile(file_path):
+        return ''
+
+    try:
+        with ZipFile(file_path) as archive:
+            names = set(archive.namelist())
+            if 'word/document.xml' in names:
+                return 'docx'
+            if 'ppt/presentation.xml' in names:
+                return 'pptx'
+    except BadZipFile:
+        pass
+
+    try:
+        with open(file_path, 'rb') as fh:
+            header = fh.read(16)
+    except OSError:
+        return ''
+
+    if header.startswith(b'%PDF'):
+        return 'pdf'
+    return ''
 
 
 # ── PPTX → HTML ─────────────────────────────────────────────────────────────

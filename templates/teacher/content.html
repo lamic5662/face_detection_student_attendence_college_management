@@ -155,6 +155,14 @@
               {% if item.marks %}
               <div class="text-muted"><i class="bi bi-trophy me-1"></i>{{ item.marks }} marks</div>
               {% endif %}
+              {% if item.content_type == 'assignment' and assignment_stats.get(item.id) %}
+              <div class="text-muted mt-1">
+                <i class="bi bi-inboxes me-1"></i>{{ assignment_stats[item.id].submitted }}/{{ assignment_stats[item.id].total }} submitted
+              </div>
+              <div class="text-muted">
+                <i class="bi bi-check2-square me-1"></i>{{ assignment_stats[item.id].reviewed }} reviewed
+              </div>
+              {% endif %}
               {% if not item.due_date and not item.marks %}—{% endif %}
             </td>
             <td class="text-muted small">{{ item.created_at.strftime('%d %b %Y') }}</td>
@@ -170,6 +178,12 @@
             </td>
             <td>
               <div class="d-flex gap-1">
+                {% if item.content_type == 'assignment' %}
+                <a href="{{ url_for('teacher.assignment_review', cid=item.id) }}"
+                   class="btn btn-sm btn-outline-success" title="Review submissions">
+                  <i class="bi bi-clipboard-check"></i>
+                </a>
+                {% endif %}
                 <a href="{{ url_for('teacher.content_preview', cid=item.id) }}"
                    class="btn btn-sm btn-outline-info" title="Preview">
                   <i class="bi bi-eye-fill"></i>

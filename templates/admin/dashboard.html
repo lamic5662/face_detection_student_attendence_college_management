@@ -3,6 +3,32 @@
 {% block page_title %}<i class="bi bi-speedometer2 me-2"></i>Dashboard{% endblock %}
 
 {% block content %}
+{% set visible_widgets = dashboard_prefs.visible_widget_keys if dashboard_prefs else [] %}
+{% set ordered_optional = dashboard_prefs.selected_optional_keys if dashboard_prefs else [] %}
+{% include "partials/dashboard_customize.html" %}
+
+{% if setup_report and not setup_report.is_ready %}
+<div class="alert alert-warning border-0 shadow-sm d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+  <div>
+    <div class="fw-semibold"><i class="bi bi-shield-exclamation me-2"></i>Production setup is incomplete</div>
+    <div class="small text-muted">
+      {{ setup_report.failures }} blocking issues and {{ setup_report.warnings }} warnings remain.
+      Finish the setup checklist before going live.
+    </div>
+  </div>
+  <div class="d-flex align-items-center gap-3">
+    <div class="text-end">
+      <div class="fw-bold">{{ setup_report.progress }}%</div>
+      <div class="small text-muted">ready</div>
+    </div>
+    <a href="{{ url_for('admin.system_setup') }}" class="btn btn-sm btn-warning">
+      <i class="bi bi-arrow-right-circle me-1"></i>Open Setup Flow
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% if 'stats_overview' in visible_widgets %}
 <!-- Stats Cards -->
 <div class="row g-4 mb-4">
   <div class="col-xl-2 col-md-4 col-6">
@@ -48,9 +74,11 @@
     </div>
   </div>
 </div>
+{% endif %}
 
+{% if 'attendance_trend' in visible_widgets or 'department_attendance' in visible_widgets %}
 <div class="row g-4 mb-4">
-  <!-- 7-Day Trend -->
+  {% if 'attendance_trend' in visible_widgets %}
   <div class="col-lg-8">
     <div class="card shadow-sm border-0 h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4">
@@ -61,8 +89,9 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
-  <!-- Department Stats -->
+  {% if 'department_attendance' in visible_widgets %}
   <div class="col-lg-4">
     <div class="card shadow-sm border-0 h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4">
@@ -89,11 +118,14 @@
       </div>
     </div>
   </div>
+  {% endif %}
 </div>
+{% endif %}
 
 <!-- College Management Row -->
+{% if 'recent_notices' in visible_widgets or ordered_optional %}
 <div class="row g-4 mb-4">
-  <!-- Recent Notices -->
+  {% if 'recent_notices' in visible_widgets %}
   <div class="col-lg-4">
     <div class="card shadow-sm border-0 h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
@@ -121,9 +153,12 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
-  <!-- Upcoming Exams -->
+  {% for widget_key in ordered_optional %}
+  {% if widget_key in ('upcoming_exams', 'fee_collection') %}
   <div class="col-lg-4">
+    {% if widget_key == 'upcoming_exams' %}
     <div class="card shadow-sm border-0 h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
         <h6 class="fw-semibold mb-0"><i class="bi bi-journals text-info me-2"></i>Upcoming Exams</h6>
@@ -146,10 +181,7 @@
         {% endfor %}
       </div>
     </div>
-  </div>
-
-  <!-- Fee Collection -->
-  <div class="col-lg-4">
+    {% elif widget_key == 'fee_collection' %}
     <div class="card shadow-sm border-0 h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
         <h6 class="fw-semibold mb-0"><i class="bi bi-cash-stack text-success me-2"></i>Fee Collection</h6>
@@ -172,15 +204,19 @@
         <div class="alert alert-warning border-0 py-2 px-3 mt-3 small mb-0">
           <i class="bi bi-calendar-x-fill me-1"></i>
           <strong>{{ pending_leaves }}</strong> pending leave requests
-          <a href="{{ url_for('leave.teacher_leaves') if current_user.role == 'teacher' else '#' }}" class="ms-1">Review</a>
         </div>
         {% endif %}
       </div>
     </div>
+    {% endif %}
   </div>
+  {% endif %}
+  {% endfor %}
 </div>
+{% endif %}
 
 <!-- Recent Sessions -->
+{% if 'recent_sessions' in visible_widgets %}
 <div class="card shadow-sm border-0">
   <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between">
     <h6 class="fw-semibold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent Sessions</h6>
@@ -227,6 +263,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

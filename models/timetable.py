@@ -7,6 +7,7 @@ class TimetableSlot(db.Model):
     __tablename__ = 'timetable_slots'
 
     id = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
     department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=False)
     semester = db.Column(db.Integer, nullable=False)
     day_of_week = db.Column(db.Integer, nullable=False)   # 0=Mon … 6=Sun
@@ -28,6 +29,8 @@ class TimetableSlot(db.Model):
     __table_args__ = (
         db.UniqueConstraint('department_id', 'semester', 'day_of_week', 'period_no',
                             name='uq_slot'),
+        db.Index('ix_timetable_slots_college_scope_day', 'college_id', 'department_id', 'semester', 'day_of_week'),
+        db.Index('ix_timetable_slots_college_teacher_day', 'college_id', 'teacher_id', 'day_of_week'),
     )
 
     @property

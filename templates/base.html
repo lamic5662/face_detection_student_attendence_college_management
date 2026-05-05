@@ -21,171 +21,96 @@
     <span class="ms-2 fw-bold">SmartAttend</span>
   </div>
   <hr class="sidebar-divider">
+  {% set nav = sidebar_navigation %}
+  {% if nav %}
+  <div class="sidebar-nav-shell">
+    <div class="sidebar-section-head">
+      <div>
+        <div class="sidebar-section-label">Quick Access</div>
+        <div class="sidebar-section-copy">Keep the most used tools upfront.</div>
+      </div>
+      {% if nav.has_customizable_items %}
+      <button type="button"
+              class="btn btn-sm btn-link sidebar-customize-btn"
+              data-bs-toggle="modal"
+              data-bs-target="#sidebarCustomizeModal">
+        Customize
+      </button>
+      {% endif %}
+    </div>
 
-  {% if current_user.role == 'admin' %}
-  <ul class="sidebar-nav">
-    <li><a href="{{ url_for('admin.dashboard') }}" class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
-      <i class="bi bi-speedometer2"></i><span>Dashboard</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.students') }}" class="{% if request.endpoint == 'admin.students' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Students">
-      <i class="bi bi-people-fill"></i><span>Students</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.teachers') }}" class="{% if request.endpoint == 'admin.teachers' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Teachers">
-      <i class="bi bi-person-badge-fill"></i><span>Teachers</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.subjects') }}" class="{% if request.endpoint == 'admin.subjects' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Subjects">
-      <i class="bi bi-journal-bookmark-fill"></i><span>Subjects</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.departments') }}" class="{% if request.endpoint == 'admin.departments' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Departments">
-      <i class="bi bi-building-fill"></i><span>Departments</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.users') }}" class="{% if request.endpoint == 'admin.users' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="All Users">
-      <i class="bi bi-person-gear"></i><span>All Users</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.sessions') }}" class="{% if request.endpoint == 'admin.sessions' or request.endpoint == 'admin.cancel_session' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Sessions">
-      <i class="bi bi-camera-video-fill"></i><span>Sessions</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.analytics') }}" class="{% if request.endpoint == 'admin.analytics' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Analytics">
-      <i class="bi bi-bar-chart-fill"></i><span>Analytics</span>
-    </a></li>
-    <li><a href="{{ url_for('leave.admin_leaves') }}" class="{% if 'leave' in (request.endpoint or '') and current_user.role == 'admin' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Leave Management">
-      <i class="bi bi-calendar-x-fill"></i><span>Leave Management</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.file_manager') }}" class="{% if request.endpoint == 'admin.file_manager' or request.endpoint == 'admin.delete_file' or request.endpoint == 'admin.bulk_delete_files' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="File Manager">
-      <i class="bi bi-folder2-open"></i><span>File Manager</span>
-    </a></li>
-    <hr class="sidebar-divider my-1">
-    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
-      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
-    </a></li>
-    <li><a href="{{ url_for('timetable.view') }}" class="{% if 'timetable' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Timetable">
-      <i class="bi bi-calendar3"></i><span>Timetable</span>
-    </a></li>
-    <li><a href="{{ url_for('exam.admin_exams') }}" class="{% if request.endpoint == 'exam.admin_exams' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exams">
-      <i class="bi bi-journals"></i><span>Exams</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.marksheet_list') }}" class="{% if request.endpoint in ('admin.marksheet_list','admin.admin_marksheet') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Marksheets">
-      <i class="bi bi-award-fill"></i><span>Marksheets</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.marksheet_signatures') }}" class="{% if 'marksheet_signature' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Signatures">
-      <i class="bi bi-pen-fill"></i><span>Signatures</span>
-    </a></li>
-    <li><a href="{{ url_for('fee.admin_fees') }}" class="{% if 'fee' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Fees">
-      <i class="bi bi-cash-stack"></i><span>Fees</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.parents') }}" class="{% if request.endpoint and 'parent' in request.endpoint %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Parent Accounts">
-      <i class="bi bi-house-heart-fill"></i><span>Parents</span>
-    </a></li>
-    <hr class="sidebar-divider my-1">
-    <li><a href="{{ url_for('admin.settings') }}" class="{% if request.endpoint == 'admin.settings' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="College Settings">
-      <i class="bi bi-gear-fill"></i><span>Settings</span>
-    </a></li>
-    <li><a href="{{ url_for('admin.id_card_template') }}" class="{% if 'id_card' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Digital ID Cards">
-      <i class="bi bi-person-badge-fill"></i><span>Digital ID Cards</span>
-      {% set pending_ids = namespace(count=0) %}
-      {% for _ in range(1) %}{% set pending_ids.count = pending_id_count or 0 %}{% endfor %}
-    </a></li>
-    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
-      <i class="bi bi-book-fill"></i><span>User Guide</span>
-    </a></li>
-  </ul>
+    <ul class="sidebar-nav">
+      {% for item in nav.quick_items %}
+      <li class="sidebar-item-row" data-nav-group="quick" data-nav-key="{{ item.key }}">
+        <a href="{{ item.url }}"
+           class="{% if item.active %}active{% endif %}"
+           data-bs-toggle="tooltip"
+           data-bs-placement="right"
+           title="{{ item.label }}">
+          <i class="bi {{ item.icon }}"></i>
+          <span>{{ item.label }}</span>
+          {% if item.badge %}
+          <span class="badge bg-danger ms-auto nav-badge">{{ item.badge }}</span>
+          {% endif %}
+        </a>
+        {% if item.pinned %}
+        <form method="post"
+              action="{{ url_for('auth.toggle_sidebar_pin') }}"
+              class="sidebar-pin-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="feature_key" value="{{ item.key }}">
+          <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+          <button type="submit"
+                  class="sidebar-pin-button"
+                  title="Unpin from quick access"
+                  aria-label="Unpin {{ item.label }} from quick access">
+            <i class="bi bi-pin-angle-fill"></i>
+          </button>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
 
-  {% elif current_user.role == 'teacher' %}
-  <ul class="sidebar-nav">
-    <li><a href="{{ url_for('teacher.dashboard') }}" class="{% if request.endpoint == 'teacher.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
-      <i class="bi bi-speedometer2"></i><span>Dashboard</span>
-    </a></li>
-    <li><a href="{{ url_for('teacher.sessions') }}" class="{% if 'session' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Attendance Sessions">
-      <i class="bi bi-camera-video-fill"></i><span>Attendance Sessions</span>
-    </a></li>
-    <li><a href="{{ url_for('leave.teacher_leaves') }}" class="{% if 'leave' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Leave Management">
-      <i class="bi bi-calendar-x-fill"></i><span>Leave Management</span>
-      {% set pending_count = current_user.teacher_profile.subjects | map(attribute='leave_requests') | sum(start=[]) | selectattr('status','eq','pending') | selectattr('leave_type','eq','student_subject') | list | length %}
-      {% if pending_count > 0 %}<span class="badge bg-danger ms-auto nav-badge">{{ pending_count }}</span>{% endif %}
-    </a></li>
-    <li><a href="{{ url_for('teacher.reports') }}" class="{% if request.endpoint == 'teacher.reports' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Reports">
-      <i class="bi bi-file-earmark-bar-graph-fill"></i><span>Reports</span>
-    </a></li>
-    <hr class="sidebar-divider my-1">
-    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
-      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
-    </a></li>
-    <li><a href="{{ url_for('timetable.view') }}" class="{% if 'timetable' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Timetable">
-      <i class="bi bi-calendar3"></i><span>Timetable</span>
-    </a></li>
-    <li><a href="{{ url_for('exam.teacher_exams') }}" class="{% if 'exam' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Exams & Marks">
-      <i class="bi bi-journals"></i><span>Exams &amp; Marks</span>
-    </a></li>
-    <li><a href="{{ url_for('teacher.content_list') }}" class="{% if 'content' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Content Manager">
-      <i class="bi bi-collection-fill"></i><span>Content Manager</span>
-    </a></li>
-    <hr class="sidebar-divider my-1">
-    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
-      <i class="bi bi-book-fill"></i><span>User Guide</span>
-    </a></li>
-  </ul>
-
-  {% elif current_user.role == 'student' %}
-  <ul class="sidebar-nav">
-    <li><a href="{{ url_for('student.dashboard') }}" class="{% if request.endpoint == 'student.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
-      <i class="bi bi-speedometer2"></i><span>Dashboard</span>
-    </a></li>
-    <li><a href="{{ url_for('student.profile') }}" class="{% if request.endpoint == 'student.profile' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Profile">
-      <i class="bi bi-person-circle"></i><span>My Profile</span>
-    </a></li>
-    <li><a href="{{ url_for('student.my_attendance') }}" class="{% if request.endpoint == 'student.my_attendance' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Attendance">
-      <i class="bi bi-calendar-check-fill"></i><span>My Attendance</span>
-    </a></li>
-    <li><a href="{{ url_for('leave.student_leaves') }}" class="{% if request.endpoint == 'leave.student_leaves' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Leave Applications">
-      <i class="bi bi-calendar-x-fill"></i><span>Leave Applications</span>
-    </a></li>
-    <li><a href="{{ url_for('student.enroll') }}" class="{% if request.endpoint == 'student.enroll' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Face Enrollment">
-      <i class="bi bi-person-bounding-box"></i><span>Face Enrollment</span>
-    </a></li>
-    <hr class="sidebar-divider my-1">
-    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
-      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
-    </a></li>
-    <li><a href="{{ url_for('timetable.view') }}" class="{% if 'timetable' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Timetable">
-      <i class="bi bi-calendar3"></i><span>Timetable</span>
-    </a></li>
-    <li><a href="{{ url_for('exam.student_results') }}" class="{% if request.endpoint == 'exam.student_results' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Results">
-      <i class="bi bi-award-fill"></i><span>My Results</span>
-    </a></li>
-    <li><a href="{{ url_for('exam.student_marksheet') }}" class="{% if request.endpoint == 'exam.student_marksheet' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Marksheet">
-      <i class="bi bi-file-earmark-text-fill"></i><span>Marksheet</span>
-    </a></li>
-    <li><a href="{{ url_for('fee.student_fees') }}" class="{% if 'fee' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My Fees">
-      <i class="bi bi-cash-stack"></i><span>My Fees</span>
-    </a></li>
-    <li><a href="{{ url_for('student.id_card') }}" class="{% if request.endpoint == 'student.id_card' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="My ID Card">
-      <i class="bi bi-person-badge-fill"></i><span>My ID Card</span>
-    </a></li>
-    <li><a href="{{ url_for('student.student_content') }}" class="{% if 'content' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Study Materials">
-      <i class="bi bi-collection-fill"></i><span>Study Materials</span>
-    </a></li>
-    <hr class="sidebar-divider my-1">
-    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
-      <i class="bi bi-book-fill"></i><span>User Guide</span>
-    </a></li>
-  </ul>
-
-  {% elif current_user.role == 'parent' %}
-  <ul class="sidebar-nav">
-    <li><a href="{{ url_for('parent.dashboard') }}" class="{% if request.endpoint == 'parent.dashboard' %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
-      <i class="bi bi-house-heart-fill"></i><span>Dashboard</span>
-    </a></li>
-    <li><a href="{{ url_for('parent.parent_marksheets') }}" class="{% if request.endpoint in ('parent.parent_marksheets', 'parent.parent_marksheet') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Marksheets">
-      <i class="bi bi-award-fill"></i><span>Marksheets</span>
-    </a></li>
-    <li><a href="{{ url_for('notice.list_notices') }}" class="{% if 'notice' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Notice Board">
-      <i class="bi bi-megaphone-fill"></i><span>Notice Board</span>
-    </a></li>
-    <hr class="sidebar-divider my-1">
-    <li><a href="{{ url_for('help.guide') }}" class="{% if 'help' in (request.endpoint or '') %}active{% endif %}" data-bs-toggle="tooltip" data-bs-placement="right" title="User Guide">
-      <i class="bi bi-book-fill"></i><span>User Guide</span>
-    </a></li>
-  </ul>
+    {% if nav.more_items %}
+    <div class="sidebar-more-wrap">
+      <button class="sidebar-more-toggle {% if nav.more_open %}{% else %}collapsed{% endif %}"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#sidebarMoreTools"
+              aria-expanded="{{ 'true' if nav.more_open else 'false' }}"
+              aria-controls="sidebarMoreTools">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-grid-1x2-fill"></i>
+          <span>More Tools</span>
+        </span>
+        <span class="d-flex align-items-center gap-2">
+          <span class="badge rounded-pill text-bg-light">{{ nav.more_items|length }}</span>
+          <i class="bi bi-chevron-down sidebar-more-chevron"></i>
+        </span>
+      </button>
+      <div class="collapse {% if nav.more_open %}show{% endif %}" id="sidebarMoreTools">
+        <ul class="sidebar-nav sidebar-nav-secondary mt-2">
+          {% for item in nav.more_items %}
+          <li data-nav-group="more" data-nav-key="{{ item.key }}">
+            <a href="{{ item.url }}"
+               class="{% if item.active %}active{% endif %}"
+               data-bs-toggle="tooltip"
+               data-bs-placement="right"
+               title="{{ item.label }}">
+              <i class="bi {{ item.icon }}"></i>
+              <span>{{ item.label }}</span>
+              {% if item.badge %}
+              <span class="badge bg-danger ms-auto nav-badge">{{ item.badge }}</span>
+              {% endif %}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+  </div>
   {% endif %}
 
   <div class="sidebar-footer">
@@ -219,6 +144,79 @@
     </button>
     <div class="topbar-title">{% block page_title %}{% endblock %}</div>
     <div class="ms-auto d-flex align-items-center gap-3">
+      <div class="dropdown">
+        <button class="btn btn-light position-relative topbar-bell" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="topbarBellButton">
+          <i class="bi bi-bell-fill"></i>
+          <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger topbar-bell-badge {% if not notification_count %}d-none{% endif %}" id="topbarBellBadge">
+            {{ 9 if notification_count > 9 else notification_count }}
+          </span>
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-0 shadow border-0 topbar-notice-menu" id="topbarNoticeMenu">
+          <div class="px-3 py-3 border-bottom d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">Notifications</div>
+              <div class="text-muted small">Quick access to recent notices</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <button type="button"
+                      class="btn btn-sm btn-outline-secondary topbar-delete-read-btn"
+                      id="topbarDeleteReadButton"
+                      title="Delete read notifications from the tray"
+                      aria-label="Delete read notifications from the tray"
+                      {% if not (notification_items | selectattr('is_read_for_current_user') | list | length) %}disabled{% endif %}>
+                <i class="bi bi-trash3"></i>
+              </button>
+              <button type="button"
+                      class="btn btn-sm btn-outline-secondary topbar-mark-read-btn"
+                      id="topbarMarkReadButton"
+                      title="Mark all unread notifications as read"
+                      aria-label="Mark all unread notifications as read"
+                      {% if not notification_count %}disabled{% endif %}>
+                <i class="bi bi-check2-all"></i>
+              </button>
+              <a href="{{ url_for('notice.list_notices') }}" class="btn btn-sm btn-outline-secondary">Open Board</a>
+            </div>
+          </div>
+
+          {% if notification_items %}
+          <div class="py-2" id="topbarNoticeList">
+            {% for notice in notification_items %}
+            <a href="{{ url_for('notice.detail', nid=notice.id) }}" class="dropdown-item px-3 py-3 topbar-notice-item {% if not notice.is_read_for_current_user %}is-unread{% endif %}">
+              <div class="d-flex gap-3 align-items-start">
+                <span class="topbar-notice-dot dot-{{ notice.category }}"></span>
+                <div class="min-w-0 flex-grow-1">
+                  <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div class="fw-semibold text-wrap">
+                      {{ notice.title }}
+                      {% if notice.is_pinned %}<i class="bi bi-pin-angle-fill text-warning ms-1"></i>{% endif %}
+                    </div>
+                    <small class="text-muted flex-shrink-0">{{ notice.created_at.strftime('%d %b') }}</small>
+                  </div>
+                  <div class="small text-muted text-wrap">{{ notice.content | truncate(70) }}</div>
+                  <div class="mt-2 d-flex gap-2 flex-wrap">
+                    <span class="badge bg-light text-secondary border text-uppercase">{{ notice.category.replace('_', ' ') }}</span>
+                    {% if notice.target_role != 'all' %}
+                    <span class="badge bg-secondary-subtle text-secondary">{{ notice.target_role }}s</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+          <div class="px-4 py-5 text-center text-muted d-none" id="topbarNoticeEmpty">
+            <i class="bi bi-bell-slash fs-3 d-block mb-2 opacity-50"></i>
+            No recent notices.
+          </div>
+          {% else %}
+          <div class="py-2 d-none" id="topbarNoticeList"></div>
+          <div class="px-4 py-5 text-center text-muted" id="topbarNoticeEmpty">
+            <i class="bi bi-bell-slash fs-3 d-block mb-2 opacity-50"></i>
+            No recent notices.
+          </div>
+          {% endif %}
+        </div>
+      </div>
       <span class="badge bg-primary-subtle text-primary text-capitalize px-3 py-2">
         <i class="bi bi-circle-fill text-success me-1" style="font-size:8px"></i>
         {{ current_user.role }}
@@ -243,6 +241,71 @@
 
     {% block content %}{% endblock %}
   </div>
+
+  {% if sidebar_navigation and sidebar_navigation.has_customizable_items %}
+  <div class="modal fade" id="sidebarCustomizeModal" tabindex="-1" aria-labelledby="sidebarCustomizeLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+        <div class="modal-header border-0 pb-0">
+          <div>
+            <h5 class="modal-title fw-bold" id="sidebarCustomizeLabel">Customize Quick Access</h5>
+            <p class="text-muted small mb-0">Show only the core tools by default, then pin extra modules you use often.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form method="post" action="{{ url_for('auth.update_sidebar_preferences') }}">
+          <div class="modal-body pt-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+
+            <div class="sidebar-modal-panel mb-3">
+              <div class="fw-semibold mb-2">Always visible</div>
+              <div class="d-flex flex-wrap gap-2">
+                {% for item in sidebar_navigation.always_visible_items %}
+                <span class="sidebar-fixed-pill">
+                  <i class="bi {{ item.icon }}"></i>{{ item.label }}
+                </span>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="sidebar-modal-panel">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-semibold">Optional tools</div>
+                <div class="small text-muted">Pin up to {{ sidebar_navigation.pin_limit }} extras</div>
+              </div>
+              <div class="sidebar-option-list">
+                {% for item in sidebar_navigation.customizable_items %}
+                <label class="sidebar-option-card">
+                  <span class="d-flex gap-3 align-items-start">
+                    <span class="sidebar-option-icon"><i class="bi {{ item.icon }}"></i></span>
+                    <span class="d-block">
+                      <span class="d-block fw-semibold">{{ item.label }}</span>
+                      <span class="d-block text-muted small">{{ item.description }}</span>
+                    </span>
+                  </span>
+                  <input class="form-check-input sidebar-option-check"
+                         type="checkbox"
+                         name="pinned_features"
+                         value="{{ item.key }}"
+                         {% if item.pinned %}checked{% endif %}>
+                </label>
+                {% endfor %}
+              </div>
+              <div class="small text-muted mt-3">
+                Unpinned tools stay available under <strong>More Tools</strong>.
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-0 pt-0">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Quick Access</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endif %}
 </div>
 
 {% else %}
@@ -288,6 +351,168 @@
   window.addEventListener('resize', () => {
     if (!isMobile()) closeMobileSidebar();
   });
+
+  const bellBadge = document.getElementById('topbarBellBadge');
+  const deleteReadButton = document.getElementById('topbarDeleteReadButton');
+  const markReadButton = document.getElementById('topbarMarkReadButton');
+  const noticeList = document.getElementById('topbarNoticeList');
+  const noticeEmpty = document.getElementById('topbarNoticeEmpty');
+  const noticeFeedUrl = '{{ url_for("notice.feed") if current_user.is_authenticated else "" }}';
+  const noticeMarkReadUrl = '{{ url_for("notice.mark_all_read") if current_user.is_authenticated else "" }}';
+  const noticeDeleteReadUrl = '{{ url_for("notice.delete_read") if current_user.is_authenticated else "" }}';
+  const csrfToken = '{{ csrf_token() if current_user.is_authenticated else "" }}';
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, function(char) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+    });
+  }
+
+  function renderNoticeItems(items) {
+    if (!noticeList || !noticeEmpty) return;
+    if (!items.length) {
+      noticeList.innerHTML = '';
+      noticeList.classList.add('d-none');
+      noticeEmpty.classList.remove('d-none');
+      return;
+    }
+
+    noticeEmpty.classList.add('d-none');
+    noticeList.classList.remove('d-none');
+      noticeList.innerHTML = items.map((notice) => `
+      <a href="${escapeHtml(notice.detail_url)}" class="dropdown-item px-3 py-3 topbar-notice-item ${notice.is_read ? '' : 'is-unread'}">
+        <div class="d-flex gap-3 align-items-start">
+          <span class="topbar-notice-dot dot-${escapeHtml(notice.category)}"></span>
+          <div class="min-w-0 flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div class="fw-semibold text-wrap">
+                ${escapeHtml(notice.title)}
+                ${notice.is_pinned ? '<i class="bi bi-pin-angle-fill text-warning ms-1"></i>' : ''}
+              </div>
+              <small class="text-muted flex-shrink-0">${escapeHtml(notice.created_label)}</small>
+            </div>
+            <div class="small text-muted text-wrap">${escapeHtml(notice.content)}</div>
+            <div class="mt-2 d-flex gap-2 flex-wrap">
+              <span class="badge bg-light text-secondary border text-uppercase">${escapeHtml(notice.category.replace('_', ' '))}</span>
+              ${notice.target_role !== 'all' ? `<span class="badge bg-secondary-subtle text-secondary">${escapeHtml(notice.target_role)}s</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </a>
+    `).join('');
+  }
+
+  function updateBellCount(count) {
+    if (!bellBadge) return;
+    if (count > 0) {
+      bellBadge.textContent = count > 9 ? '9' : String(count);
+      bellBadge.classList.remove('d-none');
+    } else {
+      bellBadge.textContent = '0';
+      bellBadge.classList.add('d-none');
+    }
+    if (markReadButton) {
+      markReadButton.disabled = count <= 0;
+      markReadButton.classList.toggle('is-disabled', count <= 0);
+    }
+  }
+
+  function updateDeleteReadState(items) {
+    if (!deleteReadButton) return;
+    const hasReadItems = (items || []).some((notice) => notice.is_read);
+    deleteReadButton.disabled = !hasReadItems;
+    deleteReadButton.classList.toggle('is-disabled', !hasReadItems);
+  }
+
+  async function refreshNoticeBell() {
+    if (!noticeFeedUrl) return;
+    try {
+      const response = await fetch(noticeFeedUrl, {
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store',
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      updateBellCount(payload.count || 0);
+      renderNoticeItems(payload.items || []);
+      updateDeleteReadState(payload.items || []);
+    } catch (_) {
+      // Ignore transient polling failures.
+    }
+  }
+
+  if (noticeFeedUrl) {
+    window.setInterval(refreshNoticeBell, 15000);
+  }
+
+  if (markReadButton && noticeMarkReadUrl) {
+    markReadButton.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        const response = await fetch(noticeMarkReadUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        updateBellCount(payload.count || 0);
+        renderNoticeItems(payload.items || []);
+        updateDeleteReadState(payload.items || []);
+      } catch (_) {
+        // Ignore transient failures.
+      }
+    });
+  }
+
+  if (deleteReadButton && noticeDeleteReadUrl) {
+    deleteReadButton.addEventListener('click', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        const response = await fetch(noticeDeleteReadUrl, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Accept': 'application/json',
+            'X-CSRFToken': csrfToken,
+          },
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        updateBellCount(payload.count || 0);
+        renderNoticeItems(payload.items || []);
+        updateDeleteReadState(payload.items || []);
+      } catch (_) {
+        // Ignore transient failures.
+      }
+    });
+  }
+
+  updateDeleteReadState([
+    {% for notice in notification_items %}
+    { is_read: {{ 'true' if notice.is_read_for_current_user else 'false' }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]);
+
+  const sidebarPinLimit = {{ sidebar_navigation.pin_limit if sidebar_navigation else 0 }};
+  const sidebarPinChecks = Array.from(document.querySelectorAll('.sidebar-option-check'));
+
+  function enforceSidebarPinLimit(changedInput) {
+    const checked = sidebarPinChecks.filter((input) => input.checked);
+    if (checked.length <= sidebarPinLimit) return;
+    changedInput.checked = false;
+    window.alert(`You can pin up to ${sidebarPinLimit} extra tools.`);
+  }
+
+  sidebarPinChecks.forEach((input) => {
+    input.addEventListener('change', () => enforceSidebarPinLimit(input));
+  });
 </script>
 {% block scripts %}{% endblock %}
 
@@ -322,6 +547,243 @@
 </div>
 
 <style>
+.sidebar-nav-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 10px;
+}
+.sidebar-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px 6px;
+}
+.sidebar-section-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+.sidebar-section-copy {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+.sidebar-customize-btn {
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.sidebar-item-row {
+  position: relative;
+}
+.sidebar-item-row > a {
+  padding-right: 42px;
+}
+.sidebar-pin-form {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+.sidebar-pin-button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #f59e0b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s ease, color .15s ease, transform .15s ease;
+}
+.sidebar-pin-button:hover {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+.sidebar-pin-button:focus-visible {
+  outline: 2px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+.sidebar-pin-button:active {
+  transform: scale(.96);
+}
+.sidebar-more-wrap {
+  padding: 0 10px 4px;
+}
+.sidebar-more-toggle {
+  width: 100%;
+  border: 0;
+  background: rgba(241, 245, 249, 0.9);
+  color: #0f172a;
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 13px;
+}
+.sidebar-more-toggle:hover {
+  background: #e2e8f0;
+}
+.sidebar-more-chevron {
+  transition: transform .2s ease;
+}
+.sidebar-more-toggle.collapsed .sidebar-more-chevron {
+  transform: rotate(-90deg);
+}
+.sidebar-nav-secondary {
+  padding-top: 2px;
+}
+.sidebar-modal-panel {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 16px;
+}
+.sidebar-fixed-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #dbeafe;
+  color: #1e3a8a;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sidebar-option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sidebar-option-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px;
+  cursor: pointer;
+}
+.sidebar-option-card:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+.sidebar-option-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sidebar-option-check {
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.topbar-bell {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+}
+.topbar-bell:hover,
+.topbar-bell.show {
+  background: #f8fafc;
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+.topbar-bell-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 18px;
+}
+.topbar-notice-menu {
+  width: min(390px, calc(100vw - 2rem));
+  border-radius: 18px;
+  overflow: hidden;
+}
+.topbar-mark-read-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.topbar-mark-read-btn.is-disabled,
+.topbar-mark-read-btn:disabled,
+.topbar-delete-read-btn.is-disabled,
+.topbar-delete-read-btn:disabled {
+  opacity: 0.55;
+}
+.topbar-delete-read-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.topbar-notice-item {
+  white-space: normal;
+}
+.topbar-notice-item:hover {
+  background: #f8fbff;
+}
+.topbar-notice-item.is-unread {
+  background: linear-gradient(180deg, rgba(239, 246, 255, .9), rgba(255, 255, 255, .95));
+}
+.topbar-notice-item.is-unread .fw-semibold::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 8px;
+  border-radius: 999px;
+  background: #2563eb;
+  vertical-align: middle;
+}
+.topbar-notice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+.topbar-notice-dot.dot-general { background: #3b82f6; }
+.topbar-notice-dot.dot-exam { background: #f59e0b; }
+.topbar-notice-dot.dot-holiday { background: #22c55e; }
+.topbar-notice-dot.dot-event { background: #06b6d4; }
+.topbar-notice-dot.dot-fee { background: #ef4444; }
+.topbar-notice-dot.dot-urgent { background: #dc2626; }
+.min-w-0 { min-width: 0; }
 .sa-confirm-dialog { max-width: 400px; }
 .sa-confirm-header {
   height: 80px; display: flex; align-items: center; justify-content: center;
@@ -343,6 +805,12 @@
 
 .sa-confirm-cancel-btn { min-width: 110px; }
 .sa-confirm-ok-btn     { min-width: 130px; }
+
+@media (max-width: 768px) {
+  .sidebar-section-copy {
+    display: none;
+  }
+}
 </style>
 
 <script>

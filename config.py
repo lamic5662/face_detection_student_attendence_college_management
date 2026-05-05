@@ -28,11 +28,11 @@ class Config:
     SQLALCHEMY_DATABASE_URI = _db_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-        'pool_size': 10,
-        'max_overflow': 20,
-        'pool_timeout': 30,
+        'pool_recycle': int(os.environ.get('DB_POOL_RECYCLE', 300)),
+        'pool_pre_ping': os.environ.get('DB_POOL_PRE_PING', 'True') == 'True',
+        'pool_size': int(os.environ.get('DB_POOL_SIZE', 10)),
+        'max_overflow': int(os.environ.get('DB_MAX_OVERFLOW', 20)),
+        'pool_timeout': int(os.environ.get('DB_POOL_TIMEOUT', 30)),
     }
 
     # ── Session / Cookies ─────────────────────────────────────────────────────
@@ -57,16 +57,34 @@ class Config:
     MAIL_MAX_EMAILS = 10
 
     # ── Uploads ───────────────────────────────────────────────────────────────
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads', 'faces')
-    PRIVATE_UPLOAD_FOLDER = os.path.join(BASE_DIR, 'instance', 'uploads')
-    CONTENT_UPLOAD_FOLDER = os.path.join(PRIVATE_UPLOAD_FOLDER, 'content')
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
+    UPLOAD_FOLDER = os.environ.get(
+        'UPLOAD_FOLDER',
+        os.path.join(BASE_DIR, 'static', 'uploads', 'faces'),
+    )
+    PRIVATE_UPLOAD_FOLDER = os.environ.get(
+        'PRIVATE_UPLOAD_FOLDER',
+        os.path.join(BASE_DIR, 'instance', 'uploads'),
+    )
+    CONTENT_UPLOAD_FOLDER = os.environ.get(
+        'CONTENT_UPLOAD_FOLDER',
+        os.path.join(PRIVATE_UPLOAD_FOLDER, 'content'),
+    )
+    ASSIGNMENT_UPLOAD_FOLDER = os.environ.get(
+        'ASSIGNMENT_UPLOAD_FOLDER',
+        os.path.join(PRIVATE_UPLOAD_FOLDER, 'assignment_submissions'),
+    )
+    MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 10 * 1024 * 1024))
 
     # ── App-specific ──────────────────────────────────────────────────────────
     LOW_ATTENDANCE_THRESHOLD = int(os.environ.get('LOW_ATTENDANCE_THRESHOLD', 75))
     COLLEGE_LAT = float(os.environ.get('COLLEGE_LAT', 27.7172))   # default: Kathmandu
     COLLEGE_LNG = float(os.environ.get('COLLEGE_LNG', 85.3240))
     COLLEGE_NAME = os.environ.get('COLLEGE_NAME', 'College')
+    DEFAULT_COLLEGE_CODE = os.environ.get('DEFAULT_COLLEGE_CODE', 'MAIN')
+    MULTI_COLLEGE_ROOT_DOMAIN = os.environ.get('MULTI_COLLEGE_ROOT_DOMAIN', '')
+    ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get('ALLOWED_HOSTS', '').split(',') if host.strip()]
+    TRUST_PROXY_HEADERS = os.environ.get('TRUST_PROXY_HEADERS', 'True') == 'True'
+    TRUSTED_PROXY_HOPS = int(os.environ.get('TRUSTED_PROXY_HOPS', 1))
     FACE_RECOGNITION_TOLERANCE = float(os.environ.get('FACE_RECOGNITION_TOLERANCE', 0.5))
     EAR_THRESHOLD = 0.25
     EAR_CONSEC_FRAMES = 2
@@ -83,7 +101,7 @@ class Config:
 
     # ── Logging ───────────────────────────────────────────────────────────────
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
-    LOG_DIR = os.path.join(BASE_DIR, 'logs')
+    LOG_DIR = os.environ.get('LOG_DIR', os.path.join(BASE_DIR, 'logs'))
 
 
 class DevelopmentConfig(Config):
@@ -99,6 +117,7 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
+    PREFERRED_URL_SCHEME = 'https'
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
     # Enforce strong key in prod

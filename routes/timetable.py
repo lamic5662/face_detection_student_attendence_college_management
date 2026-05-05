@@ -7,6 +7,7 @@ from models.subject import Subject
 from models.teacher import Teacher
 from models.user import User
 from utils.decorators import admin_required
+from utils.tenancy import current_college_id
 from datetime import datetime
 
 timetable_bp = Blueprint('timetable', __name__)
@@ -14,7 +15,7 @@ timetable_bp = Blueprint('timetable', __name__)
 
 def _get_timetable_grid(dept_id, semester):
     slots = TimetableSlot.query.filter_by(
-        department_id=dept_id, semester=semester
+        college_id=current_college_id(), department_id=dept_id, semester=semester
     ).order_by(TimetableSlot.day_of_week, TimetableSlot.period_no).all()
 
     grid = {d: {} for d in range(7)}
@@ -28,7 +29,7 @@ def _get_timetable_grid(dept_id, semester):
 @timetable_bp.route('/timetable')
 @login_required
 def view():
-    departments = Department.query.order_by(Department.name).all()
+    departments = Department.query.filter_by(college_id=current_college_id()).order_by(Department.name).all()
     dept_id  = request.args.get('department_id', type=int)
     semester = request.args.get('semester', type=int)
 
@@ -68,11 +69,11 @@ def manage():
 
     if dept_id and semester:
         subjects = Subject.query.filter_by(
-            department_id=dept_id, semester=semester
+            college_id=current_college_id(), department_id=dept_id, semester=semester
         ).order_by(Subject.name).all()
         teachers = (Teacher.query
                     .join(User)
-                    .filter(Teacher.department_id == dept_id)
+                    .filter(Teacher.college_id == current_college_id(), Teacher.department_id == dept_id)
                     .order_by(User.name)
                     .all())
         subject_teacher_map = {s.id: s.teacher_id for s in subjects}
@@ -113,7 +114,7 @@ def save_slot():
         return jsonify({'error': 'Invalid time format'}), 400
 
     slot = TimetableSlot.query.filter_by(
-        department_id=dept_id, semester=semester,
+        college_id=current_college_id(), department_id=dept_id, semester=semester,
         day_of_week=day, period_no=period
     ).first()
 
@@ -126,6 +127,7 @@ def save_slot():
         slot.end_time   = end
     else:
         slot = TimetableSlot(
+            college_id=current_college_id(),
             department_id=dept_id, semester=semester,
             day_of_week=day, period_no=period,
             subject_id=subject_id, teacher_id=teacher_id,
@@ -143,7 +145,7 @@ def save_slot():
 @login_required
 @admin_required
 def delete_slot(sid):
-    slot = TimetableSlot.query.get_or_404(sid)
+    slot = TimetableSlot.query.filter_by(id=sid, college_id=current_college_id()).first_or_404()
     db.session.delete(slot)
     db.session.commit()
     return jsonify({'success': True})
