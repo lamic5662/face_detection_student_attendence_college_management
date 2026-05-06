@@ -15,6 +15,7 @@
           <option value="admin"   {% if selected_role == 'admin'   %}selected{% endif %}>Admin</option>
           <option value="teacher" {% if selected_role == 'teacher' %}selected{% endif %}>Teacher</option>
           <option value="student" {% if selected_role == 'student' %}selected{% endif %}>Student</option>
+          <option value="parent"  {% if selected_role == 'parent'  %}selected{% endif %}>Parent</option>
         </select>
       </div>
       <div class="col-md-4">
@@ -63,10 +64,19 @@
                 {{ u.name }}
               </div>
             </td>
-            <td class="text-muted">{{ u.email }}</td>
             <td>
-              <span class="badge {% if u.role == 'admin' %}bg-danger-subtle text-danger{% elif u.role == 'teacher' %}bg-primary-subtle text-primary{% else %}bg-success-subtle text-success{% endif %}">
-                <i class="bi bi-{% if u.role == 'admin' %}shield-fill{% elif u.role == 'teacher' %}person-badge{% else %}person{% endif %} me-1"></i>
+              <div class="text-muted">{{ u.email }}</div>
+              {% if u.must_change_password %}
+              <span class="badge bg-warning-subtle text-warning mt-1">
+                {{ 'Setup email sent' if u.password_setup_email_sent_at else 'Temporary password active' }}
+              </span>
+              {% else %}
+              <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge {% if u.role == 'admin' %}bg-danger-subtle text-danger{% elif u.role == 'teacher' %}bg-primary-subtle text-primary{% elif u.role == 'parent' %}bg-warning-subtle text-warning{% else %}bg-success-subtle text-success{% endif %}">
+                <i class="bi bi-{% if u.role == 'admin' %}shield-fill{% elif u.role == 'teacher' %}person-badge{% elif u.role == 'parent' %}house-heart-fill{% else %}person{% endif %} me-1"></i>
                 {{ u.role.capitalize() }}
               </span>
             </td>
@@ -110,7 +120,10 @@
                   <div class="modal-body">
                     <label class="form-label fw-semibold small">New Password</label>
                     <input type="password" name="new_password" class="form-control"
-                           minlength="6" required placeholder="Min. 6 characters">
+                           minlength="8" required placeholder="Temporary password">
+                    <div class="form-text">
+                      This becomes a temporary password. The user will be prompted to set a personal password on next login.
+                    </div>
                   </div>
                   <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Cancel</button>

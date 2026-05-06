@@ -1,6 +1,7 @@
 """Gunicorn production configuration."""
 import multiprocessing
 import os
+from pathlib import Path
 
 
 def _int_env(name, default):
@@ -19,7 +20,8 @@ worker_connections = _int_env('GUNICORN_WORKER_CONNECTIONS', 1000)
 max_requests = _int_env('GUNICORN_MAX_REQUESTS', 1000)
 max_requests_jitter = _int_env('GUNICORN_MAX_REQUESTS_JITTER', 100)
 preload_app = os.environ.get('GUNICORN_PRELOAD_APP', 'False') == 'True'
-worker_tmp_dir = os.environ.get('GUNICORN_WORKER_TMP_DIR', '/dev/shm')
+_default_tmp_dir = '/dev/shm' if Path('/dev/shm').exists() else '/tmp'
+worker_tmp_dir = os.environ.get('GUNICORN_WORKER_TMP_DIR', _default_tmp_dir)
 
 # ── Timeouts ──────────────────────────────────────────────────────────────────
 timeout = _int_env('GUNICORN_TIMEOUT', 120)          # face-recognition frames can take a moment

@@ -45,7 +45,16 @@
                 {{ parent.name }}
               </div>
             </td>
-            <td class="text-muted small">{{ parent.email }}</td>
+            <td>
+              <div class="text-muted small">{{ parent.email }}</div>
+              {% if parent.must_change_password %}
+              <span class="badge bg-warning-subtle text-warning mt-1">
+                {{ 'Setup email sent' if parent.password_setup_email_sent_at else 'Temporary password active' }}
+              </span>
+              {% else %}
+              <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
+              {% endif %}
+            </td>
             <td>
               {% if children %}
                 {% for link in children %}
@@ -162,7 +171,7 @@
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">Password <span class="text-danger">*</span></label>
-              <input type="password" name="password" class="form-control" placeholder="Minimum 8 characters" required minlength="8">
+              <input type="password" name="password" class="form-control" placeholder="Temporary password" required minlength="8">
             </div>
             <div class="col-12"><hr class="my-1"></div>
             <div class="col-md-8">
@@ -186,7 +195,7 @@
           </div>
           <div class="alert alert-info border-0 mt-3 py-2 px-3 small">
             <i class="bi bi-info-circle me-1"></i>
-            The parent can log in with these credentials to view their child's attendance, marks, fees, and today's classes.
+            The parent account starts with a temporary password. On first login, the parent can request a secure email link and set a private password that admins cannot view later.
             Additional children can be linked after creation.
           </div>
         </div>

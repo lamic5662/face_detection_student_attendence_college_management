@@ -1,8 +1,9 @@
 import io
 import os
 from datetime import date
+from unittest.mock import patch
 
-from extensions import db
+from extensions import db, mail
 from models.academic_calendar import AcademicCalendarEvent
 from models.assignment import AssignmentSubmission
 from models.college import College
@@ -17,6 +18,7 @@ from models.notice_read import NoticeRead
 from models.platform_audit import PlatformAuditLog
 from models.student import Student
 from models.user import User
+from utils.account_setup import build_public_url, generate_password_setup_token
 
 
 def login(client, email, password='Password@123', college_code=None):
@@ -37,6 +39,330 @@ def test_teacher_cannot_download_another_teachers_session_report(app, client):
     response = client.get(f'/teacher/reports/session/{foreign_session_id}/download')
 
     assert response.status_code == 403
+
+
+def test_student_with_temporary_password_is_prompted_on_first_login(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        user.set_temporary_password('TempPass@123')
+        db.session.commit()
+
+    response = login(
+        client,
+        'student1@example.com',
+        password='TempPass@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/password-setup-prompt')
+
+
+def test_student_with_temporary_password_cannot_open_dashboard_before_changing_it(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        user.set_temporary_password('TempPass@123')
+        db.session.commit()
+
+    login(
+        client,
+        'student1@example.com',
+        password='TempPass@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+    response = client.get('/student/dashboard', follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/password-setup-prompt')
+
+
+def test_student_can_request_password_setup_email(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        user.set_temporary_password('TempPass@123')
+        db.session.commit()
+
+    login(
+        client,
+        'student1@example.com',
+        password='TempPass@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+
+    sent_messages = []
+
+    def _capture_message(message):
+        sent_messages.append(message)
+
+    with patch.object(mail, 'send', side_effect=_capture_message):
+        response = client.post('/password-setup-prompt/send-email', follow_redirects=True)
+
+    assert response.status_code == 200
+    assert sent_messages
+    assert sent_messages[0].recipients == ['student1@example.com']
+    assert b'you still need to set your new password before continuing' in response.data
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        assert user.password_setup_email_sent_at is not None
+
+
+def test_college_user_can_request_forgot_password_email(app, client):
+    sent_messages = []
+
+    def _capture_message(message):
+        sent_messages.append(message)
+
+    with patch.object(mail, 'send', side_effect=_capture_message):
+        response = client.post(
+            '/forgot-password',
+            data={
+                'college_code': app.config['TEST_DATA']['college_code'],
+                'email': 'student1@example.com',
+            },
+            follow_redirects=True,
+        )
+
+    assert response.status_code == 200
+    assert sent_messages
+    assert sent_messages[0].recipients == ['student1@example.com']
+    assert b'If we found an active account for that email' in response.data
+
+
+def test_super_admin_can_request_forgot_password_without_college_code(app, client):
+    sent_messages = []
+
+    def _capture_message(message):
+        sent_messages.append(message)
+
+    with patch.object(mail, 'send', side_effect=_capture_message):
+        response = client.post(
+            '/forgot-password',
+            data={
+                'email': 'superadmin@example.com',
+            },
+            follow_redirects=True,
+        )
+
+    assert response.status_code == 200
+    assert sent_messages
+    assert sent_messages[0].recipients == ['superadmin@example.com']
+    assert b'If we found an active account for that email' in response.data
+
+
+def test_student_must_change_temporary_password_and_then_sign_in_again(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        user.set_temporary_password('TempPass@123')
+        db.session.commit()
+
+    login(
+        client,
+        'student1@example.com',
+        password='TempPass@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+    response = client.post(
+        '/password-setup-prompt',
+        data={
+            'new_password': 'StudentDirect@123',
+            'confirm_password': 'StudentDirect@123',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'Please sign in again with your new password' in response.data
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        assert user.must_change_password is False
+        assert user.check_password('StudentDirect@123') is True
+    old_password_login = login(
+        client,
+        'student1@example.com',
+        password='TempPass@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+    assert old_password_login.status_code == 200
+    assert b'Invalid email or password' in old_password_login.data
+    new_password_login = login(
+        client,
+        'student1@example.com',
+        password='StudentDirect@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+    assert new_password_login.status_code == 302
+    assert new_password_login.headers['Location'].endswith('/student/dashboard')
+
+
+def test_student_cannot_reuse_temporary_password_as_new_password(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        user.set_temporary_password('TempPass@123')
+        db.session.commit()
+
+    login(
+        client,
+        'student1@example.com',
+        password='TempPass@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+    response = client.post(
+        '/password-setup-prompt',
+        data={
+            'new_password': 'TempPass@123',
+            'confirm_password': 'TempPass@123',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'must be different from the current one' in response.data
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        assert user.must_change_password is True
+        assert user.check_password('TempPass@123') is True
+
+
+def test_student_can_set_password_from_email_link(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        user.set_temporary_password('TempPass@123')
+        db.session.commit()
+        token = generate_password_setup_token(user)
+
+    response = client.post(
+        f'/set-password/{token}',
+        data={
+            'new_password': 'StudentNew@123',
+            'confirm_password': 'StudentNew@123',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'Please sign in with your new password' in response.data
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        assert user.must_change_password is False
+        assert user.password_changed_at is not None
+        assert user.check_password('StudentNew@123') is True
+
+
+def test_password_reset_link_rejects_reusing_existing_password(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        token = generate_password_setup_token(user)
+
+    response = client.post(
+        f'/set-password/{token}?mode=reset',
+        data={
+            'new_password': 'Password@123',
+            'confirm_password': 'Password@123',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'must be different from the current one' in response.data
+
+
+def test_change_password_rejects_reusing_existing_password(app, client):
+    login(client, 'student1@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        '/change-password',
+        data={
+            'current_password': 'Password@123',
+            'new_password': 'Password@123',
+            'confirm_password': 'Password@123',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'must be different from the current one' in response.data
+
+
+def test_forgot_password_email_uses_reset_mode_link(app):
+    with app.app_context():
+        app.config['PUBLIC_BASE_URL'] = 'https://portal.smartattend.test'
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        sent_messages = []
+
+        def _capture_message(message):
+            sent_messages.append(message)
+
+        with patch.object(mail, 'send', side_effect=_capture_message):
+            from utils.account_setup import send_password_reset_email
+            send_password_reset_email(user)
+
+        assert sent_messages
+        assert 'mode=reset' in sent_messages[0].html
+
+
+def test_password_setup_email_uses_public_base_url_when_configured(app):
+    with app.app_context():
+        app.config['PUBLIC_BASE_URL'] = 'https://portal.smartattend.test'
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        token = generate_password_setup_token(user)
+        link = build_public_url('auth.set_password_from_email', token=token)
+
+        assert link.startswith('https://portal.smartattend.test/set-password/')
+
+
+def test_parent_with_temporary_password_is_prompted_on_first_login(app, client):
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['parent_user_id'])
+        user.set_temporary_password('ParentTemp@123')
+        db.session.commit()
+
+    response = login(
+        client,
+        'parent1@example.com',
+        password='ParentTemp@123',
+        college_code=app.config['TEST_DATA']['college_code'],
+    )
+
+    assert response.status_code == 302
+    assert response.headers['Location'].endswith('/password-setup-prompt')
+
+
+def test_admin_password_reset_creates_temporary_password_state(app, client):
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        f"/admin/users/reset-password/{app.config['TEST_DATA']['student_user_id']}",
+        data={'new_password': 'ResetTemp@123'},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        user = db.session.get(User, app.config['TEST_DATA']['student_user_id'])
+        assert user.must_change_password is True
+        assert user.password_changed_at is None
+        assert user.check_password('ResetTemp@123') is True
+
+
+def test_admin_can_add_parent_with_temporary_password(app, client):
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        '/admin/parents/add',
+        data={
+            'name': 'Parent Two',
+            'email': 'parent2@example.com',
+            'password': 'ParentTemp@123',
+            'student_id': str(app.config['TEST_DATA']['student_profile_id']),
+            'relationship': 'guardian',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        user = User.query.filter_by(email='parent2@example.com').first()
+        assert user is not None
+        assert user.role == 'parent'
+        assert user.must_change_password is True
+        assert user.password_changed_at is None
 
 
 def test_teacher_cannot_download_another_teachers_subject_report(app, client):
@@ -237,6 +563,105 @@ def test_super_admin_can_open_audit_logs_page(app, client):
 
     assert response.status_code == 200
     assert b'Platform Audit Trail' in response.data
+
+
+def test_super_admin_can_export_audit_logs_csv(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    client.post(
+        '/super-admin/colleges/create',
+        data={
+            'name': 'Export College',
+            'code': 'EXPT',
+            'subdomain': 'export-college',
+        },
+        follow_redirects=True,
+    )
+
+    response = client.get('/super-admin/audit-logs/export')
+
+    assert response.status_code == 200
+    assert response.mimetype == 'text/csv'
+    assert 'attachment; filename=' in response.headers['Content-Disposition']
+    body = response.get_data(as_text=True)
+    assert 'action_key,summary' in body
+    assert 'college.created' in body
+    assert 'Created college Export College [EXPT]' in body
+
+
+def test_super_admin_can_delete_single_audit_log(app, client):
+    with app.app_context():
+        log = PlatformAuditLog(
+            actor_user_id=app.config['TEST_DATA']['super_admin_user_id'],
+            college_id=app.config['TEST_DATA']['college_id'],
+            action_key='audit.test_delete_single',
+            summary='Delete me',
+            target_type='test',
+            target_id=101,
+        )
+        db.session.add(log)
+        db.session.commit()
+        log_id = log.id
+
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        f'/super-admin/audit-logs/{log_id}/delete',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        assert db.session.get(PlatformAuditLog, log_id) is None
+
+
+def test_super_admin_can_delete_filtered_audit_logs(app, client):
+    with app.app_context():
+        college_id = app.config['TEST_DATA']['college_id']
+        target_logs = [
+            PlatformAuditLog(
+                actor_user_id=app.config['TEST_DATA']['super_admin_user_id'],
+                college_id=college_id,
+                action_key='audit.bulk_delete_target',
+                summary='Delete target A',
+            ),
+            PlatformAuditLog(
+                actor_user_id=app.config['TEST_DATA']['super_admin_user_id'],
+                college_id=college_id,
+                action_key='audit.bulk_delete_target',
+                summary='Delete target B',
+            ),
+            PlatformAuditLog(
+                actor_user_id=app.config['TEST_DATA']['super_admin_user_id'],
+                college_id=college_id,
+                action_key='audit.keep_me',
+                summary='Keep me',
+            ),
+        ]
+        db.session.add_all(target_logs)
+        db.session.commit()
+
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        '/super-admin/audit-logs/delete-filtered',
+        data={'action': 'audit.bulk_delete_target'},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    with app.app_context():
+        assert PlatformAuditLog.query.filter_by(action_key='audit.bulk_delete_target').count() == 0
+        assert PlatformAuditLog.query.filter_by(action_key='audit.keep_me').count() == 1
+
+
+def test_super_admin_cannot_bulk_delete_audit_logs_without_filters(app, client):
+    login(client, 'superadmin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.post(
+        '/super-admin/audit-logs/delete-filtered',
+        data={},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'Apply at least one filter before deleting audit logs in bulk.' in response.data
 
 
 def test_super_admin_topbar_uses_platform_activity_instead_of_college_notices(app, client):

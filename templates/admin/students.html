@@ -92,7 +92,16 @@
           <tr>
             <td class="px-4"><span class="badge bg-secondary">{{ s.roll_number }}</span></td>
             <td class="fw-semibold">{{ s.user.name }}</td>
-            <td class="text-muted small">{{ s.user.email }}</td>
+            <td>
+              <div class="text-muted small">{{ s.user.email }}</div>
+              {% if s.user.must_change_password %}
+              <span class="badge bg-warning-subtle text-warning mt-1">
+                {{ 'Setup email sent' if s.user.password_setup_email_sent_at else 'Temporary password active' }}
+              </span>
+              {% else %}
+              <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
+              {% endif %}
+            </td>
             <td>
               <span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span>
             </td>
@@ -213,14 +222,20 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="modal-body">
           <div class="row g-3">
+            <div class="col-12">
+              <div class="alert alert-info border-0 small mb-0">
+                Students are created with a temporary password. On first login they can request a secure email link and set a personal password that admins cannot view later.
+              </div>
+            </div>
             <div class="col-12"><label class="form-label fw-semibold">Full Name</label>
               <input type="text" name="name" class="form-control" required></div>
             <div class="col-12"><label class="form-label fw-semibold">Email</label>
               <input type="email" name="email" class="form-control" required></div>
             <div class="col-md-6"><label class="form-label fw-semibold">Roll Number</label>
               <input type="text" name="roll_number" class="form-control" required></div>
-            <div class="col-md-6"><label class="form-label fw-semibold">Password</label>
-              <input type="password" name="password" class="form-control" minlength="6" required></div>
+            <div class="col-md-6"><label class="form-label fw-semibold">Temporary Password</label>
+              <input type="password" name="password" class="form-control" minlength="8" required
+                     placeholder="Min. 8 chars, upper, lower, digit, symbol"></div>
             <div class="col-md-8"><label class="form-label fw-semibold">Department</label>
               <select name="department_id" class="form-select" required>
                 <option value="">Select Department</option>
@@ -255,7 +270,7 @@
           <div class="alert alert-info border-0 small">
             <strong>Required CSV columns:</strong><br>
             <code>name, email, roll_number, department_code, semester, password</code><br>
-            <span class="text-muted">Password defaults to <code>Student@123</code> if omitted.</span>
+            <span class="text-muted">Password is treated as a temporary password and defaults to <code>Student@123!</code> if omitted.</span>
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">CSV File</label>
@@ -271,4 +286,17 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if request.args.get('open_modal') == 'add-student' %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modalEl = document.getElementById('addStudentModal');
+    if (!modalEl) return;
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+  });
+</script>
+{% endif %}
 {% endblock %}

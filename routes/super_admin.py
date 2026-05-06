@@ -1,6 +1,8 @@
+import csv
+import io
 import re
 
-from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for, jsonify
+from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for, jsonify, Response
 from flask_login import current_user, login_required
 
 from extensions import db
@@ -108,6 +110,21 @@ def _recent_platform_logs(limit: int = 8, college_id: int | None = None):
     return query.order_by(PlatformAuditLog.created_at.desc()).limit(limit).all()
 
 
+def _audit_log_filters():
+    college_id = request.values.get('college_id', type=int)
+    action = (request.values.get('action') or '').strip()
+    return college_id, action
+
+
+def _filtered_audit_log_query(college_id: int | None, action: str):
+    query = PlatformAuditLog.query
+    if college_id:
+        query = query.filter_by(college_id=college_id)
+    if action:
+        query = query.filter_by(action_key=action)
+    return query
+
+
 @super_admin_bp.route('/dashboard')
 @login_required
 @super_admin_required
@@ -165,15 +182,8 @@ def colleges():
 @login_required
 @super_admin_required
 def audit_logs():
-    college_id = request.args.get('college_id', type=int)
-    action = (request.args.get('action') or '').strip()
-
-    query = PlatformAuditLog.query
-    if college_id:
-        query = query.filter_by(college_id=college_id)
-    if action:
-        query = query.filter_by(action_key=action)
-
+    college_id, action = _audit_log_filters()
+    query = _filtered_audit_log_query(college_id, action)
     logs = query.order_by(PlatformAuditLog.created_at.desc()).limit(150).all()
     colleges = College.query.order_by(College.name.asc()).all()
     actions = [
@@ -191,6 +201,97 @@ def audit_logs():
         selected_college_id=college_id,
         selected_action=action,
     )
+
+
+@super_admin_bp.route('/audit-logs/export')
+@login_required
+@super_admin_required
+def export_audit_logs():
+    college_id, action = _audit_log_filters()
+    logs = (
+        _filtered_audit_log_query(college_id, action)
+        .order_by(PlatformAuditLog.created_at.desc())
+        .limit(5000)
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        'id',
+        'created_at',
+        'actor_name',
+        'actor_email',
+        'college_name',
+        'college_code',
+        'action_key',
+        'summary',
+        'target_type',
+        'target_id',
+        'details',
+    ])
+    for log in logs:
+        writer.writerow([
+            log.id,
+            log.created_at.isoformat() if log.created_at else '',
+            log.actor.name if log.actor else 'System',
+            log.actor.email if log.actor else '',
+            log.college.name if log.college else 'Platform',
+            log.college.code if log.college else '',
+            log.action_key,
+            log.summary,
+            log.target_type or '',
+            log.target_id or '',
+            log.detail_json or '',
+        ])
+
+    filename_parts = ['platform-audit-logs']
+    if college_id:
+        filename_parts.append(f'college-{college_id}')
+    if action:
+        filename_parts.append(action.replace('.', '-'))
+    filename = '-'.join(filename_parts) + '.csv'
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+    )
+
+
+@super_admin_bp.route('/audit-logs/delete-filtered', methods=['POST'])
+@login_required
+@super_admin_required
+def delete_filtered_audit_logs():
+    college_id, action = _audit_log_filters()
+    if not college_id and not action:
+        flash('Apply at least one filter before deleting audit logs in bulk.', 'warning')
+        return redirect(url_for('super_admin.audit_logs'))
+
+    query = _filtered_audit_log_query(college_id, action)
+    deleted_count = query.count()
+    if deleted_count == 0:
+        flash('No audit logs matched the selected filters.', 'warning')
+        return redirect(url_for('super_admin.audit_logs', college_id=college_id, action=action))
+
+    query.delete(synchronize_session=False)
+    db.session.commit()
+    flash(f'Deleted {deleted_count} filtered audit log entries.', 'success')
+    return redirect(url_for('super_admin.audit_logs', college_id=college_id, action=action))
+
+
+@super_admin_bp.route('/audit-logs/<int:log_id>/delete', methods=['POST'])
+@login_required
+@super_admin_required
+def delete_audit_log(log_id: int):
+    log = db.session.get(PlatformAuditLog, log_id)
+    if log is None:
+        abort(404)
+
+    db.session.delete(log)
+    db.session.commit()
+    flash('Audit log entry deleted.', 'success')
+    return redirect(url_for('super_admin.audit_logs'))
 
 
 @super_admin_bp.route('/notifications/feed')

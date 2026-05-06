@@ -49,6 +49,60 @@ The included Nginx config assumes:
 - static files are served from `/opt/smart_attendance/current/static/`
 - private uploads remain outside `static/`
 
+## Mobile Reset Links During Local Testing
+
+If you test forgot-password emails from a phone while SmartAttend runs only on your laptop, `127.0.0.1` will not work. Your phone needs a reachable URL.
+
+For local/mobile testing, use ngrok:
+
+1. Start SmartAttend on port `5050`
+2. Easiest option:
+
+```bash
+flask --app run.py start-mobile-tunnel
+```
+
+This starts a quick Cloudflare tunnel and updates `PUBLIC_BASE_URL` in `.env` automatically.
+
+3. Restart SmartAttend
+4. Send the reset email again
+
+Manual option:
+
+1. Run:
+
+```bash
+ngrok http 5050
+```
+
+2. Copy the HTTPS forwarding URL
+3. Set `PUBLIC_BASE_URL` to that URL
+4. Restart the app
+5. Send the reset email again
+
+The repo includes an example ngrok config at:
+
+- `deploy/ngrok/ngrok.example.yml`
+
+You can also print the exact steps for this repo with:
+
+```bash
+flask --app run.py tunnel-guide
+```
+
+The managed tunnel can be inspected or stopped with:
+
+```bash
+flask --app run.py mobile-tunnel-status
+flask --app run.py stop-mobile-tunnel
+```
+
+Important:
+
+- Email clients do not render the password form inside the email
+- The reset button always opens the password page in a browser
+- `127.0.0.1` only works on the same device running the app
+
 ## Preflight
 
 Run:
@@ -80,6 +134,33 @@ Useful overrides:
 - `GUNICORN_TIMEOUT`
 - `GUNICORN_MAX_REQUESTS`
 - `GUNICORN_MAX_REQUESTS_JITTER`
+
+## Load Balancing
+
+The included Nginx config now supports proper upstream balancing instead of pointing at a single app process.
+
+Default upstream pattern:
+
+- `127.0.0.1:5050`
+- `127.0.0.1:5051`
+
+Balancing mode:
+
+- `least_conn`
+
+For real server deployment, run multiple Gunicorn instances and put Nginx in front of them.
+
+The repo includes:
+
+- `deploy/systemd/smart_attendance.service` for a single instance
+- `deploy/systemd/smart_attendance@.service` for scaled per-port instances
+
+Example:
+
+```bash
+sudo systemctl enable --now smart_attendance@5050
+sudo systemctl enable --now smart_attendance@5051
+```
 
 ## systemd
 

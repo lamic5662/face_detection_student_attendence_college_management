@@ -26,8 +26,12 @@ from utils.content_storage import is_valid_content_relpath, resolve_content_path
 from utils.dashboard import build_dashboard_preferences
 from utils.tenancy import current_college_id
 from utils.time import utc_now_naive
+import re
 
 admin_bp = Blueprint('admin', __name__)
+_TEMP_PASSWORD_RE = re.compile(
+    r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$'
+)
 
 
 def _admin_college_id() -> int:
@@ -59,6 +63,10 @@ def _scoped_subject_query():
 
 def _scoped_user_query():
     return User.query.filter_by(college_id=_admin_college_id())
+
+
+def _validate_temporary_password(password: str) -> bool:
+    return bool(_TEMP_PASSWORD_RE.match(password))
 
 
 @admin_bp.route('/dashboard')
@@ -236,12 +244,12 @@ def toggle_user(uid):
 def reset_user_password(uid):
     user = _scoped_model_or_404(User, uid)
     new_pw = request.form.get('new_password', '').strip()
-    if len(new_pw) < 6:
-        flash('Password must be at least 6 characters.', 'danger')
+    if not _validate_temporary_password(new_pw):
+        flash('Temporary password must be at least 8 characters and include uppercase, lowercase, a digit, and a special character.', 'danger')
     else:
-        user.set_password(new_pw)
+        user.set_temporary_password(new_pw)
         db.session.commit()
-        flash(f"Password reset for {user.name}.", 'success')
+        flash(f"Temporary password reset for {user.name}. They will be prompted to set a personal password on next login.", 'success')
     return redirect(url_for('admin.users'))
 
 
@@ -342,23 +350,28 @@ def add_student():
     roll = request.form.get('roll_number', '').strip().upper()
     dept_id = request.form.get('department_id', type=int)
     semester = request.form.get('semester', type=int)
+    reopen_target = {'open_modal': 'add-student'}
 
     if not all([name, email, password, roll, dept_id, semester]):
         flash('All fields are required.', 'danger')
-        return redirect(url_for('admin.students'))
+        return redirect(url_for('admin.students', **reopen_target))
+
+    if not _validate_temporary_password(password):
+        flash('Temporary password must be at least 8 characters and include uppercase, lowercase, a digit, and a special character.', 'danger')
+        return redirect(url_for('admin.students', **reopen_target))
 
     if _scoped_user_query().filter_by(email=email).first():
         flash('Email already registered.', 'danger')
-        return redirect(url_for('admin.students'))
+        return redirect(url_for('admin.students', **reopen_target))
 
     if _scoped_student_query().filter_by(roll_number=roll).first():
         flash('Roll number already exists.', 'danger')
-        return redirect(url_for('admin.students'))
+        return redirect(url_for('admin.students', **reopen_target))
 
     department = _scoped_model_or_404(Department, dept_id)
 
     user = User(college_id=_admin_college_id(), name=name, email=email, role='student')
-    user.set_password(password)
+    user.set_temporary_password(password)
     db.session.add(user)
     db.session.flush()
 
@@ -371,7 +384,7 @@ def add_student():
     )
     db.session.add(student)
     db.session.commit()
-    flash(f'Student {roll} added successfully.', 'success')
+    flash(f'Student {roll} added with a temporary password. The student will be prompted to set a personal password on first login.', 'success')
     return redirect(url_for('admin.students'))
 
 
@@ -419,9 +432,13 @@ def import_students():
             roll     = row.get('roll_number', '').strip().upper()
             dept_code= row.get('department_code', '').strip().upper()
             semester = int(row.get('semester', 1))
-            password = row.get('password', 'Student@123').strip()
+            password = row.get('password', 'Student@123!').strip()
 
             if not all([name, email, roll, dept_code]):
+                errors += 1
+                continue
+
+            if not _validate_temporary_password(password):
                 errors += 1
                 continue
 
@@ -436,7 +453,7 @@ def import_students():
                 continue
 
             u = User(college_id=_admin_college_id(), name=name, email=email, role='student')
-            u.set_password(password)
+            u.set_temporary_password(password)
             db.session.add(u)
             db.session.flush()
             db.session.add(Student(
@@ -573,6 +590,10 @@ def add_teacher():
         flash('All fields are required.', 'danger')
         return redirect(url_for('admin.teachers'))
 
+    if not _validate_temporary_password(password):
+        flash('Temporary password must be at least 8 characters and include uppercase, lowercase, a digit, and a special character.', 'danger')
+        return redirect(url_for('admin.teachers'))
+
     if _scoped_user_query().filter_by(email=email).first():
         flash('Email already registered.', 'danger')
         return redirect(url_for('admin.teachers'))
@@ -584,7 +605,7 @@ def add_teacher():
     department = _scoped_model_or_404(Department, dept_id)
 
     user = User(college_id=_admin_college_id(), name=name, email=email, role='teacher')
-    user.set_password(password)
+    user.set_temporary_password(password)
     db.session.add(user)
     db.session.flush()
 
@@ -596,7 +617,7 @@ def add_teacher():
     )
     db.session.add(teacher)
     db.session.commit()
-    flash(f'Teacher {emp_id} added.', 'success')
+    flash(f'Teacher {emp_id} added with a temporary password. The teacher will be prompted to set a personal password on first login.', 'success')
     return redirect(url_for('admin.teachers'))
 
 
@@ -878,6 +899,10 @@ def add_parent():
         flash('Name, email, password and student are required.', 'danger')
         return redirect(url_for('admin.parents'))
 
+    if not _validate_temporary_password(password):
+        flash('Temporary password must be at least 8 characters and include uppercase, lowercase, a digit, and a special character.', 'danger')
+        return redirect(url_for('admin.parents'))
+
     if _scoped_user_query().filter_by(email=email).first():
         flash(f'Email {email} is already registered.', 'danger')
         return redirect(url_for('admin.parents'))
@@ -888,7 +913,7 @@ def add_parent():
         return redirect(url_for('admin.parents'))
 
     user = User(college_id=_admin_college_id(), name=name, email=email, role='parent', is_active=True)
-    user.set_password(password)
+    user.set_temporary_password(password)
     db.session.add(user)
     db.session.flush()
 
@@ -896,7 +921,7 @@ def add_parent():
                          relationship=relationship)
     db.session.add(link)
     db.session.commit()
-    flash(f'Parent {name} created and linked to {student.user.name}.', 'success')
+    flash(f'Parent {name} created and linked to {student.user.name}. They will be prompted to set a personal password on first login.', 'success')
     return redirect(url_for('admin.parents'))
 
 

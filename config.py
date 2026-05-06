@@ -82,6 +82,7 @@ class Config:
     COLLEGE_NAME = os.environ.get('COLLEGE_NAME', 'College')
     DEFAULT_COLLEGE_CODE = os.environ.get('DEFAULT_COLLEGE_CODE', 'MAIN')
     MULTI_COLLEGE_ROOT_DOMAIN = os.environ.get('MULTI_COLLEGE_ROOT_DOMAIN', '')
+    PUBLIC_BASE_URL = os.environ.get('PUBLIC_BASE_URL', '').strip()
     ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get('ALLOWED_HOSTS', '').split(',') if host.strip()]
     TRUST_PROXY_HEADERS = os.environ.get('TRUST_PROXY_HEADERS', 'True') == 'True'
     TRUSTED_PROXY_HOPS = int(os.environ.get('TRUSTED_PROXY_HOPS', 1))
@@ -90,6 +91,7 @@ class Config:
     EAR_CONSEC_FRAMES = 2
     REQUIRED_BLINKS = 1
     LIVENESS_STATE_TTL_SECONDS = int(os.environ.get('LIVENESS_STATE_TTL_SECONDS', 600))
+    PASSWORD_SETUP_TOKEN_MAX_AGE = int(os.environ.get('PASSWORD_SETUP_TOKEN_MAX_AGE', 86400))
 
     # ── Rate limiting ─────────────────────────────────────────────────────────
     RATELIMIT_STORAGE_URI = (

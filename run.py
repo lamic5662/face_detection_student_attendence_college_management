@@ -1,4 +1,10 @@
 import os
+import re
+import shutil
+import signal
+import subprocess
+import time
+from pathlib import Path
 from app import create_app
 from extensions import db
 from utils.system_setup import evaluate_production_setup
@@ -16,6 +22,195 @@ from models.setting import CollegeSetting   # noqa: F401
 from models.academic_calendar import AcademicCalendarEvent  # noqa: F401
 
 app = create_app()
+
+_TRYCLOUDFLARE_RE = re.compile(r'https://[a-z0-9-]+\.trycloudflare\.com', re.IGNORECASE)
+
+
+def _env_path() -> Path:
+    return Path(app.root_path) / '.env'
+
+
+def _tunnel_state_dir() -> Path:
+    path = Path(app.instance_path) / 'tunnel'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _tunnel_pid_path() -> Path:
+    return _tunnel_state_dir() / 'cloudflared.pid'
+
+
+def _tunnel_url_path() -> Path:
+    return _tunnel_state_dir() / 'cloudflared.url'
+
+
+def _tunnel_log_path() -> Path:
+    return _tunnel_state_dir() / 'cloudflared.log'
+
+
+def _extract_trycloudflare_url(text: str) -> str | None:
+    match = _TRYCLOUDFLARE_RE.search(text or '')
+    return match.group(0) if match else None
+
+
+def _is_pid_running(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _stored_tunnel_pid() -> int | None:
+    path = _tunnel_pid_path()
+    if not path.exists():
+        return None
+    try:
+        return int(path.read_text(encoding='utf-8').strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _stored_tunnel_url() -> str:
+    path = _tunnel_url_path()
+    if not path.exists():
+        return ''
+    return path.read_text(encoding='utf-8').strip()
+
+
+def _write_public_base_url(url: str) -> None:
+    env_path = _env_path()
+    lines = []
+    if env_path.exists():
+        lines = env_path.read_text(encoding='utf-8').splitlines()
+
+    replaced = False
+    updated = []
+    for line in lines:
+        if line.startswith('PUBLIC_BASE_URL='):
+            updated.append(f'PUBLIC_BASE_URL={url}')
+            replaced = True
+        else:
+            updated.append(line)
+
+    if not replaced:
+        updated.append(f'PUBLIC_BASE_URL={url}')
+
+    env_path.write_text('\n'.join(updated) + '\n', encoding='utf-8')
+
+
+def _stop_tunnel_process(pid: int) -> bool:
+    try:
+        os.killpg(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            return False
+    return True
+
+
+def _clear_tunnel_state() -> None:
+    for path in (_tunnel_pid_path(), _tunnel_url_path()):
+        if path.exists():
+            path.unlink()
+
+
+def _cluster_state_dir() -> Path:
+    path = Path(app.instance_path) / 'cluster'
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _cluster_ports() -> list[int]:
+    raw = (os.environ.get('LOCAL_CLUSTER_PORTS') or '5050,5051').strip()
+    ports = []
+    for item in raw.split(','):
+        item = item.strip()
+        if item:
+            ports.append(int(item))
+    return ports or [5050, 5051]
+
+
+def _cluster_pid_path(port: int) -> Path:
+    return _cluster_state_dir() / f'gunicorn-{port}.pid'
+
+
+def _cluster_log_path(port: int) -> Path:
+    return _cluster_state_dir() / f'gunicorn-{port}.log'
+
+
+def _stored_cluster_pid(port: int) -> int | None:
+    path = _cluster_pid_path(port)
+    if not path.exists():
+        return None
+    try:
+        return int(path.read_text(encoding='utf-8').strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _cluster_workers() -> int:
+    return int(os.environ.get('LOCAL_CLUSTER_WORKERS', 2))
+
+
+def _cluster_threads() -> int:
+    return int(os.environ.get('LOCAL_CLUSTER_THREADS', 2))
+
+
+def _start_cluster_instance(port: int) -> tuple[int, Path]:
+    gunicorn = shutil.which('gunicorn')
+    if not gunicorn:
+        raise RuntimeError('gunicorn is not installed in the current Python environment.')
+
+    log_path = _cluster_log_path(port)
+    env = os.environ.copy()
+    env['FLASK_ENV'] = 'production'
+    env['GUNICORN_BIND'] = f'127.0.0.1:{port}'
+    env['GUNICORN_WORKERS'] = str(_cluster_workers())
+    env['GUNICORN_THREADS'] = str(_cluster_threads())
+    env['GUNICORN_RELOAD'] = 'False'
+
+    with open(log_path, 'w', encoding='utf-8') as log_handle:
+        proc = subprocess.Popen(
+            [gunicorn, '-c', 'gunicorn.conf.py', 'run:app'],
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env=env,
+            cwd=app.root_path,
+        )
+
+    _cluster_pid_path(port).write_text(str(proc.pid), encoding='utf-8')
+    return proc.pid, log_path
+
+
+def _stop_cluster_instance(port: int) -> bool:
+    pid = _stored_cluster_pid(port)
+    if not pid:
+        return False
+    stopped = _stop_tunnel_process(pid)
+    path = _cluster_pid_path(port)
+    if path.exists():
+        path.unlink()
+    return stopped
+
+
+def _mobile_tunnel_target() -> str:
+    explicit = (os.environ.get('MOBILE_TUNNEL_TARGET') or '').strip()
+    if explicit:
+        return explicit
+
+    nginx_local_conf = Path('/opt/homebrew/etc/nginx/servers/smart_attendance.conf')
+    if nginx_local_conf.exists():
+        return 'http://127.0.0.1:8081'
+
+    port = int(os.environ.get('PORT', 5050))
+    return f'http://127.0.0.1:{port}'
 
 
 @app.cli.command('init-db')
@@ -240,6 +435,198 @@ def doctor():
 
     if report['failures']:
         raise SystemExit(1)
+
+
+@app.cli.command('start-local-cluster')
+def start_local_cluster():
+    """Start multiple local Gunicorn instances for Nginx load balancing."""
+    ports = _cluster_ports()
+    started = []
+
+    for port in ports:
+        pid = _stored_cluster_pid(port)
+        if pid and _is_pid_running(pid):
+            started.append((port, pid, _cluster_log_path(port), True))
+            continue
+
+        pid, log_path = _start_cluster_instance(port)
+        time.sleep(0.8)
+        if not _is_pid_running(pid):
+            tail = log_path.read_text(encoding='utf-8', errors='ignore')[-4000:]
+            raise RuntimeError(
+                f'Gunicorn instance on port {port} failed to start.\n'
+                f'--- log: {log_path} ---\n{tail}'
+            )
+        started.append((port, pid, log_path, False))
+
+    print('Local Gunicorn cluster')
+    print('----------------------')
+    print(f'Workers per instance: {_cluster_workers()}')
+    print(f'Threads per instance: {_cluster_threads()}')
+    for port, pid, log_path, reused in started:
+        label = 'reused' if reused else 'started'
+        print(f'  - {label}: 127.0.0.1:{port} (pid {pid}) log={log_path}')
+    print('Nginx can now load balance across these local instances.')
+
+
+@app.cli.command('local-cluster-status')
+def local_cluster_status():
+    """Show the local Gunicorn cluster state."""
+    ports = _cluster_ports()
+    print('Local Gunicorn cluster status')
+    print('-----------------------------')
+    print(f'Configured ports: {", ".join(str(p) for p in ports)}')
+    print(f'Workers per instance: {_cluster_workers()}')
+    print(f'Threads per instance: {_cluster_threads()}')
+    for port in ports:
+        pid = _stored_cluster_pid(port)
+        running = bool(pid and _is_pid_running(pid))
+        print(
+            f'  - 127.0.0.1:{port} | pid={pid or "(none)"} '
+            f'| running={"yes" if running else "no"} | log={_cluster_log_path(port)}'
+        )
+
+
+@app.cli.command('stop-local-cluster')
+def stop_local_cluster():
+    """Stop the local Gunicorn cluster instances."""
+    ports = _cluster_ports()
+    print('Stopping local Gunicorn cluster')
+    print('-------------------------------')
+    for port in ports:
+        stopped = _stop_cluster_instance(port)
+        print(f'  - 127.0.0.1:{port}: {"stopped" if stopped else "not running"}')
+
+
+@app.cli.command('start-mobile-tunnel')
+def start_mobile_tunnel():
+    """Start a quick Cloudflare tunnel, store the public URL, and update PUBLIC_BASE_URL."""
+    cloudflared = shutil.which('cloudflared')
+    if not cloudflared:
+        print('cloudflared is not installed. Run: brew install cloudflared')
+        raise SystemExit(1)
+
+    existing_pid = _stored_tunnel_pid()
+    existing_url = _stored_tunnel_url()
+    if existing_pid and _is_pid_running(existing_pid) and existing_url:
+        _write_public_base_url(existing_url)
+        print('Existing mobile tunnel is already running.')
+        print(f'PID: {existing_pid}')
+        print(f'URL: {existing_url}')
+        print('PUBLIC_BASE_URL refreshed in .env')
+        return
+
+    _clear_tunnel_state()
+    log_path = _tunnel_log_path()
+    target = _mobile_tunnel_target()
+
+    with open(log_path, 'w', encoding='utf-8') as log_handle:
+        proc = subprocess.Popen(
+            [cloudflared, 'tunnel', '--url', target],
+            stdout=log_handle,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+    url = ''
+    deadline = time.time() + 25
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            break
+        log_text = log_path.read_text(encoding='utf-8', errors='ignore')
+        url = _extract_trycloudflare_url(log_text) or ''
+        if url:
+            break
+        time.sleep(0.5)
+
+    if not url:
+        if proc.poll() is None:
+            _stop_tunnel_process(proc.pid)
+        print('Failed to create a mobile tunnel. Review the log below:')
+        print('--- cloudflared.log ---')
+        print(log_path.read_text(encoding='utf-8', errors='ignore')[-4000:])
+        raise SystemExit(1)
+
+    _tunnel_pid_path().write_text(str(proc.pid), encoding='utf-8')
+    _tunnel_url_path().write_text(url, encoding='utf-8')
+    _write_public_base_url(url)
+
+    print('Mobile tunnel started.')
+    print(f'PID: {proc.pid}')
+    print(f'Local target: {target}')
+    print(f'Public URL: {url}')
+    print('PUBLIC_BASE_URL updated in .env')
+    print('Restart SmartAttend and send the password reset email again.')
+
+
+@app.cli.command('mobile-tunnel-status')
+def mobile_tunnel_status():
+    """Show the current Cloudflare mobile tunnel state."""
+    pid = _stored_tunnel_pid()
+    url = _stored_tunnel_url()
+    running = bool(pid and _is_pid_running(pid))
+
+    print('Mobile Tunnel Status')
+    print('--------------------')
+    print(f'PID: {pid or "(none)"}')
+    print(f'Running: {"yes" if running else "no"}')
+    print(f'Local target: {_mobile_tunnel_target()}')
+    print(f'URL: {url or "(none)"}')
+    print(f'PUBLIC_BASE_URL: {app.config.get("PUBLIC_BASE_URL") or "(not set)"}')
+    print(f'Log: {_tunnel_log_path()}')
+
+
+@app.cli.command('stop-mobile-tunnel')
+def stop_mobile_tunnel():
+    """Stop the stored Cloudflare mobile tunnel process."""
+    pid = _stored_tunnel_pid()
+    if not pid:
+        print('No managed mobile tunnel PID is stored.')
+        return
+
+    stopped = _stop_tunnel_process(pid)
+    _clear_tunnel_state()
+    if stopped:
+        print(f'Stopped mobile tunnel PID {pid}.')
+    else:
+        print(f'Mobile tunnel PID {pid} was not running.')
+
+
+@app.cli.command('tunnel-guide')
+def tunnel_guide():
+    """Print the ngrok/mobile testing steps for password reset links."""
+    port = int(os.environ.get('PORT', 5050))
+    target = _mobile_tunnel_target()
+    current_public_base = app.config.get('PUBLIC_BASE_URL') or ''
+
+    print('Mobile Password Reset Tunnel Guide')
+    print('----------------------------------')
+    print(f'Local app port: {port}')
+    print(f'Managed tunnel target: {target}')
+    print(f'Current PUBLIC_BASE_URL: {current_public_base or "(not set)"}')
+    print()
+    print('1. Start the local app if it is not running:')
+    print(f'   python run.py  # serves on http://127.0.0.1:{port}')
+    print()
+    print('2. The easiest way now is:')
+    print('   flask --app run.py start-mobile-tunnel')
+    print()
+    print('3. Or manually start ngrok in another terminal:')
+    print(f'   ngrok http {port}')
+    print()
+    print('   Or use the included config:')
+    print('   ngrok start smartattend --config deploy/ngrok/ngrok.example.yml')
+    print()
+    print('4. Copy the HTTPS forwarding URL and set it as PUBLIC_BASE_URL in .env')
+    print()
+    print('5. Restart the SmartAttend app after changing .env')
+    print()
+    print('6. Send the forgot-password email again and open it on your phone.')
+    print()
+    print('Important:')
+    print('- Email apps cannot show the password form directly inside Gmail.')
+    print('- The reset button always opens the password page in a browser.')
+    print('- 127.0.0.1 links only work on the same device running the app.')
 
 
 if __name__ == '__main__':

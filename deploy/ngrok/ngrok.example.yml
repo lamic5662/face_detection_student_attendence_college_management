@@ -1,0 +1,17 @@
+version: 3
+
+# Copy this file, set your own authtoken, then run:
+#   ngrok start smartattend --config deploy/ngrok/ngrok.example.yml
+#
+# After ngrok starts, copy the HTTPS forwarding URL and set:
+#   PUBLIC_BASE_URL=https://your-ngrok-domain.ngrok-free.app
+
+agent:
+  authtoken: replace-with-your-ngrok-authtoken
+
+tunnels:
+  smartattend:
+    proto: http
+    addr: 5050
+    schemes:
+      - https

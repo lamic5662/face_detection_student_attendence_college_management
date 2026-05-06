@@ -2,7 +2,8 @@ import os
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import timedelta
-from flask import Flask, render_template, jsonify, request, url_for
+from urllib.parse import urlparse
+from flask import Flask, render_template, jsonify, request, url_for, redirect
 from flask_login import current_user
 from werkzeug.middleware.proxy_fix import ProxyFix
 import redis
@@ -34,6 +35,16 @@ def _host_is_allowed(host: str, allowed_hosts: list[str]) -> bool:
         elif host == candidate:
             return True
     return False
+
+
+def _effective_allowed_hosts(app: Flask) -> list[str]:
+    allowed_hosts = list(app.config.get('ALLOWED_HOSTS', []))
+    public_base_url = (app.config.get('PUBLIC_BASE_URL') or '').strip()
+    if public_base_url:
+        parsed = urlparse(public_base_url)
+        if parsed.hostname:
+            allowed_hosts.append(parsed.hostname.lower())
+    return allowed_hosts
 
 
 def _configure_logging(app: Flask) -> None:
@@ -302,6 +313,13 @@ def create_app(config_override=None) -> Flask:
     compress.init_app(app)
     limiter.init_app(app)
 
+    @limiter.request_filter
+    def _exempt_safe_auth_page_reads():
+        return request.method in {'GET', 'HEAD', 'OPTIONS'} and request.endpoint in {
+            'auth.login',
+            'auth.index',
+        }
+
     _configure_logging(app)
     if app.config.get('_RATELIMIT_FALLBACK_MESSAGE'):
         app.logger.warning(app.config['_RATELIMIT_FALLBACK_MESSAGE'])
@@ -318,9 +336,23 @@ def create_app(config_override=None) -> Flask:
     def _csrf_exempt_ajax():
         load_request_college()
         if not app.debug and not app.testing:
-            allowed_hosts = app.config.get('ALLOWED_HOSTS', [])
+            allowed_hosts = _effective_allowed_hosts(app)
             if allowed_hosts and not _host_is_allowed(request.host, allowed_hosts):
                 return render_template('errors/400.html'), 400
+        if (
+            current_user.is_authenticated
+            and current_user.role in {'student', 'teacher', 'parent'}
+            and getattr(current_user, 'must_change_password', False)
+        ):
+            allowed_endpoints = {
+                'auth.password_setup_prompt',
+                'auth.send_password_setup_email_to_current_user',
+                'auth.set_password_from_email',
+                'auth.logout',
+                'static',
+            }
+            if request.endpoint not in allowed_endpoints:
+                return redirect(url_for('auth.password_setup_prompt'))
         if current_user.is_authenticated and current_user.role != 'super_admin':
             if not endpoint_has_access(current_user, request.endpoint):
                 message = feature_access_message(request.endpoint)

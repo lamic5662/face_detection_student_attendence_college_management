@@ -101,10 +101,24 @@ flask --app run.py create-college
 flask --app run.py create-admin
 flask --app run.py check-classes
 flask --app run.py doctor
+flask --app run.py tunnel-guide
+flask --app run.py start-mobile-tunnel
+flask --app run.py mobile-tunnel-status
+flask --app run.py stop-mobile-tunnel
+flask --app run.py start-local-cluster
+flask --app run.py local-cluster-status
+flask --app run.py stop-local-cluster
 ```
 
 `check-classes` sends alerts when a scheduled class has passed and no attendance session was started.
 `doctor` runs deployment-readiness checks for database connectivity, host allowlists, limiter backend, and private upload paths.
+`tunnel-guide` prints the ngrok steps for mobile password reset testing.
+`start-mobile-tunnel` starts a quick Cloudflare tunnel and writes its public URL to `PUBLIC_BASE_URL` in `.env`.
+`mobile-tunnel-status` shows the stored tunnel PID, URL, and log path.
+`stop-mobile-tunnel` stops the managed Cloudflare tunnel.
+`start-local-cluster` starts a local multi-instance Gunicorn cluster for Nginx load balancing.
+`local-cluster-status` shows the local Gunicorn cluster state.
+`stop-local-cluster` stops the local Gunicorn cluster instances.
 
 ## Multi-College Usage
 
@@ -182,6 +196,75 @@ The admin dashboard also shows a warning banner until the setup is in a deployab
 
 For a fuller server rollout guide, see [docs/production.md](docs/production.md).
 
+## Full System Guide
+
+For a complete handbook covering:
+
+- all five user roles
+- major platform features
+- technology stack
+- free tools used in the setup
+- first-time installation and onboarding
+
+see [docs/system_guide.md](docs/system_guide.md).
+
+## Mobile Password Reset Testing
+
+If you run SmartAttend locally on your laptop and open Gmail on your phone, password reset links will only work if the link points to a URL your phone can reach.
+
+For local mobile testing:
+
+1. Start the app normally:
+
+```bash
+python run.py
+```
+
+2. The easiest option is:
+
+```bash
+flask --app run.py start-mobile-tunnel
+```
+
+This starts a quick Cloudflare tunnel and updates `PUBLIC_BASE_URL` in `.env` automatically.
+
+3. Restart the app.
+4. Send the forgot-password email again.
+
+Manual option:
+
+1. Start ngrok:
+
+```bash
+ngrok http 5050
+```
+
+2. Copy the HTTPS forwarding URL from ngrok.
+3. Set `PUBLIC_BASE_URL` in `.env` to that ngrok URL.
+4. Restart the app.
+5. Send the forgot-password email again.
+
+You can also use:
+
+```bash
+flask --app run.py tunnel-guide
+```
+
+You can inspect or stop the managed tunnel with:
+
+```bash
+flask --app run.py mobile-tunnel-status
+flask --app run.py stop-mobile-tunnel
+```
+
+An example ngrok config is included at [deploy/ngrok/ngrok.example.yml](deploy/ngrok/ngrok.example.yml).
+
+Important:
+
+- Gmail cannot display a live password form inside the email itself.
+- The reset button opens the password page in the browser.
+- `127.0.0.1` links only work on the same device running the app.
+
 ## Gunicorn
 
 Run the production server with:
@@ -206,6 +289,38 @@ Deployment templates are included in [`deploy/`](deploy):
 - systemd service unit
 - logrotate policy
 - backup script example
+- systemd template for scaled instances
+
+## Local Load Balancing
+
+For a local production-style free setup, SmartAttend can run as:
+
+- `Nginx -> Gunicorn cluster -> Flask app`
+
+Start the local cluster:
+
+```bash
+flask --app run.py start-local-cluster
+```
+
+Check it:
+
+```bash
+flask --app run.py local-cluster-status
+```
+
+Stop it:
+
+```bash
+flask --app run.py stop-local-cluster
+```
+
+The local Nginx config at [deploy/nginx/smart_attendance.local.conf](deploy/nginx/smart_attendance.local.conf) uses an upstream with:
+
+- `127.0.0.1:5050`
+- `127.0.0.1:5051`
+
+and balances using `least_conn`.
 
 ## Production Checklist
 

@@ -24,6 +24,9 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.Enum('super_admin', 'admin', 'teacher', 'student', 'parent'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
+    must_change_password = db.Column(db.Boolean, nullable=False, default=False)
+    password_changed_at = db.Column(db.DateTime, nullable=True)
+    password_setup_email_sent_at = db.Column(db.DateTime, nullable=True)
     sidebar_pins = db.Column(db.Text, nullable=True)
     dashboard_widgets = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now_naive)
@@ -33,9 +36,19 @@ class User(UserMixin, db.Model):
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+        self.must_change_password = False
+        self.password_changed_at = utc_now_naive()
+
+    def set_temporary_password(self, password):
+        self.password_hash = generate_password_hash(password)
+        self.must_change_password = True
+        self.password_changed_at = None
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def mark_password_setup_email_sent(self):
+        self.password_setup_email_sent_at = utc_now_naive()
 
     def get_sidebar_pin_keys(self):
         if not self.sidebar_pins:

@@ -73,7 +73,16 @@
           <tr>
             <td class="px-4"><span class="badge bg-secondary">{{ t.employee_id }}</span></td>
             <td class="fw-semibold">{{ t.user.name }}</td>
-            <td class="text-muted small">{{ t.user.email }}</td>
+            <td>
+              <div class="text-muted small">{{ t.user.email }}</div>
+              {% if t.user.must_change_password %}
+              <span class="badge bg-warning-subtle text-warning mt-1">
+                {{ 'Setup email sent' if t.user.password_setup_email_sent_at else 'Temporary password active' }}
+              </span>
+              {% else %}
+              <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
+              {% endif %}
+            </td>
             <td><span class="badge bg-primary-subtle text-primary">{{ t.department.name }}</span></td>
             <td><span class="badge bg-info-subtle text-info">{{ t.subjects|length }}</span></td>
             <td>
@@ -165,14 +174,20 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="row g-3">
+          <div class="col-12">
+            <div class="alert alert-info border-0 small mb-0">
+              Teachers are created with a temporary password. On first login they can request a secure email link and set a personal password that admins cannot view later.
+            </div>
+          </div>
           <div class="col-12"><label class="form-label fw-semibold">Full Name</label>
             <input type="text" name="name" class="form-control" required></div>
           <div class="col-12"><label class="form-label fw-semibold">Email</label>
             <input type="email" name="email" class="form-control" required></div>
           <div class="col-md-6"><label class="form-label fw-semibold">Employee ID</label>
             <input type="text" name="employee_id" class="form-control" required></div>
-          <div class="col-md-6"><label class="form-label fw-semibold">Password</label>
-            <input type="password" name="password" class="form-control" minlength="6" required></div>
+          <div class="col-md-6"><label class="form-label fw-semibold">Temporary Password</label>
+            <input type="password" name="password" class="form-control" minlength="8" required
+                   placeholder="Min. 8 chars, upper, lower, digit, symbol"></div>
           <div class="col-12"><label class="form-label fw-semibold">Department</label>
             <select name="department_id" class="form-select" required>
               <option value="">Select Department</option>
