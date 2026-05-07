@@ -352,7 +352,8 @@ def parent_marksheet(student_id):
     student = db.session.get(Student, student_id)
     if student is None or student.college_id != current_user.college_id:
         abort(404)
-    data = build_marksheet_data(student)
+    semester = request.args.get('semester', type=int)
+    data = build_marksheet_data(student, semester=semester)
     return render_template('exam/marksheet.html', **data, is_admin=False, is_parent=True)
 
 

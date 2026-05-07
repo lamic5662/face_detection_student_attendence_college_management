@@ -33,7 +33,8 @@ Main responsibilities:
 - update college profile, code, and subdomain
 - activate or deactivate colleges
 - create and manage college admin accounts
-- enable or disable features per college
+- enable or disable features per college using 18 configurable modules
+- apply tier presets (Starter / Standard / Professional / Enterprise) to a college
 - view college-level usage and onboarding status
 - review platform audit logs
 - monitor platform activity notifications
@@ -48,10 +49,13 @@ Main responsibilities:
 - manage teachers, students, parents, and subjects
 - manage departments
 - manage notices and academic calendar
-- manage fees and payments
-- manage timetable and attendance operations
-- manage exams and marks
+- manage fees, payments, and fee reminder email configuration
+- manage timetable (with conflict detection) and attendance operations
+- manage exams, marks, and multi-semester marksheets
 - manage ID card template and approvals
+- manage batch tracker: monitor student cohort progression and run batch promotions
+- configure semester schedules and automated attendance report emails
+- use AI assistant to query live college data in natural language
 - create user accounts with temporary passwords
 - monitor college setup progress
 
@@ -67,6 +71,7 @@ Main responsibilities:
 - review assignment submissions
 - enter marks and academic records
 - manage class-related student interactions
+- use AI assistant to query attendance, marks, student data, and notes
 
 ### 4. Student
 
@@ -77,7 +82,7 @@ Main responsibilities:
 - view attendance
 - access notes and assignments
 - submit assignments
-- view fees, exams, marksheets, notices, and calendar
+- view fees, exams, marksheets (current and previous semesters), notices, and calendar
 - request leave
 - manage their password after first login
 - request or use digital ID card
@@ -90,8 +95,10 @@ Main responsibilities:
 
 - view child attendance
 - view assignments and results
-- view fee information
+- view fee information and receive automated fee reminder emails
 - view timetable, notices, and calendar
+- view official marksheets for any semester
+- receive automated weekly attendance report emails when child is below threshold
 - monitor child-facing academic updates
 
 ## Main Features
@@ -100,7 +107,7 @@ Main responsibilities:
 
 - multi-college tenant architecture
 - super admin platform control
-- college-wise feature enable/disable system
+- 18-module per-college feature enable/disable system with 4 tier presets
 - college detail page with user counts and activity status
 - platform audit logs
 - platform activity notifications for super admin
@@ -126,17 +133,21 @@ Main responsibilities:
 - manual attendance operations
 - attendance tracking and reporting
 - low-attendance checks and alerts
+- automated weekly attendance report emails to students and parents
 
 ### Academic Features
 
 - departments
 - subjects
-- timetable
+- timetable with slot conflict detection
+- semester schedules (official start/end dates per cohort)
+- batch tracker with semester progression monitoring and batch promotion
 - assignments
 - content sharing
 - exam setup
 - marks entry
-- printable marksheet support
+- printable marksheets for any semester (not only current)
+- student ID auto-generation (COLLEGE-DEPT-YEAR-SEQ format)
 
 ### Finance Features
 
@@ -144,6 +155,7 @@ Main responsibilities:
 - fee payment records
 - receipt generation
 - parent fee visibility
+- automated fee reminder emails (upcoming / due today / overdue) with configurable schedule
 
 ### Communication Features
 
@@ -151,6 +163,13 @@ Main responsibilities:
 - notification bell
 - academic calendar
 - role-based in-app guidance
+
+### AI Features
+
+- AI assistant (RAG-based) for admins and teachers
+- powered by Groq API (llama-3.3-70b-versatile)
+- queries live college data: attendance, students, marks, subjects, notices, notes
+- natural-language interface — ask questions, get real answers based on current DB state
 
 ### Student Identity Features
 
@@ -170,29 +189,93 @@ Main responsibilities:
 
 ## Feature Access Model
 
-Super admin can control which modules a college is allowed to use.
-
-Examples:
-
-- attendance
-- assignments
-- exams
-- fees
-- parent portal
-- ID cards
-- notice board
-- calendar
-- timetable
-- analytics
-- file manager
-- live location
-- face biometrics
-
-If a feature is disabled for a college:
+Super admin controls which of the 18 modules a college can use. If a feature is disabled:
 
 - it is hidden from navigation
 - related dashboard items are hidden
 - blocked URLs return `403`
+
+### 18 Feature Modules
+
+| Key | Group | Label |
+|-----|-------|-------|
+| attendance | Academic | Attendance |
+| learning_content | Academic | Learning Content |
+| exams | Academic | Exams & Marksheets |
+| notices | Academic | Notice Board |
+| calendar | Academic | Academic Calendar |
+| timetable | Academic | Timetable |
+| leaves | Academic | Leave Management |
+| batch_tracker | Academic | Batch Tracker |
+| fees | Operations | Fees |
+| fee_reminders | Operations | Fee Reminder Emails |
+| parent_portal | Operations | Parent Portal |
+| digital_id_cards | Operations | Digital ID Cards |
+| analytics | Operations | Analytics |
+| file_manager | Operations | File Manager |
+| report_emails | Operations | Automated Report Emails |
+| face_biometrics | Advanced | Face Biometrics |
+| live_location | Advanced | Live Location |
+| ai_assistant | Advanced | AI Assistant |
+
+### Tier Presets
+
+| Tier | Modules | Best for |
+|------|---------|----------|
+| Starter | 4 | New or small college |
+| Standard | 10 | Most colleges |
+| Professional | 15 | Established college |
+| Enterprise | 18 | All features enabled |
+
+## Automated Emails
+
+### Weekly Attendance Report Emails
+
+Configured per college under **Sidebar → Semester Schedules → Report Schedule**.
+
+- toggle enabled/disabled
+- set send day (Mon–Sun) and hour
+- filter by department, semester, or admission year (leave blank = all students)
+- click **Send Now** to trigger a manual send immediately
+
+Student email: subject-wise table showing this week and overall attendance %, with a warning block for any subject below the threshold.
+
+Parent email: triggered only when at least one subject is below the low-attendance threshold (default 75%).
+
+### Fee Reminder Emails
+
+Configured per college under **Sidebar → Fees → Fee Reminder Emails** card.
+
+- toggle enabled/disabled
+- set how many days before due date to start reminding (1–30 days)
+- choose whether to send on the due date itself
+- choose whether to send overdue reminders
+- set the send hour (0–23)
+
+One consolidated email per student covers all qualifying fees in a single table — no per-fee separate emails.
+
+Parent copy is sent automatically to each linked parent.
+
+## Batch Tracker
+
+Tracks cohort (admission year) progression through semesters.
+
+- expected semester is calculated from admission year and current date
+- if semester schedules are configured, the official start/end dates are used instead
+- status badges: on-track / behind / far-behind
+- Batch Overview page shows per-cohort cards with progress bars
+- Promote button bumps all on-track students to the next semester
+
+Access via **Sidebar → Batch Overview**.
+
+## AI Assistant
+
+Available to admins and teachers when the `ai_assistant` feature is enabled.
+
+- access via **Sidebar → AI Assistant**
+- ask in plain English: "Which students have below 75% attendance?", "List recent notices", "How many students are in BCA semester 3?"
+- the system detects intent, fetches real DB data, and answers using the Groq AI model
+- responses are based on live data — not guesses
 
 ## Security and Account Logic
 
@@ -229,10 +312,16 @@ Important security rule:
 - Flask-Login
 - Flask-WTF
 - Flask-Limiter
+- APScheduler (BackgroundScheduler, Asia/Kathmandu timezone)
+
+### AI
+
+- Groq API — llama-3.3-70b-versatile
+- RAG pattern: context built from live DB data and injected as system prompt
 
 ### Database and Data
 
-- MySQL
+- MySQL (30+ tables)
 - PyMySQL
 - Alembic migrations
 - Pandas
@@ -332,6 +421,7 @@ Update at least:
 - `ALLOWED_HOSTS`
 - `RATELIMIT_STORAGE_URI`
 - `PUBLIC_BASE_URL`
+- `GROQ_API_KEY` (required for AI assistant feature)
 
 ### 5. Prepare Database
 
@@ -404,7 +494,7 @@ Super admin should:
 - verify platform setup
 - create colleges
 - create/manage college admins
-- configure feature access per college
+- configure feature access per college (apply a tier preset or enable individual modules)
 
 ### 13. Log In as College Admin
 
@@ -418,6 +508,9 @@ College admin should finish onboarding:
 - add students
 - add parents if needed
 - add subjects
+- configure semester schedules (optional but recommended for batch tracker accuracy)
+- configure report email schedule (optional)
+- configure fee reminder emails (optional)
 - review timetable, notices, fees, exams
 
 ## Mobile Reset Link Setup
@@ -453,12 +546,14 @@ Restart the app and send the reset email again.
 
 1. create college
 2. create college admin
-3. super admin sets feature access
+3. super admin sets feature access (apply tier preset)
 4. college admin completes college settings
 5. college admin adds academic structure
 6. college admin adds users
 7. users sign in and replace temporary passwords
 8. college starts daily operations
+9. configure semester schedules for batch tracker accuracy
+10. configure report email and fee reminder schedules
 
 ## Useful Commands
 
@@ -492,6 +587,7 @@ For final production:
 - use HTTPS
 - use stable hosting
 - use Redis as the live shared rate-limit backend
+- set `GROQ_API_KEY` for AI assistant
 - verify backups and restore process
 
 ## Final Summary
@@ -500,9 +596,14 @@ SmartAttend is a multi-college college-management platform with:
 
 - five role types
 - tenant isolation
-- super-admin platform controls
+- super-admin platform controls with 18 feature modules and 4 tier presets
 - college-level feature management
 - academic, attendance, fee, and identity workflows
+- automated email services (attendance reports + fee reminders)
+- AI assistant powered by RAG + Groq API
+- batch tracker for cohort progression monitoring
+- timetable conflict detection
+- multi-semester marksheet history
 - production-style local deployment support
 
 For deployment details, also see [docs/production.md](./production.md).

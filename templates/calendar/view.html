@@ -1,353 +1,460 @@
 {% extends "base.html" %}
 {% block title %}Academic Calendar{% endblock %}
-{% block page_title %}<i class="bi bi-calendar-event-fill me-2"></i>Academic Calendar{% endblock %}
+{% block page_title %}<i class="bi bi-calendar3 me-2"></i>Academic Calendar{% endblock %}
 
 {% block head %}
 <style>
-  .ac-shell { display:grid; grid-template-columns:minmax(0, 2fr) minmax(320px, 1fr); gap:1.25rem; }
-  .ac-toolbar-card, .ac-card { border:0; box-shadow:0 10px 32px rgba(15, 23, 42, .07); border-radius:22px; overflow:hidden; }
-  .ac-toolbar-card {
-    background:
-      radial-gradient(circle at top right, rgba(14, 165, 233, .12), transparent 32%),
-      linear-gradient(135deg, #fffdf8 0%, #ffffff 48%, #f7fbff 100%);
-  }
-  .ac-hero {
-    display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(260px, .9fr); gap:1rem;
-    align-items:start;
-  }
-  .ac-hero-copy { max-width:620px; }
-  .ac-eyebrow {
-    display:inline-flex; align-items:center; gap:.45rem; border-radius:999px;
-    padding:.38rem .8rem; font-size:.74rem; font-weight:800; letter-spacing:.08em;
-    text-transform:uppercase; color:#155e75; background:rgba(207, 250, 254, .85);
-  }
-  .ac-hero-title {
-    font-size:clamp(1.7rem, 2.3vw, 2.35rem); line-height:1.05; letter-spacing:-.04em;
-    font-weight:900; color:#0f172a; margin:.9rem 0 .55rem;
-  }
-  .ac-hero-copy p { margin:0; color:#526071; max-width:56ch; }
-  .ac-quickstats {
-    display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:.75rem;
-    align-self:stretch;
-  }
-  .ac-stat {
-    border:1px solid rgba(148, 163, 184, .2); border-radius:18px; background:rgba(255, 255, 255, .84);
-    padding:.95rem 1rem; min-height:100%;
-  }
-  .ac-stat-label {
-    font-size:.73rem; text-transform:uppercase; letter-spacing:.08em; color:#64748b; font-weight:800;
-  }
-  .ac-stat-value {
-    font-size:1.55rem; line-height:1; font-weight:900; color:#0f172a; letter-spacing:-.04em; margin:.45rem 0;
-  }
-  .ac-stat-note { font-size:.82rem; color:#64748b; }
-  .ac-filterbar {
-    margin-top:1rem; padding-top:1rem; border-top:1px solid rgba(148, 163, 184, .18);
-  }
-  .ac-month-wrap {
-    background:
-      linear-gradient(180deg, rgba(248, 251, 255, .94), rgba(255, 255, 255, 1) 22%),
-      linear-gradient(135deg, rgba(251, 191, 36, .06), transparent 30%);
-  }
-  .ac-month-header { display:flex; justify-content:space-between; align-items:center; gap:1rem; }
-  .ac-month-title { font-size:1.35rem; font-weight:800; color:#0f172a; letter-spacing:-.02em; }
-  .ac-context { color:#64748b; font-size:.92rem; }
-  .ac-month-frame {
-    display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:1rem; align-items:start;
-    margin-bottom:1rem;
-  }
-  .ac-month-chipset { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:.85rem; }
-  .ac-month-chip {
-    display:inline-flex; align-items:center; gap:.45rem; border-radius:999px;
-    padding:.42rem .8rem; background:#f8fafc; color:#334155; border:1px solid #e2e8f0;
-    font-size:.8rem; font-weight:700;
-  }
-  .ac-month-actions { display:flex; gap:.55rem; }
-  .ac-month-nav {
-    width:42px; height:42px; border-radius:14px; border:1px solid #dbe3ee;
-    background:#fff; color:#0f172a; display:inline-flex; align-items:center; justify-content:center;
-  }
-  .ac-month-nav:hover { background:#f8fafc; border-color:#bfdbfe; color:#1d4ed8; }
-  .ac-grid { width:100%; border-collapse:separate; border-spacing:8px; table-layout:fixed; }
-  .ac-grid th { font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; color:#64748b; padding:0 .35rem .35rem; text-align:left; }
-  .ac-day {
-    min-height:132px; background:#fff; border:1px solid #e2e8f0; border-radius:18px;
-    padding:.72rem; vertical-align:top; box-shadow:0 2px 10px rgba(15, 23, 42, .04);
-    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-  }
-  .ac-day.is-today { border-color:#0d6efd; box-shadow:0 0 0 3px rgba(13, 110, 253, .08); }
-  .ac-day.outside { opacity:.45; background:#f8fafc; }
-  .ac-day:hover { transform:translateY(-2px); box-shadow:0 10px 20px rgba(15, 23, 42, .08); }
-  .ac-day-num { display:flex; justify-content:space-between; align-items:center; font-weight:800; color:#0f172a; margin-bottom:.45rem; }
-  .ac-day-num .today-pill { font-size:.65rem; padding:.12rem .45rem; border-radius:999px; background:#dbeafe; color:#1d4ed8; }
-  .ac-day-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.55rem; }
-  .ac-day-count {
-    min-width:24px; height:24px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center;
-    background:#eff6ff; color:#1d4ed8; font-size:.72rem; font-weight:800;
-  }
-  .ac-event-pill {
-    display:block; width:100%; text-align:left; border:1px solid transparent; border-radius:12px;
-    padding:.46rem .58rem; margin-bottom:.38rem; font-size:.74rem; line-height:1.25;
-    white-space:normal;
-  }
-  .ac-event-pill strong { display:block; font-size:.75rem; margin-bottom:.12rem; }
-  .ac-event-meta { font-size:.68rem; opacity:.82; text-transform:uppercase; letter-spacing:.05em; }
-  .ac-more { font-size:.72rem; color:#64748b; font-weight:700; margin-top:.2rem; }
-  .ac-legend { display:flex; flex-wrap:wrap; gap:.55rem; }
-  .ac-legend-note { font-size:.84rem; color:#64748b; margin-top:.85rem; }
-  .ac-upcoming-item {
-    border:1px solid #e2e8f0; border-radius:18px; padding:1rem;
-    background:
-      linear-gradient(180deg, rgba(255,255,255,1), rgba(248,250,252,.82)),
-      #fff;
-  }
-  .ac-upcoming-date {
-    width:56px; min-width:56px; height:62px; border-radius:16px; background:#0f172a; color:#fff;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    box-shadow:0 10px 20px rgba(15, 23, 42, .18);
-  }
-  .ac-upcoming-month { font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; opacity:.8; }
-  .ac-upcoming-day { font-size:1.25rem; line-height:1; font-weight:900; letter-spacing:-.04em; margin-top:.08rem; }
-  .ac-upcoming-copy { min-width:0; }
-  .ac-upcoming-title {
-    font-size:1rem; font-weight:800; color:#0f172a; letter-spacing:-.02em; margin:0 0 .25rem;
-  }
-  .ac-range { color:#64748b; font-size:.8rem; }
-  .ac-scope-badge {
-    display:inline-flex; align-items:center; gap:.35rem; padding:.34rem .7rem; border-radius:999px;
-    background:#f8fafc; color:#475569; font-size:.76rem; font-weight:700; border:1px solid #e2e8f0;
-  }
-  .ac-empty {
-    border:1px dashed #cbd5e1; border-radius:16px; padding:2rem 1.25rem; text-align:center; color:#64748b;
-    background:rgba(248, 250, 252, .8);
-  }
-  @media (max-width: 1100px) {
-    .ac-shell { grid-template-columns:1fr; }
-    .ac-hero { grid-template-columns:1fr; }
-  }
-  @media (max-width: 768px) {
-    .ac-quickstats { grid-template-columns:1fr; }
-    .ac-grid { border-spacing:6px; }
-    .ac-day { min-height:92px; padding:.5rem; }
-    .ac-event-pill { font-size:.68rem; padding:.3rem .4rem; }
-    .ac-month-header { align-items:flex-start; flex-direction:column; }
-    .ac-month-frame { grid-template-columns:1fr; }
-    .ac-month-actions { width:100%; }
-  }
+/* ── Layout ── */
+.cal-shell { display:grid; grid-template-columns:1fr 320px; gap:1.5rem; align-items:start; }
+
+/* ── Month Card ── */
+.cal-card {
+  background:#fff; border:0; border-radius:24px;
+  box-shadow:0 4px 6px -1px rgba(0,0,0,.06), 0 10px 40px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+
+/* ── Month Header ── */
+.cal-header {
+  background:linear-gradient(135deg, #1e3a5f 0%, #2563eb 60%, #3b82f6 100%);
+  padding:28px 32px 22px;
+  color:#fff;
+}
+.cal-month-label {
+  font-size:1.75rem; font-weight:900; letter-spacing:-.04em; line-height:1;
+}
+.cal-year-label { font-size:1rem; font-weight:500; opacity:.7; margin-left:.45rem; }
+.cal-nav-btn {
+  width:40px; height:40px; border-radius:12px; border:1.5px solid rgba(255,255,255,.3);
+  background:rgba(255,255,255,.12); color:#fff;
+  display:inline-flex; align-items:center; justify-content:center;
+  text-decoration:none; transition:background .15s, border-color .15s;
+}
+.cal-nav-btn:hover { background:rgba(255,255,255,.22); border-color:rgba(255,255,255,.5); color:#fff; }
+.cal-today-badge {
+  font-size:.72rem; font-weight:700; padding:.28rem .7rem; border-radius:999px;
+  background:rgba(255,255,255,.18); color:#fff; letter-spacing:.04em;
+  border:1px solid rgba(255,255,255,.25);
+}
+.cal-header-pills { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:14px; }
+.cal-header-pill {
+  font-size:.74rem; font-weight:600; padding:.28rem .7rem; border-radius:999px;
+  background:rgba(255,255,255,.15); color:rgba(255,255,255,.9);
+  border:1px solid rgba(255,255,255,.2);
+}
+
+/* ── Day-of-week row ── */
+.cal-grid { width:100%; border-collapse:collapse; table-layout:fixed; }
+.cal-dow {
+  text-align:center; padding:14px 4px 10px; font-size:.7rem; font-weight:800;
+  text-transform:uppercase; letter-spacing:.1em; color:#94a3b8;
+}
+.cal-dow.weekend { color:#f87171; }
+
+/* ── Day cells ── */
+.cal-cell {
+  border:0; border-top:1px solid #f1f5f9; padding:0;
+  vertical-align:top; background:#fff;
+}
+.cal-cell.weekend-col { background:#fdfcfc; }
+.cal-cell.other-month { background:#f8fafc; }
+.cal-cell.today-col   { background:linear-gradient(180deg, #eff6ff 0%, #fff 100%); }
+
+.cal-cell-inner { padding:10px 10px 8px; min-height:110px; }
+
+/* ── Day number ── */
+.cal-num {
+  width:32px; height:32px; border-radius:50%; display:inline-flex;
+  align-items:center; justify-content:center;
+  font-size:.88rem; font-weight:800; color:#334155;
+  margin-bottom:6px; transition:background .15s;
+}
+.cal-cell.other-month .cal-num { color:#cbd5e1; font-weight:600; }
+.cal-cell.today-col .cal-num {
+  background:#2563eb; color:#fff;
+  box-shadow:0 4px 12px rgba(37,99,235,.35);
+}
+.cal-cell.weekend-col .cal-num { color:#ef4444; }
+.cal-cell.weekend-col.other-month .cal-num { color:#fca5a5; }
+
+/* ── Event pills ── */
+.cal-evt {
+  display:block; width:100%; border-radius:7px; padding:4px 8px;
+  margin-bottom:4px; font-size:.7rem; font-weight:700; line-height:1.3;
+  border-left:3px solid transparent; text-decoration:none; color:inherit;
+  transition:filter .12s;
+}
+.cal-evt:hover { filter:brightness(.93); }
+.cal-evt.holiday   { background:#fef2f2; border-color:#ef4444; color:#991b1b; }
+.cal-evt.exam_week { background:#fffbeb; border-color:#f59e0b; color:#92400e; }
+.cal-evt.event     { background:#eff6ff; border-color:#3b82f6; color:#1e40af; }
+
+.cal-evt-dot {
+  width:7px; height:7px; border-radius:50%; display:inline-block;
+  margin-right:5px; flex-shrink:0; margin-top:2px;
+}
+.cal-evt-dot.holiday   { background:#ef4444; }
+.cal-evt-dot.exam_week { background:#f59e0b; }
+.cal-evt-dot.event     { background:#3b82f6; }
+
+.cal-more {
+  font-size:.68rem; font-weight:700; color:#94a3b8;
+  padding:2px 6px; border-radius:6px; background:#f1f5f9; display:inline-block; margin-top:2px;
+}
+
+/* ── Sidebar ── */
+.cal-side-card {
+  background:#fff; border-radius:20px; border:0;
+  box-shadow:0 4px 6px -1px rgba(0,0,0,.06), 0 10px 40px rgba(0,0,0,.06);
+  overflow:hidden;
+}
+
+/* ── Legend ── */
+.cal-legend-dot {
+  width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:3px;
+}
+
+/* ── Upcoming ── */
+.cal-upcoming-row {
+  display:flex; gap:14px; align-items:flex-start; padding:14px 20px;
+  border-bottom:1px solid #f1f5f9; transition:background .12s;
+}
+.cal-upcoming-row:last-child { border-bottom:0; }
+.cal-upcoming-row:hover { background:#f8fafc; }
+.cal-date-box {
+  min-width:48px; height:56px; border-radius:14px; display:flex;
+  flex-direction:column; align-items:center; justify-content:center;
+  font-weight:900; flex-shrink:0;
+}
+.cal-date-box.holiday   { background:#fef2f2; color:#dc2626; }
+.cal-date-box.exam_week { background:#fffbeb; color:#d97706; }
+.cal-date-box.event     { background:#eff6ff; color:#2563eb; }
+.cal-date-box-day { font-size:1.35rem; line-height:1; }
+.cal-date-box-mon { font-size:.62rem; text-transform:uppercase; letter-spacing:.08em; opacity:.75; margin-top:2px; }
+.cal-upcoming-title { font-size:.9rem; font-weight:700; color:#1e293b; margin:0 0 3px; }
+.cal-upcoming-meta  { font-size:.75rem; color:#94a3b8; }
+
+/* ── Filter bar ── */
+.cal-filters {
+  background:#f8fafc; border-top:1px solid #f1f5f9;
+  padding:14px 32px;
+}
+
+/* ── Empty ── */
+.cal-empty {
+  text-align:center; padding:3rem 1.5rem; color:#94a3b8;
+}
+
+/* ── Mobile ── */
+@media (max-width:1024px) {
+  .cal-shell { grid-template-columns:1fr; }
+}
+@media (max-width:640px) {
+  .cal-header { padding:20px 18px 16px; }
+  .cal-cell-inner { min-height:70px; padding:6px 5px 4px; }
+  .cal-num { width:26px; height:26px; font-size:.78rem; }
+  .cal-evt { font-size:.62rem; padding:3px 5px; }
+  .cal-month-label { font-size:1.35rem; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="ac-shell">
+<div class="cal-shell">
+
+  {# ── Main Calendar ── #}
   <div>
-    <div class="card ac-toolbar-card mb-4">
-      <div class="card-body p-4">
-        <div class="ac-hero">
-          <div class="ac-hero-copy">
-            <span class="ac-eyebrow"><i class="bi bi-stars"></i>Academic Planner</span>
-            <div class="ac-hero-title">See the semester rhythm at a glance.</div>
-            <p>Track holidays, exam weeks, and campus events from one view so students, parents, teachers, and admins stay aligned.</p>
-          </div>
-          <div class="ac-quickstats">
-            <div class="ac-stat">
-              <div class="ac-stat-label">This Month</div>
-              <div class="ac-stat-value">{{ month_events|length }}</div>
-              <div class="ac-stat-note">Visible events in {{ month_label }}</div>
-            </div>
-            <div class="ac-stat">
-              <div class="ac-stat-label">Upcoming</div>
-              <div class="ac-stat-value">{{ upcoming_events|length }}</div>
-              <div class="ac-stat-note">Scheduled next on your calendar</div>
-            </div>
-            <div class="ac-stat">
-              <div class="ac-stat-label">Scope</div>
-              <div class="ac-stat-value">{% if context_label %}Focused{% else %}Open{% endif %}</div>
-              <div class="ac-stat-note">{% if context_label %}{{ context_label }}{% else %}All visible events for your role{% endif %}</div>
-            </div>
-          </div>
+
+    {# Filters for admin/teacher #}
+    {% if show_department_filter or show_semester_filter or (current_user.role == 'parent' and children) %}
+    <div class="cal-side-card mb-4">
+      <form method="GET" class="row g-2 align-items-end p-3">
+        {% if current_user.role == 'parent' and children %}
+        <div class="col-md-5">
+          <label class="form-label small fw-semibold mb-1">Child</label>
+          <select name="child_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for child in children %}
+            <option value="{{ child.id }}" {% if selected_child and selected_child.id == child.id %}selected{% endif %}>
+              {{ child.user.name }} — {{ child.department.code if child.department else '—' }} Sem {{ child.semester }}
+            </option>
+            {% endfor %}
+          </select>
         </div>
-
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 ac-filterbar">
-          <div class="small text-muted">
-            {% if context_label %}Showing events for {{ context_label }}.{% else %}Showing all visible events for your role.{% endif %}
-          </div>
-          {% if current_user.role == 'admin' %}
-          <a href="{{ url_for('calendar.manage_calendar') }}" class="btn btn-primary fw-semibold">
-            <i class="bi bi-sliders me-2"></i>Manage Events
-          </a>
-          {% endif %}
+        {% endif %}
+        {% if show_department_filter %}
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">Department</label>
+          <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All Departments</option>
+            {% for dept in departments %}
+            <option value="{{ dept.id }}" {% if selected_dept == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+            {% endfor %}
+          </select>
         </div>
-
-        <form method="GET" class="row g-2 align-items-end mt-1">
-          {% if current_user.role == 'parent' and children %}
-          <div class="col-md-5">
-            <label class="form-label small fw-semibold mb-1">Child</label>
-            <select name="child_id" class="form-select" onchange="this.form.submit()">
-              {% for child in children %}
-              <option value="{{ child.id }}" {% if selected_child and selected_child.id == child.id %}selected{% endif %}>
-                {{ child.user.name }} • {{ child.department.code if child.department else '—' }} • Sem {{ child.semester }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-
-          {% if show_department_filter %}
-          <div class="col-md-4">
-            <label class="form-label small fw-semibold mb-1">Department</label>
-            <select name="department_id" class="form-select" onchange="this.form.submit()">
-              <option value="">All Departments</option>
-              {% for dept in departments %}
-              <option value="{{ dept.id }}" {% if selected_dept == dept.id %}selected{% endif %}>{{ dept.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-
-          {% if show_semester_filter %}
-          <div class="col-md-3">
-            <label class="form-label small fw-semibold mb-1">Semester</label>
-            <select name="semester" class="form-select" onchange="this.form.submit()">
-              <option value="">All Semesters</option>
-              {% for sem in range(1, 9) %}
-              <option value="{{ sem }}" {% if selected_sem == sem %}selected{% endif %}>Semester {{ sem }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-
-          <input type="hidden" name="year" value="{{ year }}">
-          <input type="hidden" name="month" value="{{ month }}">
-        </form>
-      </div>
+        {% endif %}
+        {% if show_semester_filter %}
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Semester</label>
+          <select name="semester" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">All Semesters</option>
+            {% for sem in range(1, 9) %}
+            <option value="{{ sem }}" {% if selected_sem == sem %}selected{% endif %}>Semester {{ sem }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <input type="hidden" name="year" value="{{ year }}">
+        <input type="hidden" name="month" value="{{ month }}">
+        {% if context_label %}
+        <div class="col-12">
+          <span class="badge bg-primary-subtle text-primary">
+            <i class="bi bi-funnel-fill me-1"></i>{{ context_label }}
+          </span>
+        </div>
+        {% endif %}
+      </form>
     </div>
+    {% endif %}
 
-    <div class="card ac-card ac-month-wrap">
-      <div class="card-body p-4">
-        <div class="ac-month-frame">
+    <div class="cal-card">
+
+      {# ── Header ── #}
+      <div class="cal-header">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
           <div>
-            <div class="ac-month-header">
-              <div>
-                <div class="ac-month-title">{{ month_label }}</div>
-                <div class="ac-context">Monthly view of your academic schedule and key deadlines.</div>
-              </div>
+            <div class="d-flex align-items-baseline gap-1">
+              <span class="cal-month-label">{{ month_label.split(' ')[0] }}</span>
+              <span class="cal-year-label">{{ month_label.split(' ')[1] }}</span>
             </div>
-            <div class="ac-month-chipset">
-              <span class="ac-month-chip"><i class="bi bi-grid-3x3-gap-fill"></i>{{ weeks|length }} weeks shown</span>
-              <span class="ac-month-chip"><i class="bi bi-collection"></i>{{ month_events|length }} total events</span>
-              <span class="ac-month-chip"><i class="bi bi-eye"></i>{% if context_label %}{{ context_label }}{% else %}All visible scopes{% endif %}</span>
+            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+              <span class="cal-today-badge">
+                <i class="bi bi-circle-fill me-1" style="font-size:6px"></i>
+                Today is {{ ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][month-1] }} {{ year }}
+              </span>
+              {% if month_events %}
+              <span class="cal-today-badge">{{ month_events|length }} event{{ 's' if month_events|length != 1 }}</span>
+              {% endif %}
             </div>
           </div>
-          <div class="ac-month-actions">
-            <a href="{{ prev_url }}" class="ac-month-nav" aria-label="Previous month">
+          <div class="d-flex gap-2 align-items-center">
+            {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('calendar.manage_calendar') }}"
+               class="btn btn-sm fw-semibold"
+               style="background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.3);">
+              <i class="bi bi-sliders me-1"></i>Manage
+            </a>
+            {% endif %}
+            <a href="{{ prev_url }}" class="cal-nav-btn" aria-label="Previous">
               <i class="bi bi-chevron-left"></i>
             </a>
-            <a href="{{ next_url }}" class="ac-month-nav" aria-label="Next month">
+            <a href="{{ next_url }}" class="cal-nav-btn" aria-label="Next">
               <i class="bi bi-chevron-right"></i>
             </a>
           </div>
         </div>
 
-        <div class="table-responsive">
-          <table class="ac-grid">
-            <thead>
-              <tr>
-                {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
-                <th>{{ day }}</th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for week in weeks %}
-              <tr>
-                {% for day in week %}
-                <td class="ac-day {% if not day.in_month %}outside{% endif %} {% if day.is_today %}is-today{% endif %}">
-                  <div class="ac-day-head">
-                    <div class="ac-day-num mb-0">
-                      <span>{{ day.date.day }}</span>
-                      {% if day.is_today %}<span class="today-pill">Today</span>{% endif %}
-                    </div>
-                    {% if day.events %}
-                    <span class="ac-day-count">{{ day.events|length }}</span>
-                    {% endif %}
-                  </div>
-                  {% for event in day.events[:3] %}
-                  <div class="ac-event-pill bg-{{ event.category_badge }}-subtle text-{{ event.category_badge }}">
-                    <strong>{{ event.title }}</strong>
-                    <div class="ac-event-meta">{{ event.category_label }}</div>
-                  </div>
-                  {% endfor %}
-                  {% if day.events|length > 3 %}
-                  <div class="ac-more">+ {{ day.events|length - 3 }} more</div>
-                  {% endif %}
-                </td>
-                {% endfor %}
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        {# Event type summary pills #}
+        {% if month_events %}
+        <div class="cal-header-pills">
+          {% set holidays  = month_events | selectattr('category','eq','holiday')   | list %}
+          {% set exams     = month_events | selectattr('category','eq','exam_week') | list %}
+          {% set events    = month_events | selectattr('category','eq','event')     | list %}
+          {% if holidays  %}<span class="cal-header-pill">🔴 {{ holidays|length }} Holiday{{ 's' if holidays|length != 1 }}</span>{% endif %}
+          {% if exams     %}<span class="cal-header-pill">🟡 {{ exams|length }} Exam Week{{ 's' if exams|length != 1 }}</span>{% endif %}
+          {% if events    %}<span class="cal-header-pill">🔵 {{ events|length }} Event{{ 's' if events|length != 1 }}</span>{% endif %}
         </div>
+        {% endif %}
       </div>
+
+      {# ── Grid ── #}
+      <div style="padding:0 8px 16px;">
+        <table class="cal-grid">
+          <thead>
+            <tr>
+              {% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+              <th class="cal-dow {% if d in ['Sat','Sun'] %}weekend{% endif %}">{{ d }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for week in weeks %}
+            <tr>
+              {% for day in week %}
+              {% set is_weekend = day.date.weekday() in [5,6] %}
+              <td class="cal-cell
+                          {% if not day.in_month %}other-month{% endif %}
+                          {% if day.is_today %}today-col{% endif %}
+                          {% if is_weekend %}weekend-col{% endif %}">
+                <div class="cal-cell-inner">
+
+                  {# Day number #}
+                  <div class="cal-num">{{ day.date.day }}</div>
+
+                  {# Events #}
+                  {% for event in day.events[:2] %}
+                  <span class="cal-evt {{ event.category }}"
+                        title="{{ event.title }} ({{ event.start_date.strftime('%d %b') }}{% if event.end_date != event.start_date %} – {{ event.end_date.strftime('%d %b') }}{% endif %})">
+                    {{ event.title | truncate(20, true, '…') }}
+                  </span>
+                  {% endfor %}
+                  {% if day.events|length > 2 %}
+                  <span class="cal-more">+{{ day.events|length - 2 }} more</span>
+                  {% endif %}
+
+                </div>
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# ── Legend row ── #}
+      <div class="cal-filters d-flex flex-wrap gap-3 align-items-center">
+        <span class="d-flex align-items-center gap-2 small fw-semibold text-danger">
+          <span class="cal-legend-dot" style="background:#ef4444"></span>Holiday
+        </span>
+        <span class="d-flex align-items-center gap-2 small fw-semibold text-warning">
+          <span class="cal-legend-dot" style="background:#f59e0b"></span>Exam Week
+        </span>
+        <span class="d-flex align-items-center gap-2 small fw-semibold text-primary">
+          <span class="cal-legend-dot" style="background:#3b82f6"></span>Event
+        </span>
+        {% if context_label %}
+        <span class="ms-auto small text-muted">
+          <i class="bi bi-funnel me-1"></i>{{ context_label }}
+        </span>
+        {% endif %}
+      </div>
+
     </div>
   </div>
 
+  {# ── Sidebar ── #}
   <div>
-    <div class="card ac-card mb-4">
-      <div class="card-body p-4">
-        <h6 class="fw-bold mb-3">Legend</h6>
-        <div class="ac-legend">
-          {% for key, meta in category_meta.items() %}
-          <span class="badge bg-{{ meta.badge }}-subtle text-{{ meta.badge }} px-3 py-2">{{ meta.label }}</span>
-          {% endfor %}
-        </div>
-        <div class="ac-legend-note">Color groups make holidays, exam periods, and event dates easy to scan inside the monthly grid.</div>
+
+    {# Upcoming Events #}
+    <div class="cal-side-card mb-4">
+      <div class="px-5 pt-4 pb-3 d-flex justify-content-between align-items-center border-bottom">
+        <h6 class="fw-bold mb-0 text-dark">Upcoming Events</h6>
+        {% if upcoming_events %}
+        <span class="badge bg-primary-subtle text-primary rounded-pill">{{ upcoming_events|length }}</span>
+        {% endif %}
       </div>
+
+      {% if upcoming_events %}
+        {% for event in upcoming_events[:8] %}
+        <div class="cal-upcoming-row">
+          <div class="cal-date-box {{ event.category }}">
+            <div class="cal-date-box-day">{{ event.start_date.strftime('%d') }}</div>
+            <div class="cal-date-box-mon">{{ event.start_date.strftime('%b') }}</div>
+          </div>
+          <div class="min-w-0">
+            <div class="cal-upcoming-title">{{ event.title }}</div>
+            <div class="cal-upcoming-meta">
+              {% if event.end_date != event.start_date %}
+                {{ event.start_date.strftime('%d %b') }} – {{ event.end_date.strftime('%d %b %Y') }}
+              {% else %}
+                {{ event.start_date.strftime('%d %b %Y') }}
+              {% endif %}
+            </div>
+            <div class="mt-1">
+              <span class="badge bg-{{ event.category_badge }}-subtle text-{{ event.category_badge }}" style="font-size:.65rem">
+                {{ event.category_label }}
+              </span>
+              {% if event.scope_label != 'All College' %}
+              <span class="badge bg-secondary-subtle text-secondary ms-1" style="font-size:.65rem">
+                {{ event.scope_label }}
+              </span>
+              {% endif %}
+            </div>
+            {% if event.description %}
+            <div class="small text-muted mt-1" style="font-size:.73rem">{{ event.description | truncate(60) }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="cal-empty">
+          <i class="bi bi-calendar-x fs-2 d-block mb-2 opacity-30"></i>
+          <div class="small fw-semibold">No upcoming events</div>
+          <div class="small text-muted mt-1">Check back later or add events from the manage page.</div>
+        </div>
+      {% endif %}
+
+      {% if current_user.role == 'admin' %}
+      <div class="px-4 py-3 border-top">
+        <a href="{{ url_for('calendar.manage_calendar') }}" class="btn btn-sm btn-outline-primary w-100">
+          <i class="bi bi-plus-circle me-1"></i>Add Event
+        </a>
+      </div>
+      {% endif %}
     </div>
 
-    <div class="card ac-card">
-      <div class="card-body p-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h6 class="fw-bold mb-0">Upcoming Events</h6>
-          <span class="badge bg-secondary-subtle text-secondary">{{ upcoming_events|length }}</span>
-        </div>
+    {# This Month summary #}
+    <div class="cal-side-card">
+      <div class="px-5 pt-4 pb-3 border-bottom">
+        <h6 class="fw-bold mb-0">{{ month_label }} Summary</h6>
+      </div>
+      <div class="p-4">
+        {% set holidays  = month_events | selectattr('category','eq','holiday')   | list %}
+        {% set exams     = month_events | selectattr('category','eq','exam_week') | list %}
+        {% set evts      = month_events | selectattr('category','eq','event')     | list %}
 
-        {% if upcoming_events %}
-        <div class="d-grid gap-3">
-          {% for event in upcoming_events %}
-          <div class="ac-upcoming-item">
-            <div class="d-flex gap-3 align-items-start">
-              <div class="ac-upcoming-date">
-                <div class="ac-upcoming-month">{{ event.start_date.strftime('%b') }}</div>
-                <div class="ac-upcoming-day">{{ event.start_date.strftime('%d') }}</div>
-              </div>
-              <div class="ac-upcoming-copy">
-                <div class="d-flex justify-content-between align-items-start gap-2 mb-2 flex-wrap">
-                  <div class="ac-upcoming-title">{{ event.title }}</div>
-                  <span class="badge bg-{{ event.category_badge }}-subtle text-{{ event.category_badge }}">{{ event.category_label }}</span>
-                </div>
-                <div class="ac-range mb-2">
-                  {{ event.start_date.strftime('%d %b %Y') }}
-                  {% if event.end_date != event.start_date %} to {{ event.end_date.strftime('%d %b %Y') }}{% endif %}
-                </div>
-                <div class="small text-muted mb-2">
-                  <span class="ac-scope-badge"><i class="bi bi-diagram-3"></i>{{ event.scope_label }}</span>
-                </div>
-                {% if event.description %}
-                <div class="small">{{ event.description }}</div>
-                {% endif %}
+        {% if not month_events %}
+        <div class="text-center text-muted py-2 small">No events this month.</div>
+        {% else %}
+        <div class="d-grid gap-2">
+          {% if holidays %}
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:#fef2f2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width:38px;height:38px;background:#fee2e2;flex-shrink:0">
+              <i class="bi bi-calendar-x-fill text-danger"></i>
+            </div>
+            <div>
+              <div class="fw-bold small text-danger">{{ holidays|length }} Holiday{{ 's' if holidays|length != 1 }}</div>
+              <div class="text-muted" style="font-size:.72rem">
+                {{ holidays | map(attribute='title') | list | join(', ') | truncate(40) }}
               </div>
             </div>
           </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="ac-empty">
-          <i class="bi bi-calendar-x fs-2 d-block mb-2 opacity-50"></i>
-          No upcoming academic calendar events are available.
+          {% endif %}
+
+          {% if exams %}
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:#fffbeb">
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width:38px;height:38px;background:#fef3c7;flex-shrink:0">
+              <i class="bi bi-pencil-fill text-warning"></i>
+            </div>
+            <div>
+              <div class="fw-bold small text-warning">{{ exams|length }} Exam Week{{ 's' if exams|length != 1 }}</div>
+              <div class="text-muted" style="font-size:.72rem">
+                {{ exams | map(attribute='title') | list | join(', ') | truncate(40) }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {% if evts %}
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3" style="background:#eff6ff">
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width:38px;height:38px;background:#dbeafe;flex-shrink:0">
+              <i class="bi bi-star-fill text-primary"></i>
+            </div>
+            <div>
+              <div class="fw-bold small text-primary">{{ evts|length }} Event{{ 's' if evts|length != 1 }}</div>
+              <div class="text-muted" style="font-size:.72rem">
+                {{ evts | map(attribute='title') | list | join(', ') | truncate(40) }}
+              </div>
+            </div>
+          </div>
+          {% endif %}
         </div>
         {% endif %}
       </div>
     </div>
+
   </div>
 </div>
 {% endblock %}

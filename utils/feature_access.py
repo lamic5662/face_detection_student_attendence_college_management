@@ -23,6 +23,7 @@ FEATURE_GROUPS = OrderedDict(
                     'calendar',
                     'timetable',
                     'leaves',
+                    'batch_tracker',
                 ],
             },
         ),
@@ -33,10 +34,12 @@ FEATURE_GROUPS = OrderedDict(
                 'description': 'Operational modules used by the college office and college admin.',
                 'features': [
                     'fees',
+                    'fee_reminders',
                     'parent_portal',
                     'digital_id_cards',
                     'analytics',
                     'file_manager',
+                    'report_emails',
                 ],
             },
         ),
@@ -48,6 +51,7 @@ FEATURE_GROUPS = OrderedDict(
                 'features': [
                     'face_biometrics',
                     'live_location',
+                    'ai_assistant',
                 ],
             },
         ),
@@ -88,6 +92,10 @@ FEATURE_CATALOG = {
         'label': 'Fees',
         'description': 'Fee structures, due tracking, payment history, and fee reports.',
     },
+    'fee_reminders': {
+        'label': 'Fee Reminder Emails',
+        'description': 'Automated daily email reminders to students and parents for upcoming, due-today, and overdue fees.',
+    },
     'parent_portal': {
         'label': 'Parent Portal',
         'description': 'Parent accounts, linked child access, and parent-facing dashboards.',
@@ -112,47 +120,93 @@ FEATURE_CATALOG = {
         'label': 'Live Location',
         'description': 'Student location sharing and parent live location access.',
     },
+    'batch_tracker': {
+        'label': 'Batch Tracker',
+        'description': 'Admission-year batch management, expected semester tracking, semester date schedules, and bulk student promotion.',
+    },
+    'report_emails': {
+        'label': 'Automated Report Emails',
+        'description': 'Configurable weekly attendance email reports to students and parents, with department, semester, and admission-year filters.',
+    },
+    'ai_assistant': {
+        'label': 'AI Assistant',
+        'description': 'Contextual AI chatbot with live database access. Answers questions about students, attendance, notes, and college data.',
+    },
 }
 
 
 FEATURE_PRESETS = OrderedDict(
     [
         (
-            'full_suite',
+            'starter',
             {
-                'label': 'Full Suite',
-                'description': 'Enable every feature for a fully provisioned college.',
-                'features': list(FEATURE_CATALOG.keys()),
-            },
-        ),
-        (
-            'academic_core',
-            {
-                'label': 'Academic Core',
-                'description': 'Focus on attendance, learning, exams, calendar, and notices.',
+                'label': 'Starter',
+                'icon': 'bi-rocket-takeoff',
+                'color': 'secondary',
+                'description': 'Core essentials for a college just getting started — attendance, notices, calendar, and timetable.',
                 'features': [
                     'attendance',
-                    'learning_content',
-                    'exams',
                     'notices',
                     'calendar',
                     'timetable',
+                ],
+            },
+        ),
+        (
+            'standard',
+            {
+                'label': 'Standard',
+                'icon': 'bi-award',
+                'color': 'primary',
+                'description': 'Full academic experience — adds learning content, exams, leaves, batch tracking, report emails, and digital ID cards.',
+                'features': [
+                    'attendance',
+                    'notices',
+                    'calendar',
+                    'timetable',
+                    'learning_content',
+                    'exams',
                     'leaves',
+                    'batch_tracker',
+                    'report_emails',
                     'digital_id_cards',
                 ],
             },
         ),
         (
-            'lean_portal',
+            'professional',
             {
-                'label': 'Lean Portal',
-                'description': 'Keep only the leanest student and teacher experience enabled.',
+                'label': 'Professional',
+                'icon': 'bi-gem',
+                'color': 'success',
+                'description': 'Everything in Standard plus fees, parent portal, analytics, and AI assistant.',
                 'features': [
                     'attendance',
-                    'learning_content',
                     'notices',
                     'calendar',
+                    'timetable',
+                    'learning_content',
+                    'exams',
+                    'leaves',
+                    'batch_tracker',
+                    'report_emails',
+                    'digital_id_cards',
+                    'fees',
+                    'fee_reminders',
+                    'parent_portal',
+                    'analytics',
+                    'ai_assistant',
                 ],
+            },
+        ),
+        (
+            'enterprise',
+            {
+                'label': 'Enterprise',
+                'icon': 'bi-stars',
+                'color': 'warning',
+                'description': 'All 17 modules unlocked — includes biometrics, live location, and file manager.',
+                'features': list(FEATURE_CATALOG.keys()),
             },
         ),
     ]
@@ -174,6 +228,8 @@ NAV_ITEM_FEATURES = {
         'fees': 'fees',
         'parents': 'parent_portal',
         'digital_id_cards': 'digital_id_cards',
+        'batch_tracker': 'batch_tracker',
+        'semester_schedules': 'batch_tracker',
     },
     'teacher': {
         'attendance_sessions': 'attendance',
@@ -247,6 +303,7 @@ ENDPOINT_PREFIX_FEATURES = (
     ('fee.', {'fees'}),
     ('leave.', {'leaves'}),
     ('timetable.', {'timetable'}),
+    ('ai.', {'ai_assistant'}),
 )
 
 
@@ -271,6 +328,19 @@ ENDPOINT_FEATURES = {
     'admin.bulk_delete_files': {'file_manager'},
     'admin.view_file': {'file_manager'},
     'admin.preview_file': {'file_manager'},
+    # Batch Tracker
+    'admin.batch_overview': {'batch_tracker'},
+    'admin.batch_promote': {'batch_tracker'},
+    'admin.semester_schedules': {'batch_tracker'},
+    'admin.save_semester_schedule': {'batch_tracker'},
+    'admin.delete_semester_schedule': {'batch_tracker'},
+    'admin.preview_student_id': {'batch_tracker'},
+    # Report Emails
+    'admin.save_report_schedule': {'report_emails'},
+    'admin.send_weekly_report_now': {'report_emails'},
+    # Fee Reminders
+    'fee.save_fee_reminder_config': {'fees', 'fee_reminders'},
+    'fee.send_fee_reminders_now': {'fees', 'fee_reminders'},
     'admin.marksheet_list': {'exams'},
     'admin.admin_marksheet': {'exams'},
     'admin.marksheet_signatures': {'exams'},

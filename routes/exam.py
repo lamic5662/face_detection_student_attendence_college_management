@@ -15,11 +15,17 @@ exam_bp = Blueprint('exam', __name__)
 
 # ── Marksheet builder (shared by student + admin views) ───────────────────────
 
-def build_marksheet_data(student):
+def build_marksheet_data(student, semester=None):
     from models.setting import CollegeSetting
     from models.attendance import AttendanceSession, AttendanceRecord
     from models.marksheet_signature import MarksheetSignature
     college = CollegeSetting.get(student.college)
+
+    # Use requested semester or fall back to student's current semester
+    viewed_semester = int(semester) if semester else student.semester
+    # Clamp: never allow viewing a future semester the student hasn't reached
+    viewed_semester = min(viewed_semester, student.semester)
+    viewed_semester = max(viewed_semester, 1)
 
     principal_sig = MarksheetSignature.query.filter_by(
         college_id=student.college_id,
@@ -32,7 +38,7 @@ def build_marksheet_data(student):
     subjects = Subject.query.filter_by(
         college_id=student.college_id,
         department_id=student.department_id,
-        semester=student.semester
+        semester=viewed_semester
     ).order_by(Subject.name).all()
 
     subject_rows = []
@@ -132,11 +138,12 @@ def build_marksheet_data(student):
         overall_passed = False
 
     return {
-        'college':       college,
-        'student':       student,
-        'subjects':      subject_rows,
-        'principal_sig': principal_sig,
-        'hod_sig':       hod_sig,
+        'college':          college,
+        'student':          student,
+        'subjects':         subject_rows,
+        'principal_sig':    principal_sig,
+        'hod_sig':          hod_sig,
+        'viewed_semester':  viewed_semester,
         'overall': {
             'obtained':   total_obtained_all,
             'total':      grand_total_all,
@@ -398,5 +405,6 @@ def admin_exams():
 @student_required
 def student_marksheet():
     student = current_user.student_profile
-    data = build_marksheet_data(student)
+    semester = request.args.get('semester', type=int)
+    data = build_marksheet_data(student, semester=semester)
     return render_template('exam/marksheet.html', **data, is_admin=False, is_parent=False)

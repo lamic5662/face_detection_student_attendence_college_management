@@ -5,9 +5,14 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <span class="badge bg-primary-subtle text-primary px-3 py-2">
-    {{ pagination.total }} student(s)
-  </span>
+  <div class="d-flex align-items-center gap-2 flex-wrap">
+    <span class="badge bg-primary-subtle text-primary px-3 py-2">
+      {{ pagination.total }} student(s)
+    </span>
+    <a href="{{ url_for('admin.batch_overview') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-bar-chart-steps me-1"></i>Batch Tracker
+    </a>
+  </div>
   <div class="d-flex gap-2 flex-wrap">
     <a href="{{ url_for('admin.export_students') }}" class="btn btn-outline-success btn-sm">
       <i class="bi bi-download me-1"></i>Export CSV
@@ -35,6 +40,15 @@
         </select>
       </div>
       <div class="col-md-2">
+        <label class="form-label fw-semibold small mb-1">Admission Year</label>
+        <select name="admission_year" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All Batches</option>
+          {% for y in adm_years %}
+          <option value="{{ y }}" {% if selected_adm_year == y %}selected{% endif %}>{{ y }} Batch</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
         <label class="form-label fw-semibold small mb-1">Semester</label>
         <select name="semester" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="">All Sems</option>
@@ -43,7 +57,7 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label fw-semibold small mb-1">Search</label>
         <div class="input-group input-group-sm">
           <input type="text" name="q" class="form-control" placeholder="Name or roll number…" value="{{ search }}">
@@ -51,18 +65,19 @@
         </div>
       </div>
       <div class="col-auto">
-        {% if selected_dept or selected_sem or search %}
+        {% if selected_dept or selected_sem or selected_adm_year or search %}
         <a href="{{ url_for('admin.students') }}" class="btn btn-outline-secondary btn-sm">
           <i class="bi bi-x-circle me-1"></i>Clear
         </a>
         {% endif %}
       </div>
-      {% if selected_dept or selected_sem %}
+      {% if selected_dept or selected_sem or selected_adm_year %}
       <div class="col-12">
         <small class="text-muted">
           <i class="bi bi-funnel-fill me-1 text-primary"></i>
           Showing:
-          {% if selected_dept %}{% for d in departments %}{% if d.id == selected_dept %}<strong>{{ d.name }}</strong>{% endif %}{% endfor %}{% endif %}
+          {% if selected_adm_year %}<strong>{{ selected_adm_year }} Batch</strong>{% endif %}
+          {% if selected_dept %} — {% for d in departments %}{% if d.id == selected_dept %}<strong>{{ d.name }}</strong>{% endif %}{% endfor %}{% endif %}
           {% if selected_sem %} — <strong>Semester {{ selected_sem }}</strong>{% endif %}
         </small>
       </div>
@@ -77,35 +92,58 @@
       <table class="table table-hover mb-0">
         <thead class="table-light">
           <tr>
-            <th class="px-4">Roll No.</th>
+            <th class="px-4">Roll No. / Batch</th>
             <th>Name</th>
             <th>Email</th>
             <th>Faculty</th>
             <th>Semester</th>
+            <th>Progress</th>
             <th>Face</th>
             <th>Attendance</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {% for s in students %}
+          {% for s, status, diff in students_with_status %}
           <tr>
-            <td class="px-4"><span class="badge bg-secondary">{{ s.roll_number }}</span></td>
+            <td class="px-4">
+              <span class="badge bg-secondary">{{ s.roll_number }}</span>
+              {% if s.admission_year %}
+              <div class="text-muted small mt-1">{{ s.admission_year }} batch</div>
+              {% endif %}
+            </td>
             <td class="fw-semibold">{{ s.user.name }}</td>
             <td>
               <div class="text-muted small">{{ s.user.email }}</div>
               {% if s.user.must_change_password %}
               <span class="badge bg-warning-subtle text-warning mt-1">
-                {{ 'Setup email sent' if s.user.password_setup_email_sent_at else 'Temporary password active' }}
+                {{ 'Setup email sent' if s.user.password_setup_email_sent_at else 'Temp password' }}
               </span>
               {% else %}
-              <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
+              <span class="badge bg-success-subtle text-success mt-1">Password set</span>
               {% endif %}
             </td>
             <td>
               <span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span>
             </td>
             <td><span class="badge bg-light text-dark border">Sem {{ s.semester }}</span></td>
+            <td>
+              {% if status == 'on_track' %}
+                <span class="badge bg-success-subtle text-success">
+                  <i class="bi bi-check-circle-fill me-1"></i>On Track
+                </span>
+              {% elif status == 'behind' %}
+                <span class="badge bg-warning-subtle text-warning" title="{{ diff }} semester(s) behind">
+                  <i class="bi bi-clock-history me-1"></i>Behind {{ diff }}sem
+                </span>
+              {% elif status == 'far_behind' %}
+                <span class="badge bg-danger-subtle text-danger" title="{{ diff }} semester(s) behind">
+                  <i class="bi bi-exclamation-triangle-fill me-1"></i>Behind {{ diff }}sem
+                </span>
+              {% else %}
+                <span class="badge bg-secondary-subtle text-secondary">—</span>
+              {% endif %}
+            </td>
             <td>
               {% if s.is_face_enrolled %}
                 <span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle-fill me-1"></i>Enrolled</span>
@@ -192,7 +230,7 @@
           </div>
           {% else %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-5">
+            <td colspan="9" class="text-center text-muted py-5">
               <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
               No students found{% if selected_dept or selected_sem or search %} for the selected filters{% endif %}.
             </td>
@@ -218,38 +256,98 @@
         <h5 class="modal-title fw-semibold"><i class="bi bi-person-plus-fill me-2 text-primary"></i>Add Student</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form method="POST" action="{{ url_for('admin.add_student') }}">
+      <form method="POST" action="{{ url_for('admin.add_student') }}" id="addStudentForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="auto_id" id="autoIdFlag" value="0">
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-12">
               <div class="alert alert-info border-0 small mb-0">
-                Students are created with a temporary password. On first login they can request a secure email link and set a personal password that admins cannot view later.
+                <i class="bi bi-info-circle me-1"></i>Students are created with a temporary password. On first login they can set their own personal password.
               </div>
             </div>
-            <div class="col-12"><label class="form-label fw-semibold">Full Name</label>
-              <input type="text" name="name" class="form-control" required></div>
-            <div class="col-12"><label class="form-label fw-semibold">Email</label>
-              <input type="email" name="email" class="form-control" required></div>
-            <div class="col-md-6"><label class="form-label fw-semibold">Roll Number</label>
-              <input type="text" name="roll_number" class="form-control" required></div>
-            <div class="col-md-6"><label class="form-label fw-semibold">Temporary Password</label>
-              <input type="password" name="password" class="form-control" minlength="8" required
-                     placeholder="Min. 8 chars, upper, lower, digit, symbol"></div>
-            <div class="col-md-8"><label class="form-label fw-semibold">Department</label>
-              <select name="department_id" class="form-select" required>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Full Name</label>
+              <input type="text" name="name" class="form-control" required placeholder="Student full name">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Email</label>
+              <input type="email" name="email" class="form-control" required placeholder="student@email.com">
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">Department</label>
+              <select name="department_id" id="deptSelect" class="form-select" required onchange="updateIdPreview()">
                 <option value="">Select Department</option>
                 {% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
-              </select></div>
-            <div class="col-md-4"><label class="form-label fw-semibold">Semester</label>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Semester</label>
               <select name="semester" class="form-select" required>
                 {% for i in range(1, 9) %}<option value="{{ i }}">Sem {{ i }}</option>{% endfor %}
-              </select></div>
+              </select>
+            </div>
+
+            <!-- Admission Year — always visible, feeds into roll number -->
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">Admission Year
+                <span class="text-muted fw-normal small">(used in ID)</span>
+              </label>
+              <input type="number" name="admission_year" id="admissionYearInput"
+                     class="form-control" min="2000" max="2100"
+                     value="{{ now.year if now else 2024 }}"
+                     required onchange="updateIdPreview()">
+            </div>
+
+            <!-- Student ID / Roll Number -->
+            <div class="col-12">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <label class="form-label fw-semibold mb-0">
+                  Student ID / Roll Number
+                  <span class="badge bg-secondary ms-1 small fw-normal">permanent — never changes</span>
+                </label>
+                <div class="form-check form-switch mb-0">
+                  <input class="form-check-input" type="checkbox" id="autoIdToggle" onchange="toggleAutoId()">
+                  <label class="form-check-label small text-muted" for="autoIdToggle">Auto Generate</label>
+                </div>
+              </div>
+
+              <!-- Manual input -->
+              <input type="text" name="roll_number" id="manualRoll"
+                     class="form-control text-uppercase"
+                     placeholder="e.g. BCA-2024-01" required>
+
+              <!-- Auto preview -->
+              <div id="autoIdPreview" class="d-none">
+                <div class="input-group">
+                  <span class="input-group-text bg-light"><i class="bi bi-magic"></i></span>
+                  <input type="text" id="previewRoll" class="form-control bg-light fw-semibold text-primary"
+                         disabled placeholder="Select department…">
+                  <button class="btn btn-outline-secondary btn-sm" type="button" onclick="updateIdPreview()" title="Refresh preview">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
+                <div class="form-text">
+                  <i class="bi bi-lightbulb me-1 text-warning"></i>
+                  Format: <code>COLLEGE-DEPT-ADMISSIONYEAR-SEQ</code> — unique and permanent for this student.
+                </div>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">Temporary Password</label>
+              <input type="password" name="password" class="form-control" minlength="8" required
+                     placeholder="Min. 8 chars — upper, lower, digit, symbol">
+            </div>
           </div>
         </div>
         <div class="modal-footer border-0">
           <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary fw-semibold"><i class="bi bi-person-check-fill me-2"></i>Add Student</button>
+          <button type="submit" class="btn btn-primary fw-semibold px-4">
+            <i class="bi bi-person-check-fill me-2"></i>Add Student
+          </button>
         </div>
       </form>
     </div>
@@ -269,8 +367,9 @@
         <div class="modal-body">
           <div class="alert alert-info border-0 small">
             <strong>Required CSV columns:</strong><br>
-            <code>name, email, roll_number, department_code, semester, password</code><br>
-            <span class="text-muted">Password is treated as a temporary password and defaults to <code>Student@123!</code> if omitted.</span>
+            <code>name, email, department_code, semester</code><br>
+            <strong>Optional:</strong> <code>roll_number</code> (auto-generated if blank), <code>password</code> (defaults to <code>Student@123!</code>), <code>admission_year</code> (defaults to current year)<br>
+            <span class="text-muted">Leave <code>roll_number</code> blank to let the system generate a unique ID automatically.</span>
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">CSV File</label>
@@ -289,14 +388,47 @@
 {% endblock %}
 
 {% block scripts %}
-{% if request.args.get('open_modal') == 'add-student' %}
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const modalEl = document.getElementById('addStudentModal');
-    if (!modalEl) return;
-    const modal = new bootstrap.Modal(modalEl);
-    modal.show();
-  });
-</script>
+function toggleAutoId() {
+  var auto = document.getElementById('autoIdToggle').checked;
+  document.getElementById('autoIdFlag').value = auto ? '1' : '0';
+  document.getElementById('manualRoll').classList.toggle('d-none', auto);
+  document.getElementById('manualRoll').required = !auto;
+  document.getElementById('autoIdPreview').classList.toggle('d-none', !auto);
+  if (auto) updateIdPreview();
+}
+
+function updateIdPreview() {
+  if (!document.getElementById('autoIdToggle').checked) return;
+  var deptId  = document.getElementById('deptSelect').value;
+  var year    = document.getElementById('admissionYearInput').value;
+  var preview = document.getElementById('previewRoll');
+  if (!deptId) {
+    preview.value = '';
+    preview.placeholder = 'Select department first…';
+    return;
+  }
+  if (!year) {
+    preview.value = '';
+    preview.placeholder = 'Enter admission year…';
+    return;
+  }
+  preview.value = '';
+  preview.placeholder = 'Generating…';
+  fetch('{{ url_for("admin.preview_student_id") }}?dept_id=' + encodeURIComponent(deptId) + '&year=' + encodeURIComponent(year))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      preview.value = d.id || '';
+      preview.placeholder = d.id ? '' : 'Could not generate';
+    })
+    .catch(function() { preview.placeholder = 'Preview unavailable'; });
+}
+
+{% if request.args.get('open_modal') == 'add-student' %}
+document.addEventListener('DOMContentLoaded', function () {
+  var modalEl = document.getElementById('addStudentModal');
+  if (modalEl) new bootstrap.Modal(modalEl).show();
+});
 {% endif %}
+</script>
 {% endblock %}

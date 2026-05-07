@@ -97,7 +97,7 @@
       <p class="opacity-75 mb-0">Complete step-by-step guide for all features available to {{ meta[r].label|lower }}s.</p>
     </div>
     <div class="ms-auto text-end no-print">
-      <div class="opacity-60 small">Version 1.1</div>
+      <div class="opacity-60 small">Version 2.0</div>
       <div class="opacity-60 small">{{ college_name }}</div>
     </div>
   </div>
@@ -113,7 +113,7 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-primary"></i>Table of Contents</h6>
     <div class="row g-2">
-      {% for num, title in [('1','Dashboard Overview'),('2','Managing Students'),('3','Managing Teachers'),('4','Parent Accounts'),('5','Attendance Sessions'),('6','Subjects & Departments'),('7','Fee Management'),('8','Exams & Marks'),('9','Notice Board'),('10','Timetable'),('11','College Settings'),('12','Reports & Analytics'),('13','ID Cards'),('14','File Manager')] %}
+      {% for num, title in [('1','Dashboard Overview'),('2','Managing Students'),('3','Managing Teachers'),('4','Parent Accounts'),('5','Attendance Sessions'),('6','Subjects & Departments'),('7','Fee Management'),('8','Exams & Marks'),('9','Notice Board'),('10','Timetable'),('11','College Settings'),('12','Reports & Analytics'),('13','ID Cards'),('14','File Manager'),('15','Batch Tracker'),('16','Semester Schedules & Report Emails'),('17','Fee Reminder Emails'),('18','AI Assistant')] %}
       <div class="col-md-6">
         <a href="#admin-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
           <span class="badge bg-primary-subtle text-primary fw-semibold" style="min-width:28px">{{ num }}</span>
@@ -252,6 +252,9 @@
     <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Fees</strong> → click <strong>+ New Fee Structure</strong> → set Title, Academic Year, Amount, and optionally restrict to a Department/Semester.</div></div>
     <div class="step-row"><span class="step-badge">2</span><div>To record a payment, click the <strong>Record Payment</strong> button next to any student's due amount and enter the amount paid.</div></div>
     <div class="step-row"><span class="step-badge">3</span><div>Students with outstanding balances will see a <strong>red fee alert</strong> on their dashboard. Parents also see the due amount on their dashboard.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Scroll to the <strong>Fee Reminder Emails</strong> card at the bottom of the Fees page to configure automated reminders — set how many days before the due date to start notifying, whether to remind on the due date and after it, and what hour to send. Toggle <strong>Enable</strong> and save.</div></div>
+    <div class="step-row"><span class="step-badge">5</span><div>Click <strong>Send Now</strong> to trigger a manual reminder blast immediately without waiting for the scheduled hour.</div></div>
+    <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i>One consolidated email is sent per student covering all their due/overdue fees — students and their linked parents both receive it.</div>
   </div>
 </div>
 
@@ -264,6 +267,7 @@
     <div class="step-row"><span class="step-badge">3</span><div>Students can view their marks in <strong>My Results</strong>. Parents can see results in the child's full report.</div></div>
     <div class="step-row"><span class="step-badge">4</span><div>Use the <strong>Marksheet</strong> pages to open printable student marksheets generated from stored exam marks.</div></div>
     <div class="step-row"><span class="step-badge">5</span><div>Before printing official marksheets, configure <strong>Principal / HoD signatures</strong> so the output includes the correct signatories.</div></div>
+    <div class="step-row"><span class="step-badge">6</span><div>Marksheets now support <strong>semester history</strong> — use the <strong>Semester</strong> dropdown at the top of the marksheet page to switch between any completed semester's results without losing the current semester view.</div></div>
   </div>
 </div>
 
@@ -284,7 +288,8 @@
     <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">10</span>Timetable</h5>
     <div class="step-row"><span class="step-badge">1</span><div>Go to <strong>Sidebar → Timetable</strong>. Filter by Department and Semester to see the weekly schedule grid.</div></div>
     <div class="step-row"><span class="step-badge">2</span><div>As admin, click <strong>Edit Timetable</strong> to add, move or remove slots. Each slot needs a Day, Period number, Subject and optional Room.</div></div>
-    <div class="step-row"><span class="step-badge">3</span><div>Parents can see today's timetable on their child's detail page including teacher availability status.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div><strong>Conflict Detection:</strong> When a slot is saved, the system automatically checks whether the same teacher or the same room is already booked at that time. If a conflict is found, a <strong>yellow warning banner</strong> appears listing the clashing slots — you can review and resolve without the slot being blocked.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Parents can see today's timetable on their child's detail page including teacher availability status.</div></div>
   </div>
 </div>
 
@@ -333,6 +338,92 @@
   </div>
 </div>
 
+<!-- S15: Batch Tracker -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s15">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">15</span>Batch Tracker</h5>
+    <p class="text-muted small">Monitor how each admission-year cohort is progressing through semesters. Navigate to <strong>Sidebar → Batch Overview</strong>.</p>
+    <div class="step-row"><span class="step-badge">1</span><div>The Batch Overview page groups students by <strong>admission year</strong>. Each cohort card shows how many students are on-track, behind, or far-behind their expected semester.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>The expected semester is calculated automatically: <em>(years since admission × 2) + 1</em>. If you have <strong>Semester Schedules</strong> configured, the official start/end dates are used instead for greater accuracy.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Status badges on each student:
+      <ul class="mt-1 mb-0">
+        <li><span style="background:#d1e7dd;color:#0f5132;padding:1px 6px;border-radius:4px;font-size:11px">On Track</span> — at expected semester</li>
+        <li><span style="background:#fff3cd;color:#664d03;padding:1px 6px;border-radius:4px;font-size:11px">Behind</span> — 1 semester behind</li>
+        <li><span style="background:#f8d7da;color:#842029;padding:1px 6px;border-radius:4px;font-size:11px">Far Behind</span> — 2+ semesters behind</li>
+      </ul>
+    </div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Click <strong>Promote Batch</strong> on any cohort card to move all <em>on-track</em> students in that cohort to the next semester in one click.</div></div>
+    <div class="step-row"><span class="step-badge">5</span><div>Use the <strong>Admission Year</strong> filter on the Students page to view or export students from a specific intake year.</div></div>
+    <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Set up Semester Schedules (Section 16) before using Batch Tracker for the most accurate expected-semester calculation.</div>
+  </div>
+</div>
+
+<!-- S16: Semester Schedules & Report Emails -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s16">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">16</span>Semester Schedules &amp; Report Emails</h5>
+    <p class="text-muted small">Both features live on the same page: <strong>Sidebar → Semester Schedules</strong>.</p>
+    <p class="fw-semibold mb-2 mt-3">Semester Schedules</p>
+    <div class="step-row"><span class="step-badge">1</span><div>Click <strong>+ Add Schedule</strong> → select Department, Semester, Academic Year, and set the <strong>Start Date</strong> and <strong>End Date</strong> for that semester.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Status is calculated automatically: <span style="background:#cff4fc;color:#055160;padding:1px 6px;border-radius:4px;font-size:11px">Upcoming</span>, <span style="background:#d1e7dd;color:#0f5132;padding:1px 6px;border-radius:4px;font-size:11px">Active</span>, or <span style="background:#e9ecef;color:#495057;padding:1px 6px;border-radius:4px;font-size:11px">Completed</span>.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Once configured, the Batch Tracker uses these dates instead of the formula to calculate each student's expected semester.</div></div>
+    <p class="fw-semibold mb-2 mt-3">Automated Attendance Report Emails</p>
+    <div class="step-row"><span class="step-badge">4</span><div>In the <strong>Report Schedule</strong> card on the right, toggle <strong>Enable</strong> to activate weekly emails.</div></div>
+    <div class="step-row"><span class="step-badge">5</span><div>Set the <strong>Send Day</strong> (Mon–Sun) and <strong>Hour</strong>. The system sends emails once per day when the day and hour match.</div></div>
+    <div class="step-row"><span class="step-badge">6</span><div>Use the <strong>Filter</strong> chips to restrict emails to specific departments, semesters, or admission years. Leave all filters empty to send to every student.</div></div>
+    <div class="step-row"><span class="step-badge">7</span><div>Click <strong>Send Now</strong> to trigger the report immediately without waiting for the schedule.</div></div>
+    <div class="info-box mt-3"><i class="bi bi-info-circle-fill text-primary me-2"></i>Students receive a subject-wise attendance table. Parent alert emails are sent only when a student has at least one subject below the low-attendance threshold (default 75%).</div>
+  </div>
+</div>
+
+<!-- S17: Fee Reminder Emails -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s17">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">17</span>Fee Reminder Emails</h5>
+    <p class="text-muted small">Auto-notify students and parents about upcoming or overdue fees. Navigate to <strong>Sidebar → Fees</strong> and scroll to the <strong>Fee Reminder Emails</strong> card.</p>
+    <div class="step-row"><span class="step-badge">1</span><div>Toggle the <strong>Enable Fee Reminders</strong> pill to activate automated reminders.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Set <strong>Days Before Due Date</strong> (1–30) — students will receive a reminder this many days before any fee's due date.</div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>Enable <strong>Remind on Due Date</strong> to send a final reminder on the actual due date.</div></div>
+    <div class="step-row"><span class="step-badge">4</span><div>Enable <strong>Remind Overdue</strong> to continue sending daily reminders for fees that have passed their due date and remain unpaid or partially paid.</div></div>
+    <div class="step-row"><span class="step-badge">5</span><div>Set the <strong>Send Hour</strong> — the system checks and sends at this hour every day.</div></div>
+    <div class="step-row"><span class="step-badge">6</span><div>Click <strong>Save Configuration</strong>, then optionally click <strong>Send Now</strong> to test immediately.</div></div>
+    <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i>One email per student covers all qualifying fees in a single table — no separate email per fee structure. Fully paid fees are always skipped.</div>
+  </div>
+</div>
+
+<!-- S18: AI Assistant -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="admin-s18">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num">18</span>AI Assistant</h5>
+    <p class="text-muted small">Ask questions about your college in plain language and get real answers from live data. Navigate to <strong>Sidebar → AI Assistant</strong>.</p>
+    <div class="ui-mock mb-3">
+      <div class="mock-bar"><div class="mock-dot" style="background:#ff5f56"></div><div class="mock-dot" style="background:#ffbd2e"></div><div class="mock-dot" style="background:#27c93f"></div><div class="mock-url">smartattend / ai / chat</div></div>
+      <div class="mock-body">
+        <div class="mock-card" style="background:#f8f9fa;border-left:3px solid #6610f2">
+          <div style="font-size:8px;color:#6610f2;font-weight:700">You</div>
+          <div style="font-size:9px;margin-top:2px">Which students have below 75% attendance?</div>
+        </div>
+        <div class="mock-card" style="background:#eef2ff;border-left:3px solid #0d6efd;margin-top:4px">
+          <div style="font-size:8px;color:#0d6efd;font-weight:700">AI Assistant</div>
+          <div style="font-size:9px;margin-top:2px">Based on current data, 8 students are below 75%: Ram Sharma (68% — Physics), Sita Thapa (71% — Math)...</div>
+        </div>
+      </div>
+    </div>
+    <div class="step-row"><span class="step-badge">1</span><div>Type your question in the chat box and press <strong>Send</strong> or hit Enter. No special syntax required — write naturally.</div></div>
+    <div class="step-row"><span class="step-badge">2</span><div>Example questions you can ask:
+      <ul class="mt-1 mb-0 small">
+        <li>"Which students have below 75% attendance?"</li>
+        <li>"How many students are in BCA semester 3?"</li>
+        <li>"List all recent notices"</li>
+        <li>"Show me students with outstanding fees"</li>
+        <li>"Summarise the notice about the exam schedule"</li>
+      </ul>
+    </div></div>
+    <div class="step-row"><span class="step-badge">3</span><div>The assistant fetches real data from your college's database before answering — responses reflect your actual current records, not sample data.</div></div>
+    <div class="info-box mt-3"><i class="bi bi-info-circle-fill text-primary me-2"></i>The AI Assistant requires the <strong>ai_assistant</strong> feature to be enabled for your college by the Super Admin. If you don't see it in the sidebar, contact your platform administrator.</div>
+  </div>
+</div>
+
 {% endif %}
 {# ═══ END ADMIN ═════════════════════════════════════════════ #}
 
@@ -346,7 +437,7 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-success"></i>Table of Contents</h6>
     <div class="row g-2">
-      {% for num, title in [('1','Dashboard & Status'),('2','Starting Attendance'),('3','Managing Sessions'),('4','Exam Marks'),('5','Leave Requests'),('6','Reports'),('7','Teaching Content')] %}
+      {% for num, title in [('1','Dashboard & Status'),('2','Starting Attendance'),('3','Managing Sessions'),('4','Exam Marks'),('5','Leave Requests'),('6','Reports'),('7','Teaching Content'),('8','AI Assistant')] %}
       <div class="col-md-6">
         <a href="#teacher-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
           <span class="badge bg-success-subtle text-success fw-semibold" style="min-width:28px">{{ num }}</span>
@@ -459,6 +550,25 @@
   </div>
 </div>
 
+<!-- T8: AI Assistant -->
+<div class="guide-section card border-0 shadow-sm mb-4" id="teacher-s8">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#198754">8</span>AI Assistant</h5>
+    <p class="text-muted small">Ask natural-language questions about your students, attendance, and content. Navigate to <strong>Sidebar → AI Assistant</strong>.</p>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">1</span><div>Type your question and press <strong>Send</strong>. The assistant reads your college's live data before answering.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">2</span><div>Useful questions for teachers:
+      <ul class="mt-1 mb-0 small">
+        <li>"Which of my students have below 75% attendance in Physics?"</li>
+        <li>"List students who were absent more than 5 times this month"</li>
+        <li>"Show me the notes I uploaded for BCA semester 3"</li>
+        <li>"How many students submitted the last assignment?"</li>
+      </ul>
+    </div></div>
+    <div class="step-row"><span class="step-badge" style="background:#d1e7dd;color:#0a3622">3</span><div>The assistant uses your college's real records — answers are specific to your actual students and subjects, not generic responses.</div></div>
+    <div class="tip-box mt-3"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Use the AI assistant before parent-teacher meetings to quickly pull a summary of individual student performance without manually filtering through records.</div>
+  </div>
+</div>
+
 {% endif %}
 {# ═══ END TEACHER ═══════════════════════════════════════════ #}
 
@@ -472,7 +582,7 @@
   <div class="card-body px-4 py-3">
     <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-info"></i>Table of Contents</h6>
     <div class="row g-2">
-      {% for num, title in [('1','Dashboard & Profile'),('2','Face Enrollment'),('3','Location Sharing'),('4','Learning Content'),('5','Digital ID Card'),('6','Leave Applications'),('7','Attendance History & Downloads'),('8','Exam Results & Fees')] %}
+      {% for num, title in [('1','Dashboard & Profile'),('2','Face Enrollment'),('3','Location Sharing'),('4','Learning Content'),('5','Digital ID Card'),('6','Leave Applications'),('7','Attendance History & Downloads'),('8','Exam Results, Marksheets & Fees')] %}
       <div class="col-md-6">
         <a href="#student-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
           <span class="badge bg-info-subtle text-info fw-semibold" style="min-width:28px">{{ num }}</span>
@@ -596,13 +706,16 @@
   </div>
 </div>
 
-<!-- St8: Results & Fees -->
+<!-- St8: Results, Marksheets & Fees -->
 <div class="guide-section card border-0 shadow-sm mb-4" id="student-s8">
   <div class="card-body px-4 py-4">
-    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">8</span>Exam Results &amp; Fees</h5>
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#0dcaf0;color:#000">8</span>Exam Results, Marksheets &amp; Fees</h5>
     <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">1</span><div><strong>Results:</strong> Go to <strong>Sidebar → My Results</strong> to see all exam marks organised by subject and date.</div></div>
-    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div><strong>Fees:</strong> Go to <strong>Sidebar → My Fees</strong> to see a list of fee structures, what you have paid, and any outstanding balance.</div></div>
-    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>A red <strong>Fee Due</strong> alert on your dashboard means you have an outstanding balance — visit the Fees page for details.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">2</span><div><strong>Marksheet:</strong> Go to <strong>Sidebar → My Marksheet</strong> to view your official marksheet. If you have been promoted to a higher semester, a <strong>Semester</strong> dropdown appears at the top — use it to switch between your previous semester results and the current one.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">3</span><div>Click <strong>Print / Save as PDF</strong> on the marksheet page to save or print any semester's official result document.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">4</span><div><strong>Fees:</strong> Go to <strong>Sidebar → My Fees</strong> to see a list of fee structures, what you have paid, and any outstanding balance.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#cff4fc;color:#055160">5</span><div>A red <strong>Fee Due</strong> alert on your dashboard means you have an outstanding balance — visit the Fees page for details.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>The semester dropdown only appears once you have been promoted — semester 1 students see the current semester automatically with no dropdown.</div>
   </div>
 </div>
 
@@ -730,7 +843,9 @@
     <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#fd7e14">6</span>Official Marksheets</h5>
     <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">1</span><div>Use <strong>Sidebar → Marksheets</strong> to see all linked children who have printable marksheets available.</div></div>
     <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">2</span><div>Click a child to open the full official marksheet generated from exam records and configured signature data.</div></div>
-    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>From the browser print dialog, you can save the marksheet as PDF for home records.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">3</span><div>If your child has been promoted past semester 1, a <strong>Semester</strong> dropdown appears at the top of the marksheet — use it to view results from any previous semester alongside the current one.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#fff3cd;color:#664d03">4</span><div>From the browser print dialog, you can save any semester's marksheet as PDF for home records.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>You can also receive automated email alerts when your child has low attendance — the college admin enables this via the Report Email schedule setting.</div>
   </div>
 </div>
 
@@ -739,7 +854,7 @@
 
 <!-- Footer (visible in PDF) -->
 <div class="text-center text-muted small mt-5 pt-4 border-top">
-  <strong>{{ college_name }}</strong> &bull; SmartAttend College Management System &bull; User Guide v1.1<br>
+  <strong>{{ college_name }}</strong> &bull; SmartAttend College Management System &bull; User Guide v2.0<br>
   <span class="no-print">To save this guide as PDF: click <strong>Download as PDF</strong> above or press <kbd>Ctrl+P</kbd> → Save as PDF.</span>
 </div>
 

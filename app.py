@@ -106,9 +106,11 @@ def _register_blueprints(app: Flask) -> None:
     from routes.fee import fee_bp
     from routes.parent import parent_bp
     from routes.help import help_bp
+    from routes.ai import ai_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(help_bp)
+    app.register_blueprint(ai_bp)
     app.register_blueprint(super_admin_bp, url_prefix='/super-admin')
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(teacher_bp, url_prefix='/teacher')
@@ -474,4 +476,43 @@ def create_app(config_override=None) -> Flask:
                 current_college=None,
             )
 
+    _start_scheduler(app)
+
     return app
+
+
+def _start_scheduler(app: 'Flask') -> None:
+    """Start APScheduler for background jobs. Safe under Gunicorn with multiple workers
+    by using an env-var guard so only one worker registers the scheduler."""
+    import os
+    if os.environ.get('SCHEDULER_STARTED') == '1':
+        return
+    os.environ['SCHEDULER_STARTED'] = '1'
+
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from services.attendance_report import check_and_run_scheduled_reports
+        from services.fee_reminder import check_and_send_fee_reminders
+
+        def _hourly_jobs():
+            check_and_run_scheduled_reports(app)
+            check_and_send_fee_reminders(app)
+
+        scheduler = BackgroundScheduler(timezone='Asia/Kathmandu')
+        # Poll every hour; each college's schedule config is checked inside each job
+        scheduler.add_job(
+            func=_hourly_jobs,
+            trigger='cron',
+            minute=0,
+            id='hourly_background_jobs',
+            replace_existing=True,
+        )
+        scheduler.start()
+        import logging
+        logging.getLogger(__name__).info('APScheduler started — hourly background jobs (attendance reports + fee reminders)')
+
+        import atexit
+        atexit.register(lambda: scheduler.shutdown(wait=False))
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(f'Scheduler failed to start: {exc}')

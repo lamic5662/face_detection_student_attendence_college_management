@@ -307,20 +307,70 @@ def delete_department(did):
 
 # ─── Students ────────────────────────────────────────────────────────────────
 
+def _expected_semester_from_schedules(college_id: int, dept_id: int,
+                                       admission_year: int) -> int | None:
+    """
+    Use SemesterSchedule records to find which semester is currently active
+    for a student admitted in admission_year. Falls back to None if no schedules set.
+    """
+    from models.academic_calendar import SemesterSchedule
+    today = date.today()
+    # Find the highest semester whose start_date has passed for this batch
+    schedules = SemesterSchedule.query.filter(
+        SemesterSchedule.college_id == college_id,
+        SemesterSchedule.academic_year == admission_year,
+        db.or_(
+            SemesterSchedule.department_id == None,
+            SemesterSchedule.department_id == dept_id,
+        ),
+        SemesterSchedule.start_date <= today,
+    ).order_by(SemesterSchedule.semester.desc()).all()
+
+    if schedules:
+        return schedules[0].semester  # highest started semester
+    return None
+
+
+def _student_track_status(student, current_year):
+    """Return (status, semesters_diff) for a student vs expected progress."""
+    if not student.admission_year:
+        return 'unknown', 0
+
+    # Prefer schedule-based expected semester
+    expected_sem = _expected_semester_from_schedules(
+        student.college_id, student.department_id, student.admission_year)
+
+    # Fall back to year-math if no schedules configured
+    if expected_sem is None:
+        years_elapsed = max(0, current_year - student.admission_year)
+        expected_sem = min(years_elapsed * 2 + 1, 8)
+
+    diff = student.semester - expected_sem
+    if diff >= 0:
+        return 'on_track', diff
+    elif diff >= -2:
+        return 'behind', abs(diff)
+    else:
+        return 'far_behind', abs(diff)
+
+
 @admin_bp.route('/students')
 @login_required
 @admin_required
 def students():
-    page       = request.args.get('page', 1, type=int)
-    dept_id    = request.args.get('department_id', type=int)
-    semester   = request.args.get('semester', type=int)
-    search     = request.args.get('q', '').strip()
+    page        = request.args.get('page', 1, type=int)
+    dept_id     = request.args.get('department_id', type=int)
+    semester    = request.args.get('semester', type=int)
+    adm_year    = request.args.get('admission_year', type=int)
+    search      = request.args.get('q', '').strip()
 
     query = Student.query.join(User).filter(Student.college_id == _admin_college_id())
     if dept_id:
         query = query.filter(Student.department_id == dept_id)
     if semester:
         query = query.filter(Student.semester == semester)
+    if adm_year:
+        query = query.filter(Student.admission_year == adm_year)
     if search:
         query = query.filter(
             db.or_(User.name.ilike(f'%{search}%'),
@@ -331,29 +381,180 @@ def students():
         page=page, per_page=15, error_out=False
     )
     departments = _scoped_department_query().order_by(Department.name).all()
+    current_year = datetime.now().year
+
+    # Distinct admission years for filter dropdown
+    adm_years = [
+        r[0] for r in
+        db.session.query(Student.admission_year)
+        .filter(Student.college_id == _admin_college_id(), Student.admission_year.isnot(None))
+        .distinct().order_by(Student.admission_year.desc()).all()
+    ]
+
+    # Attach track status to each student on this page
+    students_with_status = [
+        (s, *_student_track_status(s, current_year))
+        for s in pagination.items
+    ]
+
     return render_template('admin/students.html',
                            pagination=pagination,
-                           students=pagination.items,
+                           students_with_status=students_with_status,
                            departments=departments,
+                           adm_years=adm_years,
                            selected_dept=dept_id,
                            selected_sem=semester,
-                           search=search)
+                           selected_adm_year=adm_year,
+                           search=search,
+                           now=datetime.now())
+
+
+@admin_bp.route('/batch-overview')
+@login_required
+@admin_required
+def batch_overview():
+    """Batch-wise analysis — shows all admission-year batches with progress tracking."""
+    college_id   = _admin_college_id()
+    current_year = datetime.now().year
+    dept_filter  = request.args.get('department_id', type=int)
+    year_filter  = request.args.get('admission_year', type=int)
+
+    base_q = Student.query.join(User).filter(Student.college_id == college_id)
+    if dept_filter:
+        base_q = base_q.filter(Student.department_id == dept_filter)
+    if year_filter:
+        base_q = base_q.filter(Student.admission_year == year_filter)
+
+    all_students = base_q.order_by(Student.admission_year, Student.department_id, Student.roll_number).all()
+    departments  = _scoped_department_query().order_by(Department.name).all()
+    dept_map     = {d.id: d for d in departments}
+
+    adm_years = [
+        r[0] for r in
+        db.session.query(Student.admission_year)
+        .filter(Student.college_id == college_id, Student.admission_year.isnot(None))
+        .distinct().order_by(Student.admission_year.desc()).all()
+    ]
+
+    # Build batch groups: {(adm_year, dept_id): [students]}
+    from collections import defaultdict
+    groups = defaultdict(list)
+    for s in all_students:
+        key = (s.admission_year or 0, s.department_id)
+        groups[key].append(s)
+
+    batches = []
+    for (adm_year, dept_id), sts in sorted(groups.items(), key=lambda x: (-x[0][0], x[0][1])):
+        dept   = dept_map.get(dept_id)
+        years_elapsed = max(0, current_year - adm_year) if adm_year else 0
+        expected_sem  = min(years_elapsed * 2 + 1, 8) if adm_year else None
+
+        counts = {'on_track': 0, 'behind': 0, 'far_behind': 0, 'unknown': 0}
+        student_rows = []
+        for s in sts:
+            status, diff = _student_track_status(s, current_year)
+            counts[status] += 1
+            student_rows.append({
+                'student': s,
+                'status':  status,
+                'diff':    diff,
+                'expected_sem': expected_sem,
+            })
+
+        batches.append({
+            'adm_year':     adm_year,
+            'dept':         dept,
+            'dept_id':      dept_id,
+            'expected_sem': expected_sem,
+            'total':        len(sts),
+            'counts':       counts,
+            'students':     student_rows,
+            'year_label':   f"Year {years_elapsed + 1}" if adm_year else 'Unknown',
+        })
+
+    return render_template('admin/batch_overview.html',
+                           batches=batches,
+                           departments=departments,
+                           adm_years=adm_years,
+                           dept_filter=dept_filter,
+                           year_filter=year_filter,
+                           current_year=current_year)
+
+
+@admin_bp.route('/batch-promote', methods=['POST'])
+@login_required
+@admin_required
+def batch_promote():
+    """Promote all on-track students in a batch to the next semester."""
+    college_id  = _admin_college_id()
+    dept_id     = request.form.get('dept_id', type=int)
+    adm_year    = request.form.get('adm_year', type=int)
+    current_year = datetime.now().year
+
+    if not dept_id or not adm_year:
+        flash('Invalid batch.', 'danger')
+        return redirect(url_for('admin.batch_overview'))
+
+    students_in_batch = Student.query.filter_by(
+        college_id=college_id, department_id=dept_id, admission_year=adm_year
+    ).all()
+
+    promoted = skipped = 0
+    for s in students_in_batch:
+        status, _ = _student_track_status(s, current_year)
+        if status == 'on_track' and s.semester < 8:
+            s.semester += 1
+            promoted += 1
+        else:
+            skipped += 1
+
+    db.session.commit()
+
+    dept = Department.query.get(dept_id)
+    dept_name = dept.name if dept else 'Unknown'
+    flash(
+        f'{promoted} student(s) in {dept_name} {adm_year} batch promoted to next semester. '
+        f'{skipped} skipped (behind schedule or already at Semester 8).',
+        'success'
+    )
+    return redirect(url_for('admin.batch_overview',
+                            admission_year=adm_year, department_id=dept_id))
+
+
+@admin_bp.route('/students/preview-id')
+@login_required
+@admin_required
+def preview_student_id():
+    from datetime import datetime
+    dept_id = request.args.get('dept_id', type=int)
+    year = request.args.get('year', type=int) or datetime.now().year
+    if not dept_id:
+        return jsonify(id='')
+    preview = Student.generate_roll_number(_admin_college_id(), dept_id, year)
+    return jsonify(id=preview)
 
 
 @admin_bp.route('/students/add', methods=['POST'])
 @login_required
 @admin_required
 def add_student():
-    name = request.form.get('name', '').strip()
-    email = request.form.get('email', '').strip().lower()
-    password = request.form.get('password', '')
-    roll = request.form.get('roll_number', '').strip().upper()
-    dept_id = request.form.get('department_id', type=int)
-    semester = request.form.get('semester', type=int)
+    from datetime import datetime
+    name        = request.form.get('name', '').strip()
+    email       = request.form.get('email', '').strip().lower()
+    password    = request.form.get('password', '')
+    auto_id     = request.form.get('auto_id') == '1'
+    roll        = request.form.get('roll_number', '').strip().upper()
+    dept_id     = request.form.get('department_id', type=int)
+    semester    = request.form.get('semester', type=int)
+    adm_year    = request.form.get('admission_year', type=int) or datetime.now().year
     reopen_target = {'open_modal': 'add-student'}
 
-    if not all([name, email, password, roll, dept_id, semester]):
+    if not all([name, email, password, dept_id, semester]):
         flash('All fields are required.', 'danger')
+        return redirect(url_for('admin.students', **reopen_target))
+
+    if not auto_id and not roll:
+        flash('Enter a roll number or choose Auto Generate.', 'danger')
         return redirect(url_for('admin.students', **reopen_target))
 
     if not _validate_temporary_password(password):
@@ -364,11 +565,14 @@ def add_student():
         flash('Email already registered.', 'danger')
         return redirect(url_for('admin.students', **reopen_target))
 
-    if _scoped_student_query().filter_by(roll_number=roll).first():
-        flash('Roll number already exists.', 'danger')
-        return redirect(url_for('admin.students', **reopen_target))
-
     department = _scoped_model_or_404(Department, dept_id)
+
+    if auto_id:
+        roll = Student.generate_roll_number(_admin_college_id(), dept_id, adm_year)
+    else:
+        if _scoped_student_query().filter_by(roll_number=roll).first():
+            flash('Roll number already exists.', 'danger')
+            return redirect(url_for('admin.students', **reopen_target))
 
     user = User(college_id=_admin_college_id(), name=name, email=email, role='student')
     user.set_temporary_password(password)
@@ -381,6 +585,7 @@ def add_student():
         roll_number=roll,
         department_id=department.id,
         semester=semester,
+        admission_year=adm_year,
     )
     db.session.add(student)
     db.session.commit()
@@ -425,16 +630,19 @@ def import_students():
     reader = csv.DictReader(stream)
     added = skipped = errors = 0
 
+    from datetime import datetime
+    current_year = datetime.now().year
     for row in reader:
         try:
-            name     = row.get('name', '').strip()
-            email    = row.get('email', '').strip().lower()
-            roll     = row.get('roll_number', '').strip().upper()
-            dept_code= row.get('department_code', '').strip().upper()
-            semester = int(row.get('semester', 1))
-            password = row.get('password', 'Student@123!').strip()
+            name      = row.get('name', '').strip()
+            email     = row.get('email', '').strip().lower()
+            roll      = row.get('roll_number', '').strip().upper()
+            dept_code = row.get('department_code', '').strip().upper()
+            semester  = int(row.get('semester', 1))
+            password  = row.get('password', 'Student@123!').strip()
+            adm_year  = int(row.get('admission_year', current_year))
 
-            if not all([name, email, roll, dept_code]):
+            if not all([name, email, dept_code]):
                 errors += 1
                 continue
 
@@ -442,14 +650,20 @@ def import_students():
                 errors += 1
                 continue
 
-            if _scoped_user_query().filter_by(email=email).first() or \
-               _scoped_student_query().filter_by(roll_number=roll).first():
+            if _scoped_user_query().filter_by(email=email).first():
                 skipped += 1
                 continue
 
             dept = _scoped_department_query().filter_by(code=dept_code).first()
             if not dept:
                 errors += 1
+                continue
+
+            # Auto-generate roll number if not provided — uses admission year
+            if not roll:
+                roll = Student.generate_roll_number(_admin_college_id(), dept.id, adm_year)
+            elif _scoped_student_query().filter_by(roll_number=roll).first():
+                skipped += 1
                 continue
 
             u = User(college_id=_admin_college_id(), name=name, email=email, role='student')
@@ -462,6 +676,7 @@ def import_students():
                 roll_number=roll,
                 department_id=dept.id,
                 semester=semester,
+                admission_year=adm_year,
             ))
             added += 1
         except Exception:
@@ -1607,8 +1822,9 @@ def marksheet_list():
 @admin_required
 def admin_marksheet(student_id):
     from routes.exam import build_marksheet_data
-    student = _scoped_model_or_404(Student, student_id)
-    data    = build_marksheet_data(student)
+    student  = _scoped_model_or_404(Student, student_id)
+    semester = request.args.get('semester', type=int)
+    data     = build_marksheet_data(student, semester=semester)
     return render_template('exam/marksheet.html', **data, is_admin=True, is_parent=False)
 
 
@@ -1700,3 +1916,164 @@ def delete_marksheet_signature(sig_id):
     db.session.commit()
     flash('Signature removed.', 'info')
     return redirect(url_for('admin.marksheet_signatures'))
+
+
+# ─── Reports ──────────────────────────────────────────────────────────────────
+
+@admin_bp.route('/reports/send-weekly', methods=['POST'])
+@login_required
+@admin_required
+def send_weekly_report_now():
+    """Manually trigger weekly attendance report for this college, respecting saved filters."""
+    from threading import Thread
+    from services.attendance_report import run_weekly_reports
+    from models.academic_calendar import ReportScheduleConfig
+    app = current_app._get_current_object()
+    college_id = _admin_college_id()
+
+    cfg = ReportScheduleConfig.query.filter_by(college_id=college_id).first()
+    dept_ids  = (cfg.filter_department_ids  or []) if cfg else []
+    semesters = (cfg.filter_semesters        or []) if cfg else []
+    adm_years = (cfg.filter_admission_years  or []) if cfg else []
+
+    def run():
+        result = run_weekly_reports(
+            app, college_id=college_id,
+            department_ids=dept_ids or None,
+            semesters=semesters or None,
+            admission_years=adm_years or None,
+        )
+        app.logger.info(f'Manual weekly report: {result}')
+
+    Thread(target=run, daemon=True).start()
+    flash('Weekly attendance reports are being sent in the background. Students and parents will receive emails shortly.', 'success')
+    return redirect(request.referrer or url_for('admin.semester_schedules'))
+
+
+@admin_bp.route('/reports/schedule/save', methods=['POST'])
+@login_required
+@admin_required
+def save_report_schedule():
+    """Save or update the automated report schedule config for this college."""
+    from models.academic_calendar import ReportScheduleConfig
+    college_id = _admin_college_id()
+
+    enabled    = request.form.get('enabled') == '1'
+    send_day   = request.form.get('send_day', type=int, default=0)
+    send_hour  = request.form.get('send_hour', type=int, default=7)
+    send_minute = request.form.get('send_minute', type=int, default=0)
+
+    dept_ids  = [int(x) for x in request.form.getlist('filter_department_ids')  if x.isdigit()]
+    semesters = [int(x) for x in request.form.getlist('filter_semesters')        if x.isdigit()]
+    adm_years = [int(x) for x in request.form.getlist('filter_admission_years')  if x.isdigit()]
+
+    cfg = ReportScheduleConfig.query.filter_by(college_id=college_id).first()
+    if not cfg:
+        cfg = ReportScheduleConfig(college_id=college_id)
+        db.session.add(cfg)
+
+    cfg.enabled    = enabled
+    cfg.send_day   = max(0, min(6, send_day))
+    cfg.send_hour  = max(0, min(23, send_hour))
+    cfg.send_minute = max(0, min(59, send_minute))
+    cfg.filter_department_ids  = dept_ids
+    cfg.filter_semesters       = semesters
+    cfg.filter_admission_years = adm_years
+    cfg.updated_by = current_user.id
+
+    db.session.commit()
+    flash('Report schedule saved successfully.', 'success')
+    return redirect(url_for('admin.semester_schedules'))
+
+
+# ─── Semester Schedules ───────────────────────────────────────────────────────
+
+@admin_bp.route('/semester-schedules')
+@login_required
+@admin_required
+def semester_schedules():
+    from models.academic_calendar import SemesterSchedule, ReportScheduleConfig, DAYS_OF_WEEK
+    college_id = _admin_college_id()
+    schedules = SemesterSchedule.query.filter_by(college_id=college_id).order_by(
+        SemesterSchedule.academic_year.desc(), SemesterSchedule.semester,
+    ).all()
+    departments = _scoped_department_query().order_by(Department.name).all()
+    report_cfg  = ReportScheduleConfig.query.filter_by(college_id=college_id).first()
+
+    # Distinct admission years present in this college
+    adm_years_raw = db.session.query(Student.admission_year).filter(
+        Student.college_id == college_id,
+        Student.admission_year.isnot(None),
+    ).distinct().order_by(Student.admission_year.desc()).all()
+    adm_years = [r[0] for r in adm_years_raw]
+
+    return render_template('admin/semester_schedules.html',
+                           schedules=schedules,
+                           departments=departments,
+                           report_cfg=report_cfg,
+                           adm_years=adm_years,
+                           days_of_week=DAYS_OF_WEEK,
+                           now=datetime.now())
+
+
+@admin_bp.route('/semester-schedules/save', methods=['POST'])
+@login_required
+@admin_required
+def save_semester_schedule():
+    from models.academic_calendar import SemesterSchedule
+    from datetime import date as _date
+    college_id   = _admin_college_id()
+    dept_id      = request.form.get('department_id', type=int) or None
+    semester     = request.form.get('semester', type=int)
+    acad_year    = request.form.get('academic_year', type=int)
+    start_str    = request.form.get('start_date', '').strip()
+    end_str      = request.form.get('end_date', '').strip()
+
+    if not all([semester, acad_year, start_str, end_str]):
+        flash('All fields are required.', 'danger')
+        return redirect(url_for('admin.semester_schedules'))
+
+    try:
+        start_date = _date.fromisoformat(start_str)
+        end_date   = _date.fromisoformat(end_str)
+    except ValueError:
+        flash('Invalid date format.', 'danger')
+        return redirect(url_for('admin.semester_schedules'))
+
+    if end_date < start_date:
+        flash('End date must be after start date.', 'danger')
+        return redirect(url_for('admin.semester_schedules'))
+
+    existing = SemesterSchedule.query.filter_by(
+        college_id=college_id, department_id=dept_id,
+        semester=semester, academic_year=acad_year,
+    ).first()
+
+    if existing:
+        existing.start_date = start_date
+        existing.end_date   = end_date
+        flash('Semester schedule updated.', 'success')
+    else:
+        db.session.add(SemesterSchedule(
+            college_id=college_id, department_id=dept_id,
+            semester=semester, academic_year=acad_year,
+            start_date=start_date, end_date=end_date,
+            created_by=current_user.id,
+        ))
+        flash('Semester schedule added.', 'success')
+
+    db.session.commit()
+    return redirect(url_for('admin.semester_schedules'))
+
+
+@admin_bp.route('/semester-schedules/<int:sid>/delete', methods=['POST'])
+@login_required
+@admin_required
+def delete_semester_schedule(sid):
+    from models.academic_calendar import SemesterSchedule
+    schedule = SemesterSchedule.query.filter_by(
+        id=sid, college_id=_admin_college_id()).first_or_404()
+    db.session.delete(schedule)
+    db.session.commit()
+    flash('Semester schedule removed.', 'info')
+    return redirect(url_for('admin.semester_schedules'))

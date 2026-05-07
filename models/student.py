@@ -59,5 +59,25 @@ class Student(db.Model):
         present = query.filter(AttendanceRecord.status == 'present').count()
         return round((present / total) * 100, 2)
 
+    @classmethod
+    def generate_roll_number(cls, college_id: int, department_id: int, year: int) -> str:
+        from models.college import College
+        from models.department import Department
+        college = College.query.get(college_id)
+        dept = Department.query.get(department_id)
+        college_code = (college.code if college else 'COL').upper()
+        dept_code = (dept.code if dept else 'DEPT').upper()
+        prefix = f"{college_code}-{dept_code}-{year}-"
+        existing = cls.query.filter(
+            cls.college_id == college_id,
+            cls.roll_number.like(f"{prefix}%")
+        ).count()
+        seq = existing + 1
+        candidate = f"{prefix}{seq:03d}"
+        while cls.query.filter_by(college_id=college_id, roll_number=candidate).first():
+            seq += 1
+            candidate = f"{prefix}{seq:03d}"
+        return candidate
+
     def __repr__(self):
         return f'<Student {self.roll_number}>'

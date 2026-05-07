@@ -3,6 +3,28 @@
 {% block title %}Fee Structures{% endblock %}
 {% block page_title %}<i class="bi bi-cash-stack me-2"></i>Fee Management{% endblock %}
 
+{% block head %}
+<style>
+.reminder-toggle {
+  position:relative; display:inline-flex; align-items:center;
+  width:52px; height:28px; border-radius:14px; cursor:pointer;
+  transition:background .2s; background:#dee2e6; flex-shrink:0;
+}
+.reminder-toggle.on { background:#0d6efd; }
+.reminder-toggle::after {
+  content:''; position:absolute; left:3px; width:22px; height:22px;
+  border-radius:50%; background:#fff; transition:left .2s;
+  box-shadow:0 1px 4px rgba(0,0,0,.2);
+}
+.reminder-toggle.on::after { left:27px; }
+.reminder-opt {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-radius:12px; background:#f8fafc;
+  border:1.5px solid #e2e8f0; gap:12px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Create Structure Modal -->
 <div class="modal fade" id="createModal" tabindex="-1">
@@ -187,4 +209,153 @@
   </div>
   {% endif %}
 </div>
+
+{# ── Fee Reminder Config Card ── #}
+<div class="card border-0 shadow-sm mt-4">
+  <div class="card-header border-0 bg-white pt-4 px-4 pb-0">
+    <div class="d-flex align-items-center gap-3">
+      <div class="rounded-circle bg-warning-subtle d-flex align-items-center justify-content-center flex-shrink-0"
+           style="width:44px;height:44px">
+        <i class="bi bi-bell-fill text-warning fs-5"></i>
+      </div>
+      <div>
+        <h6 class="fw-bold mb-0">Fee Reminder Emails</h6>
+        <p class="small text-muted mb-0">
+          Automatically email students (and parents) when fees are approaching or overdue.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body px-4 pt-3 pb-4">
+    <form method="POST" action="{{ url_for('fee.save_fee_reminder_config') }}" id="reminderForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="enabled" id="reminderEnabled"
+             value="{{ '1' if reminder_cfg and reminder_cfg.enabled else '0' }}">
+      <input type="hidden" name="remind_on_due_date" id="remindOnDue"
+             value="{{ '1' if not reminder_cfg or reminder_cfg.remind_on_due_date else '0' }}">
+      <input type="hidden" name="remind_overdue" id="remindOverdue"
+             value="{{ '1' if not reminder_cfg or reminder_cfg.remind_overdue else '0' }}">
+
+      <div class="row g-3">
+
+        {# Enable toggle #}
+        <div class="col-12">
+          <div class="reminder-opt">
+            <div>
+              <div class="fw-semibold">Auto reminders enabled</div>
+              <div class="small text-muted">Send reminders automatically on your chosen schedule.</div>
+            </div>
+            <div id="mainToggle"
+                 class="reminder-toggle {{ 'on' if reminder_cfg and reminder_cfg.enabled else '' }}"
+                 onclick="toggleReminder(this, 'reminderEnabled')">
+            </div>
+          </div>
+        </div>
+
+        {# Days before due #}
+        <div class="col-md-4">
+          <label class="form-label fw-semibold small">Send reminder</label>
+          <div class="input-group">
+            <input type="number" name="days_before_due" class="form-control"
+                   value="{{ reminder_cfg.days_before_due if reminder_cfg else 7 }}"
+                   min="1" max="30">
+            <span class="input-group-text">days before due</span>
+          </div>
+          <div class="form-text">Students will receive a reminder this many days before the fee due date.</div>
+        </div>
+
+        {# Send hour #}
+        <div class="col-md-3">
+          <label class="form-label fw-semibold small">Send time (daily)</label>
+          <select name="send_hour" class="form-select">
+            {% for h in range(24) %}
+            <option value="{{ h }}"
+              {{ 'selected' if reminder_cfg and reminder_cfg.send_hour == h
+                 else ('selected' if not reminder_cfg and h == 8 else '') }}>
+              {{ '%02d'|format(h) }}:00
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# On due date toggle #}
+        <div class="col-md-5">
+          <label class="form-label fw-semibold small d-block">Additional triggers</label>
+          <div class="d-flex flex-column gap-2">
+            <div class="reminder-opt">
+              <div>
+                <div class="fw-semibold small">Remind on due date</div>
+                <div class="small text-muted">Send again on the actual due date.</div>
+              </div>
+              <div id="dueToggle"
+                   class="reminder-toggle {{ 'on' if not reminder_cfg or reminder_cfg.remind_on_due_date else '' }}"
+                   onclick="toggleReminder(this, 'remindOnDue')">
+              </div>
+            </div>
+            <div class="reminder-opt">
+              <div>
+                <div class="fw-semibold small">Remind when overdue</div>
+                <div class="small text-muted">Keep reminding until the fee is paid.</div>
+              </div>
+              <div id="overdueToggle"
+                   class="reminder-toggle {{ 'on' if not reminder_cfg or reminder_cfg.remind_overdue else '' }}"
+                   onclick="toggleReminder(this, 'remindOverdue')">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# Status + last sent #}
+        {% if reminder_cfg and reminder_cfg.enabled %}
+        <div class="col-12">
+          <div class="small text-success">
+            <i class="bi bi-check-circle-fill me-1"></i>
+            Auto reminders active — sends daily at
+            <strong>{{ reminder_cfg.send_hour_display }}</strong>,
+            starting <strong>{{ reminder_cfg.days_before_due }} days</strong> before each due date.
+            {% if reminder_cfg.last_sent_at %}
+              Last sent: <strong>{{ reminder_cfg.last_sent_at.strftime('%d %b %Y %H:%M') }}</strong>.
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+      </div>{# /row #}
+
+      {# How it works #}
+      <div class="rounded-3 p-3 my-3 small" style="background:#fffbeb;border:1px solid #fde68a">
+        <i class="bi bi-info-circle-fill text-warning me-2"></i>
+        <strong>How it works:</strong> Each day at the chosen time, the system checks all active
+        fee structures with a due date. Students with any unpaid or partially paid fees receive
+        one consolidated email listing everything they owe. Parents are also notified.
+        Already fully-paid fees are never included.
+      </div>
+
+      <div class="d-flex gap-3 flex-wrap">
+        <button type="submit" class="btn btn-primary fw-semibold">
+          <i class="bi bi-save me-2"></i>Save Settings
+        </button>
+        <form method="POST" action="{{ url_for('fee.send_fee_reminders_now') }}"
+              data-confirm="Send fee reminder emails now to all students with outstanding fees?"
+              data-confirm-title="Send Fee Reminders" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-warning fw-semibold">
+            <i class="bi bi-send-fill me-2"></i>Send Now
+          </button>
+        </form>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleReminder(pill, inputId) {
+  const isOn = pill.classList.toggle('on');
+  document.getElementById(inputId).value = isOn ? '1' : '0';
+}
+</script>
 {% endblock %}

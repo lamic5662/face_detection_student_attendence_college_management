@@ -22,6 +22,22 @@
     <i class="bi bi-arrow-left me-1"></i>Back to Results
   </a>
   {% endif %}
+
+  {# Semester selector — shown when student has completed more than one semester #}
+  {% if student.semester > 1 %}
+  <div class="d-flex align-items-center gap-2">
+    <label class="form-label mb-0 text-muted small fw-semibold">Semester:</label>
+    <select class="form-select form-select-sm" style="width:auto;"
+            onchange="window.location = '?semester=' + this.value">
+      {% for s in range(1, student.semester + 1) %}
+      <option value="{{ s }}" {% if s == viewed_semester %}selected{% endif %}>
+        Semester {{ s }}{% if s == student.semester %} (Current){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
   <button onclick="window.print()" class="btn btn-primary btn-sm">
     <i class="bi bi-printer-fill me-1"></i>Print / Save as PDF
   </button>
@@ -38,7 +54,7 @@
     {% endif %}
     <div class="ms-doc-title">STUDENT MARKSHEET</div>
     <div class="ms-semester-label">
-      Semester {{ student.semester }} &nbsp;|&nbsp;
+      Semester {{ viewed_semester }} &nbsp;|&nbsp;
       {{ student.department.name if student.department else '' }}
     </div>
   </div>
@@ -60,7 +76,7 @@
       </div>
       <div class="ms-info-cell">
         <span class="ms-info-lbl">Semester</span>
-        <span class="ms-info-val">{{ student.semester }}</span>
+        <span class="ms-info-val">{{ viewed_semester }}</span>
       </div>
     </div>
     <div class="ms-info-row">

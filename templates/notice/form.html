@@ -15,8 +15,22 @@
                    value="{{ notice.title if notice else '' }}" placeholder="Notice title…">
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Content <span class="text-danger">*</span></label>
-            <textarea name="content" class="form-control" rows="7" required
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <label class="form-label fw-semibold mb-0">Content <span class="text-danger">*</span></label>
+              <button type="button" class="btn btn-sm btn-outline-primary" id="aiGenBtn"
+                      onclick="aiGenerateNotice()" style="font-size:.8rem;">
+                <i class="bi bi-stars me-1"></i>AI Generate
+              </button>
+            </div>
+            <div class="input-group mb-2 d-none" id="aiTopicRow">
+              <input type="text" class="form-control form-control-sm" id="aiTopicInput"
+                     placeholder="Describe the notice topic (e.g. exam postponed to next Monday)…" maxlength="200">
+              <button class="btn btn-primary btn-sm" type="button" onclick="aiSubmitTopic()" id="aiSubmitBtn">
+                <i class="bi bi-send-fill"></i>
+              </button>
+              <button class="btn btn-light btn-sm" type="button" onclick="aiCancelTopic()">Cancel</button>
+            </div>
+            <textarea name="content" class="form-control" rows="7" required id="noticeContent"
                       placeholder="Write the full notice here…">{{ notice.content if notice else '' }}</textarea>
           </div>
           <div class="row g-3 mb-3">
@@ -62,4 +76,45 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function aiGenerateNotice() {
+  document.getElementById('aiTopicRow').classList.remove('d-none');
+  document.getElementById('aiGenBtn').classList.add('d-none');
+  document.getElementById('aiTopicInput').focus();
+}
+function aiCancelTopic() {
+  document.getElementById('aiTopicRow').classList.add('d-none');
+  document.getElementById('aiGenBtn').classList.remove('d-none');
+  document.getElementById('aiTopicInput').value = '';
+}
+function aiSubmitTopic() {
+  var topic = document.getElementById('aiTopicInput').value.trim();
+  if (!topic) return;
+  var btn = document.getElementById('aiSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+  fetch('/ai/generate-notice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+    body: JSON.stringify({ topic: topic })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.error) { alert('AI Error: ' + data.error); }
+    else { document.getElementById('noticeContent').value = data.content; aiCancelTopic(); }
+  })
+  .catch(function() { alert('Network error. Please try again.'); })
+  .finally(function() {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-send-fill"></i>';
+  });
+}
+document.getElementById('aiTopicInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); aiSubmitTopic(); }
+});
+</script>
 {% endblock %}

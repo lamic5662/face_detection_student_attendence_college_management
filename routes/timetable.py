@@ -137,7 +137,40 @@ def save_slot():
         db.session.add(slot)
 
     db.session.commit()
-    return jsonify({'success': True, 'slot_id': slot.id})
+
+    # ── Conflict detection ────────────────────────────────────────────────────
+    conflicts = []
+    if start and end and (teacher_id or room):
+        other_slots = TimetableSlot.query.filter(
+            TimetableSlot.college_id == current_college_id(),
+            TimetableSlot.day_of_week == day,
+            TimetableSlot.id != slot.id,
+            TimetableSlot.start_time.isnot(None),
+            TimetableSlot.end_time.isnot(None),
+        ).all()
+
+        for other in other_slots:
+            # Time overlap: not (other ends before we start OR other starts after we end)
+            overlaps = not (other.end_time <= start or other.start_time >= end)
+            if not overlaps:
+                continue
+            dept_label = f'{other.department.name} Sem {other.semester}' if other.department else ''
+            subj_label = other.subject.name if other.subject else 'Unknown'
+            time_label = f'{other.start_time.strftime("%H:%M")}–{other.end_time.strftime("%H:%M")}'
+
+            if teacher_id and other.teacher_id == int(teacher_id):
+                teacher_name = other.teacher.user.name if other.teacher else 'Teacher'
+                conflicts.append({
+                    'type': 'teacher',
+                    'message': f'{teacher_name} is already teaching {subj_label} ({dept_label}) at {time_label}',
+                })
+            if room and other.room and other.room.strip().lower() == room.strip().lower():
+                conflicts.append({
+                    'type': 'room',
+                    'message': f'Room "{room}" is already used for {subj_label} ({dept_label}) at {time_label}',
+                })
+
+    return jsonify({'success': True, 'slot_id': slot.id, 'conflicts': conflicts})
 
 
 @timetable_bp.route('/timetable/slot/<int:sid>/delete', methods=['POST'])

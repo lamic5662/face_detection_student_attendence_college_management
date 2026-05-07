@@ -253,7 +253,7 @@
       {% if messages %}
         <div class="mb-4">
           {% for category, message in messages %}
-            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert" data-flash>
               <i class="bi bi-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-triangle{% elif category == 'warning' %}exclamation-circle{% else %}info-circle{% endif %}-fill me-2"></i>
               {{ message }}
               <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -375,6 +375,12 @@
   window.addEventListener('resize', () => {
     if (!isMobile()) closeMobileSidebar();
   });
+
+  // Scroll active nav item into view so lower items stay visible after navigation
+  const activeNavLink = document.querySelector('.sidebar-nav a.active');
+  if (activeNavLink) {
+    activeNavLink.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+  }
 
   const bellBadge = document.getElementById('topbarBellBadge');
   const deleteReadButton = document.getElementById('topbarDeleteReadButton');
@@ -915,5 +921,160 @@ document.addEventListener('submit', async function(e) {
   if (ok) { form.removeAttribute('data-confirm'); form.submit(); }
 }, true);
 </script>
+
+<script>
+/* ── Auto-dismiss flash alerts (runs immediately – DOM is ready at page bottom) */
+document.querySelectorAll('.alert[data-flash]').forEach(function (el) {
+  setTimeout(function () {
+    el.style.transition = 'opacity 0.5s ease';
+    el.style.opacity = '0';
+    setTimeout(function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 500);
+  }, 2000);
+});
+</script>
+
+{% if current_user.is_authenticated %}
+<!-- ── SmartAttend AI Chat Widget ─────────────────────────────────────────── -->
+<style>
+#sa-ai-btn {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1050;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none; color: #fff; font-size: 1.3rem;
+  box-shadow: 0 4px 18px rgba(99,102,241,0.45);
+  cursor: pointer; transition: transform .2s, box-shadow .2s;
+  display: flex; align-items: center; justify-content: center;
+}
+#sa-ai-btn:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(99,102,241,0.55); }
+
+#sa-ai-panel {
+  position: fixed; bottom: 88px; right: 24px; z-index: 1049;
+  width: 360px; max-width: calc(100vw - 32px);
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  display: flex; flex-direction: column;
+  transform: translateY(20px) scale(0.97); opacity: 0;
+  pointer-events: none; transition: all .22s cubic-bezier(.4,0,.2,1);
+}
+#sa-ai-panel.open {
+  transform: translateY(0) scale(1); opacity: 1; pointer-events: all;
+}
+.sa-ai-header {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff; padding: 14px 16px; border-radius: 16px 16px 0 0;
+  display: flex; align-items: center; gap: 10px;
+}
+.sa-ai-header .sa-ai-title { font-weight: 600; font-size: .95rem; flex: 1; }
+.sa-ai-header button { background: none; border: none; color: rgba(255,255,255,.8); font-size: 1rem; cursor: pointer; padding: 0; }
+.sa-ai-header button:hover { color: #fff; }
+#sa-ai-messages {
+  flex: 1; overflow-y: auto; padding: 14px 14px 8px;
+  min-height: 200px; max-height: 340px; display: flex; flex-direction: column; gap: 10px;
+}
+.sa-msg { max-width: 88%; padding: 9px 13px; border-radius: 12px; font-size: .875rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.sa-msg.user { background: #6366f1; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+.sa-msg.ai   { background: #f3f4f6; color: #111; align-self: flex-start; border-bottom-left-radius: 4px; }
+.sa-msg.typing { color: #6b7280; font-style: italic; }
+.sa-ai-footer { padding: 10px 12px 12px; border-top: 1px solid #f0f0f0; display: flex; gap: 8px; }
+#sa-ai-input {
+  flex: 1; border: 1.5px solid #e5e7eb; border-radius: 10px;
+  padding: 8px 12px; font-size: .875rem; outline: none;
+  transition: border-color .15s;
+}
+#sa-ai-input:focus { border-color: #6366f1; }
+#sa-ai-send {
+  background: #6366f1; color: #fff; border: none;
+  border-radius: 10px; padding: 0 14px; cursor: pointer;
+  font-size: .95rem; transition: background .15s;
+}
+#sa-ai-send:hover { background: #4f46e5; }
+#sa-ai-send:disabled { background: #c7d2fe; cursor: not-allowed; }
+.sa-ai-empty { color: #9ca3af; font-size: .82rem; text-align: center; margin: auto; padding: 20px 0; }
+</style>
+
+<button id="sa-ai-btn" title="SmartAttend AI" onclick="saAiToggle()">
+  <i class="bi bi-stars"></i>
+</button>
+
+<div id="sa-ai-panel">
+  <div class="sa-ai-header">
+    <i class="bi bi-stars"></i>
+    <span class="sa-ai-title">SmartAttend AI</span>
+    <span style="font-size:.75rem;opacity:.75">Powered by Groq</span>
+    <button onclick="saAiToggle()" title="Close"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <div id="sa-ai-messages">
+    <div class="sa-ai-empty">Ask me anything — study help, notices, system guidance…</div>
+  </div>
+  <div class="sa-ai-footer">
+    <input id="sa-ai-input" type="text" placeholder="Type a message…" maxlength="500"
+           onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();saAiSend();}">
+    <button id="sa-ai-send" onclick="saAiSend()"><i class="bi bi-send-fill"></i></button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var history = [];
+  var panel   = document.getElementById('sa-ai-panel');
+  var msgs    = document.getElementById('sa-ai-messages');
+  var input   = document.getElementById('sa-ai-input');
+  var sendBtn = document.getElementById('sa-ai-send');
+
+  window.saAiToggle = function () {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) { input.focus(); }
+  };
+
+  function addMsg(text, role) {
+    var empty = msgs.querySelector('.sa-ai-empty');
+    if (empty) empty.remove();
+    var div = document.createElement('div');
+    div.className = 'sa-msg ' + role;
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div;
+  }
+
+  window.saAiSend = function () {
+    var text = input.value.trim();
+    if (!text || sendBtn.disabled) return;
+    input.value = '';
+    addMsg(text, 'user');
+    history.push({ role: 'user', content: text });
+
+    sendBtn.disabled = true;
+    var typing = addMsg('Thinking…', 'ai typing');
+
+    fetch('/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+      body: JSON.stringify({ messages: history })
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      typing.remove();
+      if (data.error) {
+        addMsg('Error: ' + data.error, 'ai');
+      } else {
+        addMsg(data.reply, 'ai');
+        history.push({ role: 'assistant', content: data.reply });
+      }
+    })
+    .catch(function () {
+      typing.remove();
+      addMsg('Network error. Please try again.', 'ai');
+    })
+    .finally(function () {
+      sendBtn.disabled = false;
+      input.focus();
+    });
+  };
+})();
+</script>
+{% endif %}
 </body>
 </html>

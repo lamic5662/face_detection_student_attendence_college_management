@@ -1,5 +1,6 @@
 from extensions import db
 from utils.time import utc_now_naive, utc_today
+from datetime import date as _date
 
 
 class FeeStructure(db.Model):
@@ -63,3 +64,25 @@ class FeePayment(db.Model):
 
     def __repr__(self):
         return f'<FeePayment student={self.student_id} structure={self.fee_structure_id}>'
+
+
+class FeeReminderConfig(db.Model):
+    """Per-college config for automated fee reminder emails."""
+    __tablename__ = 'fee_reminder_configs'
+
+    id         = db.Column(db.Integer, primary_key=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, unique=True)
+
+    enabled            = db.Column(db.Boolean, default=False, nullable=False)
+    days_before_due    = db.Column(db.Integer, default=7,    nullable=False)  # remind X days before
+    remind_on_due_date = db.Column(db.Boolean, default=True, nullable=False)  # also remind on due day
+    remind_overdue     = db.Column(db.Boolean, default=True, nullable=False)  # remind for overdue fees
+    send_hour          = db.Column(db.Integer, default=8,    nullable=False)  # 0-23
+
+    last_sent_at = db.Column(db.DateTime, nullable=True)
+    updated_by   = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    updated_at   = db.Column(db.DateTime, default=utc_now_naive, onupdate=utc_now_naive)
+
+    @property
+    def send_hour_display(self) -> str:
+        return f'{self.send_hour:02d}:00'

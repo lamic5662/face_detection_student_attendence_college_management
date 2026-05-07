@@ -256,23 +256,72 @@ function openSlotModal(day, period, slotId, subjectId, teacherId, room, type, st
 }
 
 async function saveSlot() {
-  const resp = await fetch(SAVE_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      department_id: DEPT_ID,
-      semester:      SEMESTER,
-      day_of_week:   parseInt(document.getElementById('slotDay').value),
-      period_no:     parseInt(document.getElementById('slotPeriod').value),
-      subject_id:    document.getElementById('slotSubject').value || null,
-      teacher_id:    document.getElementById('slotTeacher').value || null,
-      room:          document.getElementById('slotRoom').value,
-      slot_type:     document.getElementById('slotType').value,
-      start_time:    document.getElementById('slotStart').value,
-      end_time:      document.getElementById('slotEnd').value,
-    }),
-  });
-  if ((await resp.json()).success) location.reload();
+  const saveBtn = document.querySelector('#slotModal .btn-primary');
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
+
+  let data;
+  try {
+    const resp = await fetch(SAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        department_id: DEPT_ID,
+        semester:      SEMESTER,
+        day_of_week:   parseInt(document.getElementById('slotDay').value),
+        period_no:     parseInt(document.getElementById('slotPeriod').value),
+        subject_id:    document.getElementById('slotSubject').value || null,
+        teacher_id:    document.getElementById('slotTeacher').value || null,
+        room:          document.getElementById('slotRoom').value,
+        slot_type:     document.getElementById('slotType').value,
+        start_time:    document.getElementById('slotStart').value,
+        end_time:      document.getElementById('slotEnd').value,
+      }),
+    });
+    data = await resp.json();
+  } catch(e) {
+    alert('Network error. Please try again.');
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Save';
+    return;
+  }
+
+  if (!data.success) {
+    alert('Save failed: ' + (data.error || 'Unknown error'));
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<i class="bi bi-save me-2"></i>Save';
+    return;
+  }
+
+  // Show conflict warnings before reloading
+  if (data.conflicts && data.conflicts.length > 0) {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('slotModal'));
+    modal.hide();
+    // Build conflict alert
+    const existing = document.getElementById('conflictAlert');
+    if (existing) existing.remove();
+    const div = document.createElement('div');
+    div.id = 'conflictAlert';
+    div.className = 'alert alert-warning border-warning shadow-sm mb-3';
+    div.innerHTML = `
+      <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle-fill fs-5 text-warning mt-1"></i>
+        <div>
+          <strong>Slot saved — but conflicts detected:</strong>
+          <ul class="mb-0 mt-1">
+            ${data.conflicts.map(c =>
+              `<li>${c.type === 'teacher' ? '<i class="bi bi-person-fill text-danger me-1"></i>' : '<i class="bi bi-door-open-fill text-danger me-1"></i>'}${c.message}</li>`
+            ).join('')}
+          </ul>
+          <div class="mt-2 small text-muted">The slot was saved. Review the conflicts and adjust if needed.</div>
+        </div>
+        <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+      </div>`;
+    document.querySelector('.card.shadow-sm')?.before(div);
+    location.reload();
+  } else {
+    location.reload();
+  }
 }
 
 async function deleteSlot() {

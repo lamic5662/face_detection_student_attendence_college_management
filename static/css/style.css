@@ -46,6 +46,16 @@ body {
   border-color: #e8ecf0;
 }
 
+.sidebar-nav-shell {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* required so a flex child can scroll */
+}
+
+.sidebar-nav-shell::-webkit-scrollbar { width: 3px; }
+.sidebar-nav-shell::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav-shell::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+
 .sidebar-nav {
   list-style: none;
   padding: 12px 8px;

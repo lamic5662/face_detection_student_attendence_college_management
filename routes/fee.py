@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user
 from extensions import db
-from models.fee import FeeStructure, FeePayment
+from models.fee import FeeStructure, FeePayment, FeeReminderConfig
 from models.student import Student
 from models.department import Department
 from utils.decorators import admin_required, student_required
@@ -50,11 +50,13 @@ def admin_fees():
         .distinct()
         .all()
     )
+    reminder_cfg = FeeReminderConfig.query.filter_by(college_id=current_college_id()).first()
     return render_template('fee/admin_structures.html',
                            pagination=pagination, structures=pagination.items,
                            departments=departments,
                            years=[y[0] for y in years],
                            selected_dept=dept_id, selected_year=year,
+                           reminder_cfg=reminder_cfg,
                            today=date.today())
 
 
@@ -238,3 +240,45 @@ def student_fees():
                            total_due=total_due,
                            total_paid=total_paid,
                            today=date.today())
+
+
+# ── Fee Reminder Config ────────────────────────────────────────────────────────
+
+@fee_bp.route('/admin/fees/reminder/save', methods=['POST'])
+@login_required
+@admin_required
+def save_fee_reminder_config():
+    college_id = current_college_id()
+    cfg = FeeReminderConfig.query.filter_by(college_id=college_id).first()
+    if not cfg:
+        cfg = FeeReminderConfig(college_id=college_id)
+        db.session.add(cfg)
+
+    cfg.enabled            = request.form.get('enabled') == '1'
+    cfg.days_before_due    = max(1, min(30, request.form.get('days_before_due', type=int, default=7)))
+    cfg.remind_on_due_date = request.form.get('remind_on_due_date') == '1'
+    cfg.remind_overdue     = request.form.get('remind_overdue') == '1'
+    cfg.send_hour          = max(0, min(23, request.form.get('send_hour', type=int, default=8)))
+    cfg.updated_by         = current_user.id
+
+    db.session.commit()
+    flash('Fee reminder settings saved.', 'success')
+    return redirect(url_for('fee.admin_fees'))
+
+
+@fee_bp.route('/admin/fees/reminder/send-now', methods=['POST'])
+@login_required
+@admin_required
+def send_fee_reminders_now():
+    from threading import Thread
+    from services.fee_reminder import run_fee_reminders
+    app = current_app._get_current_object()
+    college_id = current_college_id()
+
+    def run():
+        result = run_fee_reminders(app, college_id=college_id)
+        app.logger.info(f'Manual fee reminders: {result}')
+
+    Thread(target=run, daemon=True).start()
+    flash('Fee reminder emails are being sent in the background.', 'success')
+    return redirect(url_for('fee.admin_fees'))

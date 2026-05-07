@@ -86,6 +86,7 @@ class Config:
     ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get('ALLOWED_HOSTS', '').split(',') if host.strip()]
     TRUST_PROXY_HEADERS = os.environ.get('TRUST_PROXY_HEADERS', 'True') == 'True'
     TRUSTED_PROXY_HOPS = int(os.environ.get('TRUSTED_PROXY_HOPS', 1))
+    GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
     FACE_RECOGNITION_TOLERANCE = float(os.environ.get('FACE_RECOGNITION_TOLERANCE', 0.5))
     EAR_THRESHOLD = 0.25
     EAR_CONSEC_FRAMES = 2
