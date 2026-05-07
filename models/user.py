@@ -22,7 +22,7 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.Enum('super_admin', 'admin', 'teacher', 'student', 'parent'), nullable=False)
+    role = db.Column(db.Enum('super_admin', 'admin', 'sub_admin', 'teacher', 'student', 'parent'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     must_change_password = db.Column(db.Boolean, nullable=False, default=False)
     password_changed_at = db.Column(db.DateTime, nullable=True)
@@ -76,7 +76,11 @@ class User(UserMixin, db.Model):
 
     @property
     def is_admin(self):
-        return self.role == 'admin'
+        return self.role in ('admin', 'sub_admin')
+
+    @property
+    def is_sub_admin(self):
+        return self.role == 'sub_admin'
 
     @property
     def is_super_admin(self):

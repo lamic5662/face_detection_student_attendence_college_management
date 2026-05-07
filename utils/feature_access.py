@@ -488,7 +488,8 @@ def user_has_feature(user, feature_key: str) -> bool:
 
 
 def nav_item_is_enabled(user, item_key: str) -> bool:
-    feature_key = NAV_ITEM_FEATURES.get(user.role, {}).get(item_key)
+    nav_role = 'admin' if getattr(user, 'role', None) == 'sub_admin' else getattr(user, 'role', None)
+    feature_key = NAV_ITEM_FEATURES.get(nav_role, {}).get(item_key)
     if not feature_key:
         return True
     return user_has_feature(user, feature_key)

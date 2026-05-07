@@ -7,6 +7,7 @@ from models.id_card import StudentIDCard
 from models.leave import LeaveRequest
 from models.subject import Subject
 from utils.feature_access import nav_item_is_enabled
+from utils.subadmin import nav_key_visible_for_subadmin, subadmin_visible_modules
 
 
 PIN_LIMIT = 4
@@ -243,6 +244,15 @@ NAV_ITEMS = {
             'description': 'College-wide configuration.',
             'section': 'more',
             'active_endpoints': ['admin.save_settings'],
+        },
+        {
+            'key': 'sub_admins',
+            'label': 'Sub-Admins',
+            'icon': 'bi-person-lock',
+            'endpoint': 'admin.sub_admins',
+            'description': 'Delegate access to staff with limited permissions.',
+            'section': 'more',
+            'active_endpoints': ['admin.add_sub_admin', 'admin.edit_sub_admin', 'admin.delete_sub_admin'],
         },
         {
             'key': 'digital_id_cards',
@@ -554,7 +564,7 @@ def _is_active(spec: dict, endpoint: str | None) -> bool:
 
 
 def _badge_for_item(user, item_key: str) -> int | None:
-    if user.role == 'admin' and item_key == 'digital_id_cards':
+    if user.role in ('admin', 'sub_admin') and item_key == 'digital_id_cards':
         count = StudentIDCard.query.filter_by(status='pending').count()
         return count or None
 
@@ -575,9 +585,10 @@ def _badge_for_item(user, item_key: str) -> int | None:
 
 
 def allowed_pin_keys(role: str) -> list[str]:
+    nav_role = 'admin' if role == 'sub_admin' else role
     return [
         spec['key']
-        for spec in NAV_ITEMS.get(role, [])
+        for spec in NAV_ITEMS.get(nav_role, [])
         if spec.get('section') == 'more'
     ]
 
@@ -594,8 +605,13 @@ def normalize_sidebar_pins(role: str, requested_keys: list[str]) -> tuple[list[s
 
 
 def build_sidebar_navigation(user, endpoint: str | None) -> dict:
-    specs = NAV_ITEMS.get(user.role, [])
+    nav_role = 'admin' if user.role == 'sub_admin' else user.role
+    specs = NAV_ITEMS.get(nav_role, [])
     saved_pins, _ = normalize_sidebar_pins(user.role, user.get_sidebar_pin_keys())
+
+    visible_modules: set[str] = set()
+    if user.role == 'sub_admin':
+        visible_modules = subadmin_visible_modules(user.id, user.college_id)
     saved_pin_set = set(saved_pins)
 
     quick_items = []
@@ -605,6 +621,8 @@ def build_sidebar_navigation(user, endpoint: str | None) -> dict:
 
     for spec in specs:
         if not nav_item_is_enabled(user, spec['key']):
+            continue
+        if user.role == 'sub_admin' and not nav_key_visible_for_subadmin(spec['key'], visible_modules):
             continue
 
         item = {

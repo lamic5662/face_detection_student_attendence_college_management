@@ -15,6 +15,11 @@ def role_required(*roles):
 
 
 def admin_required(f):
+    return role_required('admin', 'sub_admin')(f)
+
+
+def strict_admin_required(f):
+    """Restricts to real admin only — sub-admins are denied."""
     return role_required('admin')(f)
 
 

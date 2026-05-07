@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+{% block title %}Sub-Admins{% endblock %}
+{% block page_title %}<i class="bi bi-person-lock me-2"></i>Sub-Admins{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+
+  <!-- Intro card -->
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body px-4 py-3 d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+          <h6 class="fw-semibold mb-1">Delegate Admin Access</h6>
+          <p class="text-muted small mb-0">
+            Create staff accounts that can only access the sections you choose.
+            Each sub-admin gets independent view, edit, and delete controls per module.
+          </p>
+        </div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSubAdminModal">
+          <i class="bi bi-person-plus-fill me-1"></i>Add Sub-Admin
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {% if sub_admin_users %}
+  <!-- Sub-admin list -->
+  {% for user in sub_admin_users %}
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 px-4 pt-4 pb-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+          <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center"
+               style="width:42px;height:42px;flex-shrink:0;">
+            <i class="bi bi-person-lock text-primary fs-5"></i>
+          </div>
+          <div>
+            <div class="fw-semibold">{{ user.name }}</div>
+            <div class="text-muted small">{{ user.email }}</div>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary"
+                  data-bs-toggle="modal" data-bs-target="#editModal{{ user.id }}">
+            <i class="bi bi-pencil-fill me-1"></i>Edit Permissions
+          </button>
+          <form method="POST" action="{{ url_for('admin.delete_sub_admin', uid=user.id) }}"
+                onsubmit="return confirm('Remove {{ user.name }} as sub-admin? This cannot be undone.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger">
+              <i class="bi bi-trash-fill me-1"></i>Remove
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card-body px-4 pb-4">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr class="text-muted small">
+                <th>Module</th>
+                <th class="text-center">View</th>
+                <th class="text-center">Edit</th>
+                <th class="text-center">Delete</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for module_key, module_label in modules.items() %}
+              {% set perm = perm_map[user.id].get(module_key) %}
+              <tr>
+                <td class="fw-medium">{{ module_label }}</td>
+                <td class="text-center">
+                  {% if perm and (perm.can_view or perm.can_edit or perm.can_delete) %}
+                  <i class="bi bi-check-circle-fill text-success"></i>
+                  {% else %}
+                  <i class="bi bi-dash text-muted"></i>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if perm and perm.can_edit %}
+                  <i class="bi bi-check-circle-fill text-success"></i>
+                  {% else %}
+                  <i class="bi bi-dash text-muted"></i>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if perm and perm.can_delete %}
+                  <i class="bi bi-check-circle-fill text-danger"></i>
+                  {% else %}
+                  <i class="bi bi-dash text-muted"></i>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit permissions modal for this sub-admin -->
+  <div class="modal fade" id="editModal{{ user.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content border-0">
+        <div class="modal-header">
+          <h5 class="modal-title fw-semibold">
+            <i class="bi bi-shield-lock-fill text-primary me-2"></i>Edit — {{ user.name }}
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form method="POST" action="{{ url_for('admin.edit_sub_admin', uid=user.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="modal-body">
+
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Display Name</label>
+              <input type="text" name="name" class="form-control" value="{{ user.name }}">
+            </div>
+
+            <h6 class="fw-semibold mb-3 text-muted">Module Permissions</h6>
+            <p class="small text-muted mb-3">
+              <strong>View</strong> — read-only access to the module.<br>
+              <strong>Edit</strong> — can create and modify records (includes View).<br>
+              <strong>Delete</strong> — can delete records (requires View to navigate).
+            </p>
+
+            <div class="table-responsive">
+              <table class="table align-middle mb-0">
+                <thead>
+                  <tr class="text-muted small">
+                    <th style="width:40%">Module</th>
+                    <th class="text-center">View</th>
+                    <th class="text-center">Edit</th>
+                    <th class="text-center">Delete</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for module_key, module_label in modules.items() %}
+                  {% set perm = perm_map[user.id].get(module_key) %}
+                  <tr>
+                    <td class="fw-medium">{{ module_label }}</td>
+                    <td class="text-center">
+                      <input class="form-check-input perm-view" type="checkbox"
+                             name="perm_{{ module_key }}_view" value="1"
+                             data-module="{{ module_key }}"
+                             {% if perm and (perm.can_view or perm.can_edit or perm.can_delete) %}checked{% endif %}>
+                    </td>
+                    <td class="text-center">
+                      <input class="form-check-input perm-edit" type="checkbox"
+                             name="perm_{{ module_key }}_edit" value="1"
+                             data-module="{{ module_key }}"
+                             {% if perm and perm.can_edit %}checked{% endif %}>
+                    </td>
+                    <td class="text-center">
+                      <input class="form-check-input perm-delete" type="checkbox"
+                             name="perm_{{ module_key }}_delete" value="1"
+                             data-module="{{ module_key }}"
+                             {% if perm and perm.can_delete %}checked{% endif %}>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i>Save Permissions
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-person-lock fs-1 mb-3 d-block opacity-25"></i>
+        <p class="mb-0">No sub-admins yet. Add one to delegate access.</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+
+<!-- Add Sub-Admin Modal -->
+<div class="modal fade" id="addSubAdminModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0">
+      <div class="modal-header">
+        <h5 class="modal-title fw-semibold">
+          <i class="bi bi-person-plus-fill text-primary me-2"></i>Add Sub-Admin
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('admin.add_sub_admin') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Full Name <span class="text-danger">*</span></label>
+              <input type="text" name="name" class="form-control" required placeholder="e.g. Rajan Shrestha">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+              <input type="email" name="email" class="form-control" required placeholder="e.g. rajan@college.edu">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Temporary Password <span class="text-danger">*</span></label>
+              <input type="text" name="temp_password" class="form-control" required
+                     placeholder="Min 8 chars — uppercase, lowercase, digit, special char">
+              <div class="form-text">Sub-admin will be asked to change this on first login.</div>
+            </div>
+          </div>
+
+          <h6 class="fw-semibold mb-3 text-muted">Module Permissions</h6>
+          <p class="small text-muted mb-3">
+            <strong>View</strong> — read-only access to the module.<br>
+            <strong>Edit</strong> — can create and modify records (includes View).<br>
+            <strong>Delete</strong> — can delete records (requires View to navigate).
+          </p>
+
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr class="text-muted small">
+                  <th style="width:40%">Module</th>
+                  <th class="text-center">View</th>
+                  <th class="text-center">Edit</th>
+                  <th class="text-center">Delete</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for module_key, module_label in modules.items() %}
+                <tr>
+                  <td class="fw-medium">{{ module_label }}</td>
+                  <td class="text-center">
+                    <input class="form-check-input perm-view" type="checkbox"
+                           name="perm_{{ module_key }}_view" value="1"
+                           data-module="{{ module_key }}">
+                  </td>
+                  <td class="text-center">
+                    <input class="form-check-input perm-edit" type="checkbox"
+                           name="perm_{{ module_key }}_edit" value="1"
+                           data-module="{{ module_key }}">
+                  </td>
+                  <td class="text-center">
+                    <input class="form-check-input perm-delete" type="checkbox"
+                           name="perm_{{ module_key }}_delete" value="1"
+                           data-module="{{ module_key }}">
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-person-plus-fill me-1"></i>Create Sub-Admin
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+/* Auto-check view when edit or delete is checked; uncheck edit/delete when view is unchecked */
+document.querySelectorAll('.perm-edit, .perm-delete').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    if (this.checked) {
+      var module = this.dataset.module;
+      var viewCb = this.closest('tr').querySelector('.perm-view');
+      if (viewCb) viewCb.checked = true;
+    }
+  });
+});
+document.querySelectorAll('.perm-view').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    if (!this.checked) {
+      var tr = this.closest('tr');
+      tr.querySelector('.perm-edit').checked = false;
+      tr.querySelector('.perm-delete').checked = false;
+    }
+  });
+});
+</script>
+{% endblock %}

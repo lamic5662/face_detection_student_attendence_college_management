@@ -16,13 +16,19 @@ _PASSWORD_RE = re.compile(
 )
 
 
+def _dashboard_url(role: str) -> str:
+    if role == 'sub_admin':
+        return url_for('admin.dashboard')
+    return url_for(f'{role}.dashboard')
+
+
 def _post_login_destination(user: User):
     if user.must_change_password and user.role in {'student', 'teacher', 'parent'}:
         return redirect(url_for('auth.password_setup_prompt'))
     next_page = request.args.get('next')
     if next_page and _is_safe_url(next_page):
         return redirect(next_page)
-    return redirect(url_for(f'{user.role}.dashboard'))
+    return redirect(_dashboard_url(user.role))
 
 
 def _find_global_super_admin(email: str) -> User | None:
@@ -213,9 +219,9 @@ def logout():
 @login_required
 def password_setup_prompt():
     if not current_user.must_change_password:
-        return redirect(url_for(f'{current_user.role}.dashboard'))
-    if current_user.role not in {'student', 'teacher', 'parent'}:
-        return redirect(url_for(f'{current_user.role}.dashboard'))
+        return redirect(_dashboard_url(current_user.role))
+    if current_user.role not in {'student', 'teacher', 'parent', 'sub_admin'}:
+        return redirect(_dashboard_url(current_user.role))
     if request.method == 'POST':
         new_pw = request.form.get('new_password', '')
         confirm_pw = request.form.get('confirm_password', '')
@@ -253,8 +259,8 @@ def password_setup_prompt():
 @login_required
 @limiter.limit('5 per hour', methods=['POST'])
 def send_password_setup_email_to_current_user():
-    if not current_user.must_change_password or current_user.role not in {'student', 'teacher', 'parent'}:
-        return redirect(url_for(f'{current_user.role}.dashboard'))
+    if not current_user.must_change_password or current_user.role not in {'student', 'teacher', 'parent', 'sub_admin'}:
+        return redirect(_dashboard_url(current_user.role))
 
     try:
         send_password_setup_email(current_user)
@@ -338,7 +344,7 @@ def change_password():
             db.session.commit()
             current_app.logger.info('User %s changed password', current_user.email)
             flash('Password changed successfully!', 'success')
-            return redirect(url_for(f'{current_user.role}.dashboard'))
+            return redirect(_dashboard_url(current_user.role))
 
     return render_template('auth/change_password.html')
 
@@ -359,10 +365,10 @@ def update_sidebar_preferences():
     else:
         flash('Quick access updated.', 'success')
 
-    next_page = request.form.get('next') or request.referrer or url_for(f'{current_user.role}.dashboard')
+    next_page = request.form.get('next') or request.referrer or _dashboard_url(current_user.role)
     if next_page and _is_safe_url(next_page):
         return redirect(next_page)
-    return redirect(url_for(f'{current_user.role}.dashboard'))
+    return redirect(_dashboard_url(current_user.role))
 
 
 @auth_bp.route('/preferences/sidebar/toggle', methods=['POST'])
@@ -389,10 +395,10 @@ def toggle_sidebar_pin():
                 'warning',
             )
 
-    next_page = request.form.get('next') or request.referrer or url_for(f'{current_user.role}.dashboard')
+    next_page = request.form.get('next') or request.referrer or _dashboard_url(current_user.role)
     if next_page and _is_safe_url(next_page):
         return redirect(next_page)
-    return redirect(url_for(f'{current_user.role}.dashboard'))
+    return redirect(_dashboard_url(current_user.role))
 
 
 @auth_bp.route('/preferences/dashboard', methods=['POST'])
@@ -405,7 +411,7 @@ def update_dashboard_preferences():
 
     flash('Dashboard widgets updated.', 'success')
 
-    next_page = request.form.get('next') or request.referrer or url_for(f'{current_user.role}.dashboard')
+    next_page = request.form.get('next') or request.referrer or _dashboard_url(current_user.role)
     if next_page and _is_safe_url(next_page):
         return redirect(next_page)
-    return redirect(url_for(f'{current_user.role}.dashboard'))
+    return redirect(_dashboard_url(current_user.role))

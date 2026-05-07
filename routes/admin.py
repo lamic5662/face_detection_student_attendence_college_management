@@ -16,7 +16,8 @@ from models.fee import FeeStructure, FeePayment
 from models.parent import ParentStudent
 from models.setting import CollegeSetting
 from models.id_card import IDCardTemplate, StudentIDCard
-from utils.decorators import admin_required
+from utils.decorators import admin_required, strict_admin_required
+from utils.subadmin import SUBADMIN_MODULES
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
@@ -2077,3 +2078,127 @@ def delete_semester_schedule(sid):
     db.session.commit()
     flash('Semester schedule removed.', 'info')
     return redirect(url_for('admin.semester_schedules'))
+
+
+# ---------------------------------------------------------------------------
+# Sub-admin management (strict admin only)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/sub-admins')
+@login_required
+@strict_admin_required
+def sub_admins():
+    from models.sub_admin import SubAdminPermission
+    cid = _admin_college_id()
+    sub_admin_users = User.query.filter_by(college_id=cid, role='sub_admin', is_active=True).all()
+    perm_map: dict[int, dict[str, object]] = {}
+    for u in sub_admin_users:
+        perms = SubAdminPermission.query.filter_by(user_id=u.id, college_id=cid).all()
+        perm_map[u.id] = {p.module: p for p in perms}
+    return render_template(
+        'admin/sub_admins.html',
+        sub_admin_users=sub_admin_users,
+        perm_map=perm_map,
+        modules=SUBADMIN_MODULES,
+    )
+
+
+@admin_bp.route('/sub-admins/add', methods=['POST'])
+@login_required
+@strict_admin_required
+def add_sub_admin():
+    from models.sub_admin import SubAdminPermission
+    cid = _admin_college_id()
+    name = request.form.get('name', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    temp_password = request.form.get('temp_password', '').strip()
+
+    if not name or not email or not temp_password:
+        flash('Name, email, and temporary password are required.', 'danger')
+        return redirect(url_for('admin.sub_admins'))
+
+    if not _validate_temporary_password(temp_password):
+        flash('Temporary password must be at least 8 characters with uppercase, lowercase, digit, and special character.', 'danger')
+        return redirect(url_for('admin.sub_admins'))
+
+    if User.query.filter_by(college_id=cid, email=email).first():
+        flash('A user with that email already exists in this college.', 'danger')
+        return redirect(url_for('admin.sub_admins'))
+
+    user = User(
+        college_id=cid,
+        name=name,
+        email=email,
+        role='sub_admin',
+        is_active=True,
+    )
+    user.set_temporary_password(temp_password)
+    db.session.add(user)
+    db.session.flush()
+
+    for module in SUBADMIN_MODULES:
+        can_view = request.form.get(f'perm_{module}_view') == '1'
+        can_edit = request.form.get(f'perm_{module}_edit') == '1'
+        can_delete = request.form.get(f'perm_{module}_delete') == '1'
+        if can_view or can_edit or can_delete:
+            db.session.add(SubAdminPermission(
+                college_id=cid,
+                user_id=user.id,
+                module=module,
+                can_view=can_view,
+                can_edit=can_edit,
+                can_delete=can_delete,
+            ))
+
+    db.session.commit()
+    flash(f'Sub-admin {name} created successfully.', 'success')
+    return redirect(url_for('admin.sub_admins'))
+
+
+@admin_bp.route('/sub-admins/<int:uid>/edit', methods=['POST'])
+@login_required
+@strict_admin_required
+def edit_sub_admin(uid):
+    from models.sub_admin import SubAdminPermission
+    cid = _admin_college_id()
+    user = User.query.filter_by(id=uid, college_id=cid, role='sub_admin').first_or_404()
+
+    name = request.form.get('name', '').strip()
+    if name:
+        user.name = name
+
+    for module in SUBADMIN_MODULES:
+        can_view = request.form.get(f'perm_{module}_view') == '1'
+        can_edit = request.form.get(f'perm_{module}_edit') == '1'
+        can_delete = request.form.get(f'perm_{module}_delete') == '1'
+
+        perm = SubAdminPermission.query.filter_by(
+            college_id=cid, user_id=user.id, module=module).first()
+
+        if can_view or can_edit or can_delete:
+            if perm is None:
+                perm = SubAdminPermission(college_id=cid, user_id=user.id, module=module)
+                db.session.add(perm)
+            perm.can_view = can_view
+            perm.can_edit = can_edit
+            perm.can_delete = can_delete
+        elif perm is not None:
+            db.session.delete(perm)
+
+    db.session.commit()
+    flash(f'Permissions updated for {user.name}.', 'success')
+    return redirect(url_for('admin.sub_admins'))
+
+
+@admin_bp.route('/sub-admins/<int:uid>/delete', methods=['POST'])
+@login_required
+@strict_admin_required
+def delete_sub_admin(uid):
+    from models.sub_admin import SubAdminPermission
+    cid = _admin_college_id()
+    user = User.query.filter_by(id=uid, college_id=cid, role='sub_admin').first_or_404()
+    SubAdminPermission.query.filter_by(user_id=user.id, college_id=cid).delete()
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Sub-admin {user.name} removed.', 'info')
+    return redirect(url_for('admin.sub_admins'))

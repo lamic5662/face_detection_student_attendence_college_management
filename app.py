@@ -343,7 +343,7 @@ def create_app(config_override=None) -> Flask:
                 return render_template('errors/400.html'), 400
         if (
             current_user.is_authenticated
-            and current_user.role in {'student', 'teacher', 'parent'}
+            and current_user.role in {'student', 'teacher', 'parent', 'sub_admin'}
             and getattr(current_user, 'must_change_password', False)
         ):
             allowed_endpoints = {
@@ -361,6 +361,12 @@ def create_app(config_override=None) -> Flask:
                 if request.is_json:
                     return jsonify(error='Feature disabled', message=message), 403
                 return render_template('errors/403.html', message=message), 403
+        if current_user.is_authenticated and current_user.role == 'sub_admin':
+            from utils.subadmin import check_subadmin_access
+            if not check_subadmin_access(current_user, request.endpoint):
+                if request.is_json:
+                    return jsonify(error='Permission denied'), 403
+                return render_template('errors/403.html', message='You do not have permission to access this section.'), 403
 
     @app.context_processor
     def inject_globals():
@@ -397,6 +403,7 @@ def create_app(config_override=None) -> Flask:
                         notice_query = notice_query.filter(Notice.target_role.in_(['all', 'teacher']))
                     elif current_user.role == 'parent':
                         notice_query = notice_query.filter(Notice.target_role.in_(['all', 'student']))
+                    # admin and sub_admin see all notices (no filter)
 
                     recent_cutoff = utc_now_naive() - timedelta(days=7)
                     scoped_query = notice_query.filter(
