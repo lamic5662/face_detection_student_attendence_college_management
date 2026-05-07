@@ -67,6 +67,15 @@ NAV_ITEMS = {
             'section': 'core',
         },
         {
+            'key': 'sub_admins',
+            'label': 'Sub-Admins',
+            'icon': 'bi-person-lock',
+            'endpoint': 'admin.sub_admins',
+            'description': 'Delegate access to staff with limited permissions.',
+            'section': 'core',
+            'active_endpoints': ['admin.add_sub_admin', 'admin.edit_sub_admin', 'admin.delete_sub_admin'],
+        },
+        {
             'key': 'students',
             'label': 'Students',
             'icon': 'bi-people-fill',
@@ -244,15 +253,6 @@ NAV_ITEMS = {
             'description': 'College-wide configuration.',
             'section': 'more',
             'active_endpoints': ['admin.save_settings'],
-        },
-        {
-            'key': 'sub_admins',
-            'label': 'Sub-Admins',
-            'icon': 'bi-person-lock',
-            'endpoint': 'admin.sub_admins',
-            'description': 'Delegate access to staff with limited permissions.',
-            'section': 'more',
-            'active_endpoints': ['admin.add_sub_admin', 'admin.edit_sub_admin', 'admin.delete_sub_admin'],
         },
         {
             'key': 'digital_id_cards',

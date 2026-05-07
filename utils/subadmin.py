@@ -76,6 +76,7 @@ ENDPOINT_PERMISSION_MAP: dict[str, tuple[str, str] | None] = {
 
     # Exams & Marksheets
     'exam.admin_exams': ('exams', 'view'),
+    'exam.admin_delete_exam': ('exams', 'delete'),
     'admin.marksheet_list': ('exams', 'view'),
     'admin.admin_marksheet': ('exams', 'view'),
     'admin.marksheet_signatures': ('exams', 'view'),
