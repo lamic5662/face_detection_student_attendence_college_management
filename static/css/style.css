@@ -354,8 +354,8 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 72px;
-  padding: 12px 14px;
+  min-height: 54px;
+  padding: 10px 14px;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 14px;
   background: rgba(255,255,255,.06);
@@ -374,6 +374,41 @@ body {
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
+}
+.feature-desc {
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* Stats row */
+.auth-stats-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 18px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255,255,255,.05);
+}
+.auth-stat {
+  flex: 1;
+  text-align: center;
+  padding: 12px 8px;
+  border-right: 1px solid rgba(255,255,255,.1);
+}
+.auth-stat:last-child { border-right: none; }
+.auth-stat-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #93c5fd;
+  line-height: 1;
+}
+.auth-stat-label {
+  font-size: 11px;
+  color: rgba(255,255,255,.5);
+  margin-top: 4px;
 }
 
 .auth-side-note {
@@ -415,6 +450,13 @@ body {
 }
 
 .form-header { margin-bottom: 24px; }
+.form-logo-sm {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: #fff;
+  margin-bottom: 14px;
+}
 .form-title {
   font-size: 30px; font-weight: 800;
   color: #0f172a; margin-bottom: 8px;

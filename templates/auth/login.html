@@ -35,32 +35,47 @@
 
       {# Headline #}
       <div class="left-headline">
-        Manage college operations from one secure platform.
+        Smart attendance. Complete college management.
       </div>
       <div class="left-subtext">
-        Built for super admins, college admins, teachers, students, and parents with
-        one connected system for academics, operations, and communication.
+        From face-recognition attendance to AI-powered insights — everything your
+        college needs in one secure, role-based platform.
+      </div>
+
+      {# Stats row #}
+      <div class="auth-stats-row">
+        <div class="auth-stat">
+          <div class="auth-stat-value">18+</div>
+          <div class="auth-stat-label">Modules</div>
+        </div>
+        <div class="auth-stat">
+          <div class="auth-stat-value">5</div>
+          <div class="auth-stat-label">User Roles</div>
+        </div>
+        <div class="auth-stat">
+          <div class="auth-stat-value">100%</div>
+          <div class="auth-stat-label">Open Source</div>
+        </div>
       </div>
 
       {# Feature list #}
       <div class="feature-list">
-        {% for icon, label in [
-        ('bi-shield-fill-check', 'Super Admin Controls'),
-        ('bi-camera-video-fill', 'Attendance & Biometrics'),
-        ('bi-journals', 'Exams, Fees & Reports'),
-        ('bi-collection-fill', 'Assignments & Content'),
+        {% for icon, label, sub in [
+        ('bi-camera-video-fill',   'Face Recognition Attendance',  'Live capture with blink liveness detection'),
+        ('bi-journal-richtext',    'Exams, Marks & Marksheets',    'Print-ready A4 marksheets with digital signatures'),
+        ('bi-cash-coin',           'Fee Management & Reminders',   'Payments, receipts, and automated email alerts'),
+        ('bi-robot',               'AI Assistant',                 'Natural-language queries over live college data'),
+        ('bi-people-fill',         'Parent Portal',                'Real-time attendance, fees, and results for parents'),
+        ('bi-bar-chart-steps',     'Batch Tracker',                'Cohort progression monitoring and bulk promotion'),
         ] %}
         <div class="feature-item">
           <div class="feature-dot"><i class="bi {{ icon }}"></i></div>
           <div class="feature-copy">
             <div class="feature-title">{{ label }}</div>
+            <div class="feature-desc">{{ sub }}</div>
           </div>
         </div>
         {% endfor %}
-      </div>
-
-      <div class="auth-side-note">
-        Secure access, college-level isolation, and role-based workflows in one production-ready system.
       </div>
 
       {# Role badges #}
@@ -93,8 +108,11 @@
 
       {# Header #}
       <div class="form-header">
+        <div class="form-logo-sm">
+          <i class="bi bi-mortarboard-fill"></i>
+        </div>
         <h2 class="form-title">Welcome back!</h2>
-        <p class="form-sub">Sign in to continue to SmartAttend.</p>
+        <p class="form-sub">Sign in to your SmartAttend account.</p>
       </div>
 
       {# Flash messages #}
@@ -169,9 +187,10 @@
           <span class="sec-badge"><i class="bi bi-lock-fill"></i> SSL Secured</span>
           <span class="sec-badge"><i class="bi bi-shield-check-fill"></i> CSRF Protected</span>
           <span class="sec-badge"><i class="bi bi-eye-slash-fill"></i> Rate Limited</span>
+          <span class="sec-badge"><i class="bi bi-person-lock-fill"></i> Role Isolated</span>
         </div>
         <div class="auth-copyright">
-          Copyright &copy; 2026 SmartAttend. All rights reserved.
+          &copy; 2026 SmartAttend &mdash; All rights reserved.
         </div>
       </div>
 
