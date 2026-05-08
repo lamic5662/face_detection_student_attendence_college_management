@@ -71,6 +71,7 @@ def build_marksheet_data(student, semester=None):
                 'exam': exam, 'mark': mark,
                 'obtained': obtained, 'total': exam.total_marks,
                 'pass_marks': exam.pass_marks, 'grade': grade, 'percentage': pct,
+                'cancelled': exam.is_deleted,
             })
 
         sub_pct = round(sub_obtained / sub_total * 100, 1) if sub_total > 0 else None
@@ -102,13 +103,29 @@ def build_marksheet_data(student, semester=None):
         total_obtained_all += sub_obtained
         grand_total_all += sub_total
 
+        # Group exams by type for clean marksheet display
+        _TYPE_ORDER = ['mid_term', 'final', 'quiz', 'practical', 'assignment']
+        _by_type: dict = {}
+        for er in exam_rows:
+            _by_type.setdefault(er['exam'].exam_type, []).append(er)
+        grouped_exams = []
+        for _t in _TYPE_ORDER:
+            if _t in _by_type:
+                grouped_exams.append({'type': _t, 'label': _t.replace('_', ' ').title(), 'exams': _by_type[_t]})
+        for _t, _ers in _by_type.items():
+            if _t not in _TYPE_ORDER:
+                grouped_exams.append({'type': _t, 'label': _t.replace('_', ' ').title(), 'exams': _ers})
+        # total rows = type-separator rows + exam rows + 1 subtotal row
+        total_table_rows = len(grouped_exams) + len(exam_rows) + 1 if grouped_exams else 1
+
         subject_rows.append({
-            'subject': subject, 'exams': exam_rows,
+            'subject': subject, 'exams': exam_rows, 'grouped_exams': grouped_exams,
             'obtained': sub_obtained, 'total': sub_total,
             'percentage': sub_pct, 'grade': sub_grade, 'passed': passed,
             'has_marks': sub_total > 0,
             'total_classes': total_classes, 'present': present_count,
             'absent': total_classes - present_count, 'att_pct': att_pct,
+            'total_table_rows': total_table_rows,
         })
 
     if grand_total_all > 0:
@@ -144,6 +161,7 @@ def get_upcoming_exams_for_student(student):
         Exam.college_id == student.college_id,
         Exam.subject_id.in_(subject_ids),
         Exam.exam_date >= date.today(),
+        Exam.is_deleted == False,
     ).order_by(Exam.exam_date, Exam.start_time).all()
 
 
@@ -222,12 +240,29 @@ def _post_exam_notice(exam, sub, author_id):
     if exam.instructions:
         parts.append(f"\nInstructions: {exam.instructions}")
 
+    base_content = "\n".join(parts)
+
+    # Notify students
     db.session.add(Notice(
         college_id=sub.college_id,
         title=f"Exam Scheduled: {exam.title}",
-        content="\n".join(parts),
+        content=base_content,
         category='exam',
         target_role='student',
+        is_pinned=False,
+        author_id=author_id,
+    ))
+
+    # Notify the subject teacher
+    teacher_parts = [f"An exam has been scheduled for your subject."] + parts + [
+        "\nPlease be prepared to enter marks after the exam."
+    ]
+    db.session.add(Notice(
+        college_id=sub.college_id,
+        title=f"Exam Scheduled: {exam.title}",
+        content="\n".join(teacher_parts),
+        category='exam',
+        target_role='teacher',
         is_pinned=False,
         author_id=author_id,
     ))
@@ -259,7 +294,7 @@ def admin_exams():
     departments = Department.query.filter_by(college_id=cid).order_by(Department.name).all()
     subjects = Subject.query.filter_by(college_id=cid).order_by(Subject.name).all()
 
-    query = Exam.query.filter_by(college_id=cid)
+    query = Exam.query.filter_by(college_id=cid, is_deleted=False)
     if subject_id:
         query = query.filter_by(subject_id=subject_id)
     elif dept_id:
@@ -282,14 +317,125 @@ def admin_exams():
 @strict_admin_required
 def admin_delete_exam(exam_id):
     exam = Exam.query.filter_by(id=exam_id, college_id=current_user.college_id).first_or_404()
-    Notice.query.filter_by(
-        college_id=current_user.college_id,
-        title=f"Exam Scheduled: {exam.title}",
-        category='exam',
-    ).delete()
-    db.session.delete(exam)
+
+    has_marks = any(
+        m.marks_obtained is not None or m.is_absent
+        for m in exam.marks
+    )
+
+    if has_marks:
+        # Soft delete — preserve marks so students keep their records
+        exam.is_deleted = True
+        exam.deleted_at = utc_now_naive()
+        db.session.commit()
+        flash('Exam removed from schedule. Student marks are preserved.', 'info')
+    else:
+        # No marks entered — safe to hard delete along with notices
+        for notice in Notice.query.filter_by(
+            college_id=current_user.college_id,
+            title=f"Exam Scheduled: {exam.title}",
+            category='exam',
+        ).all():
+            db.session.delete(notice)
+        db.session.delete(exam)
+        db.session.commit()
+        flash('Exam deleted.', 'info')
+
+    return redirect(url_for('exam.admin_exams'))
+
+
+# ── Admin: bulk exam scheduling ──────────────────────────────────────────────
+
+@exam_bp.route('/admin/exams/bulk', methods=['POST'])
+@login_required
+@admin_required
+def admin_bulk_exams():
+    cid = current_user.college_id
+    exam_type = request.form.get('exam_type', 'mid_term')
+    subject_ids = request.form.getlist('subject_id')
+
+    if not subject_ids:
+        flash('No subjects selected.', 'warning')
+        return redirect(url_for('exam.admin_exams'))
+
+    created = 0
+    skipped = 0
+
+    for sid_str in subject_ids:
+        try:
+            sid = int(sid_str)
+        except (ValueError, TypeError):
+            continue
+
+        sub = Subject.query.filter_by(id=sid, college_id=cid).first()
+        if not sub:
+            continue
+
+        title = request.form.get(f'title_{sid}', '').strip()
+        date_str = request.form.get(f'date_{sid}', '').strip()
+
+        if not title or not date_str:
+            skipped += 1
+            continue
+
+        try:
+            exam_date = date.fromisoformat(date_str)
+        except ValueError:
+            skipped += 1
+            continue
+
+        start_time = None
+        start_str = request.form.get(f'start_{sid}', '').strip()
+        if start_str:
+            try:
+                start_time = datetime.strptime(start_str, '%H:%M').time()
+            except ValueError:
+                pass
+
+        dur_raw   = request.form.get(f'duration_{sid}', '').strip()
+        total_raw = request.form.get(f'total_{sid}', '100').strip()
+        pass_raw  = request.form.get(f'pass_{sid}', '').strip()
+        room      = request.form.get(f'room_{sid}', '').strip()
+
+        duration    = int(dur_raw)   if dur_raw   else None
+        total_marks = float(total_raw) if total_raw else 100.0
+        pass_marks  = float(pass_raw)  if pass_raw  else None
+
+        exam = Exam(
+            college_id=cid,
+            subject_id=sid,
+            title=title,
+            exam_type=exam_type,
+            exam_date=exam_date,
+            start_time=start_time,
+            duration_mins=duration,
+            total_marks=total_marks,
+            pass_marks=pass_marks,
+            room=room,
+            instructions='',
+            created_by=None,
+        )
+        db.session.add(exam)
+        db.session.flush()
+
+        students = Student.query.filter_by(
+            college_id=cid,
+            department_id=sub.department_id,
+            semester=sub.semester,
+        ).all()
+        for s in students:
+            db.session.add(Mark(college_id=s.college_id, exam_id=exam.id, student_id=s.id))
+
+        _post_exam_notice(exam, sub, current_user.id)
+        created += 1
+
     db.session.commit()
-    flash('Exam deleted.', 'info')
+
+    if created:
+        flash(f'{created} exam{"s" if created != 1 else ""} scheduled successfully.', 'success')
+    if skipped:
+        flash(f'{skipped} subject{"s" if skipped != 1 else ""} skipped (missing title or date).', 'warning')
+
     return redirect(url_for('exam.admin_exams'))
 
 
@@ -306,12 +452,13 @@ def teacher_exams():
 
     if subject_id:
         exams = Exam.query.filter_by(
-            college_id=teacher.college_id, subject_id=subject_id
+            college_id=teacher.college_id, subject_id=subject_id, is_deleted=False
         ).order_by(Exam.exam_date.desc()).all()
     else:
         exams = Exam.query.filter(
             Exam.college_id == teacher.college_id,
             Exam.subject_id.in_(sub_ids),
+            Exam.is_deleted == False,
         ).order_by(Exam.exam_date.desc()).all()
 
     return render_template('exam/teacher_list.html',
@@ -370,7 +517,7 @@ def student_results():
                 exam_id=exam.id,
                 student_id=student.id,
             ).first()
-            results.append({'exam': exam, 'mark': mark})
+            results.append({'exam': exam, 'mark': mark, 'cancelled': exam.is_deleted})
 
     # All upcoming exams — full routine, no limit
     upcoming = get_upcoming_exams_for_student(student)

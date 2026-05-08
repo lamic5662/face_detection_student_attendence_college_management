@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}My Plan{% endblock %}
+{% block page_title %}<i class="bi bi-layers-fill me-2"></i>My Plan{% endblock %}
+
+{% block content %}
+
+{# ── Expiry Warning ── #}
+{% if days_left is not none %}
+  {% if days_left < 0 %}
+  <div class="alert alert-danger border-0 shadow-sm mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+      <div>
+        <div class="fw-semibold">Your plan has expired</div>
+        <div class="small">Your {{ plan_meta.label }} plan expired {{ (-days_left) }} day{{ 's' if days_left != -1 }} ago.
+        Contact support immediately to renew and avoid service interruption.</div>
+      </div>
+    </div>
+  </div>
+  {% elif days_left <= 14 %}
+  <div class="alert alert-warning border-0 shadow-sm mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-clock-fill fs-5"></i>
+      <div>
+        <div class="fw-semibold">Plan expiring in {{ days_left }} day{{ 's' if days_left != 1 }}</div>
+        <div class="small">Renew before {{ college.plan_expires_at.strftime('%d %B %Y') }} to avoid any disruption.</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+
+{# ── Current Plan Card ── #}
+<div class="row g-4 mb-4">
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm h-100"
+         style="border-left: 4px solid var(--bs-{{ plan_meta.color }}) !important;">
+      <div class="card-body p-4">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <span class="d-inline-flex align-items-center justify-content-center rounded-circle
+            bg-{{ plan_meta.color }}-subtle"
+            style="width:56px;height:56px;flex-shrink:0">
+            <i class="bi {{ plan_meta.icon }} fs-4 text-{{ plan_meta.color }}"></i>
+          </span>
+          <div>
+            <div class="fw-bold fs-5">{{ plan_meta.label }} Plan</div>
+            <span class="badge bg-{{ plan_meta.color }}-subtle text-{{ plan_meta.color }} fw-semibold">
+              Current Plan
+            </span>
+          </div>
+        </div>
+
+        <p class="text-muted small mb-3">{{ plan_meta.description }}</p>
+
+        <div class="border-top pt-3">
+          <div class="row g-2 small">
+            <div class="col-6">
+              <div class="text-muted">College</div>
+              <div class="fw-semibold">{{ college.name }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-muted">College Code</div>
+              <div class="fw-semibold">{{ college.code }}</div>
+            </div>
+            <div class="col-6 mt-2">
+              <div class="text-muted">Status</div>
+              <div class="fw-semibold {% if college.is_active %}text-success{% else %}text-danger{% endif %}">
+                {{ 'Active' if college.is_active else 'Suspended' }}
+              </div>
+            </div>
+            <div class="col-6 mt-2">
+              <div class="text-muted">Valid Until</div>
+              {% if college.plan_expires_at %}
+                <div class="fw-semibold {% if days_left is not none and days_left < 0 %}text-danger{% elif days_left is not none and days_left <= 14 %}text-warning{% endif %}">
+                  {{ college.plan_expires_at.strftime('%d %b %Y') }}
+                  {% if days_left is not none and days_left >= 0 %}
+                  <span class="text-muted fw-normal">({{ days_left }}d left)</span>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div class="fw-semibold text-success">No expiry set</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Enabled Modules ── #}
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0"><i class="bi bi-toggles text-success me-2"></i>Your Active Modules</h6>
+        <span class="badge bg-success-subtle text-success fw-semibold">{{ enabled_features|length }} enabled</span>
+      </div>
+      <div class="card-body px-4 pb-4">
+        {% if enabled_features %}
+        <div class="row g-2">
+          {% for key in enabled_features %}
+          {% set meta = feature_catalog.get(key, {}) %}
+          <div class="col-md-6">
+            <div class="d-flex align-items-center gap-2 p-2 rounded-3 bg-success-subtle">
+              <i class="bi bi-check-circle-fill text-success small"></i>
+              <span class="small fw-semibold">{{ meta.get('label', key) }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-3 small">
+          No modules are currently enabled. Contact support to activate your plan.
+        </div>
+        {% endif %}
+
+        {% if disabled_features %}
+        <div class="border-top mt-3 pt-3">
+          <div class="small text-muted fw-semibold mb-2">Not in your current plan:</div>
+          <div class="d-flex flex-wrap gap-2">
+            {% for key in disabled_features %}
+            {% set meta = feature_catalog.get(key, {}) %}
+            <span class="badge bg-secondary-subtle text-secondary fw-normal">
+              {{ meta.get('label', key) }}
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── All Plans Comparison ── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2">
+    <h6 class="fw-bold mb-0"><i class="bi bi-bar-chart-steps text-primary me-2"></i>Plan Comparison</h6>
+    <div class="small text-muted mt-1">Upgrade to unlock more modules for your college.</div>
+  </div>
+  <div class="card-body px-4 pb-4">
+    <div class="row g-3">
+      {% for pk, pm in all_plans.items() %}
+      <div class="col-md-6 col-xl">
+        <div class="card h-100 border-{{ pm.color if pk == plan_key else '0' }} shadow-sm
+          {% if pk == plan_key %}border-2{% endif %}"
+          style="{% if pk == plan_key %}background: var(--bs-{{ pm.color }}-bg-subtle, #f8f9fa){% endif %}">
+          <div class="card-body p-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi {{ pm.icon }} text-{{ pm.color }}"></i>
+              <span class="fw-bold small">{{ pm.label }}</span>
+              {% if pk == plan_key %}
+              <span class="badge bg-{{ pm.color }} ms-auto" style="font-size:9px">CURRENT</span>
+              {% endif %}
+            </div>
+            <p class="text-muted mb-0" style="font-size:11px;line-height:1.5">{{ pm.description }}</p>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ── How to Pay / Contact Support ── #}
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-credit-card text-primary me-2"></i>How to Renew or Upgrade</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <ol class="small text-muted ps-3 mb-0" style="line-height:2">
+          <li>Contact our support team (details below)</li>
+          <li>Tell us your <strong>College Code: {{ college.code }}</strong> and the plan you want</li>
+          <li>We will send you a payment invoice</li>
+          <li>Make the payment via bank transfer or agreed method</li>
+          <li>Once confirmed, your plan will be updated within 24 hours</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-headset text-primary me-2"></i>Contact Support</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <div class="d-flex flex-column gap-3">
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
+            <i class="bi bi-envelope-fill text-primary fs-5"></i>
+            <div>
+              <div class="text-muted small">Email</div>
+              <a href="mailto:{{ support_email }}" class="fw-semibold text-dark text-decoration-none">
+                {{ support_email }}
+              </a>
+            </div>
+          </div>
+          {% if support_phone %}
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
+            <i class="bi bi-telephone-fill text-success fs-5"></i>
+            <div>
+              <div class="text-muted small">Phone / WhatsApp</div>
+              <a href="tel:{{ support_phone }}" class="fw-semibold text-dark text-decoration-none">
+                {{ support_phone }}
+              </a>
+            </div>
+          </div>
+          {% endif %}
+          <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-primary-subtle">
+            <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+            <div class="small text-primary">
+              When contacting support, always mention your
+              <strong>College Code: {{ college.code }}</strong>
+              so we can find your account instantly.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

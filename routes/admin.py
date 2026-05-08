@@ -306,6 +306,32 @@ def delete_department(did):
     return redirect(url_for('admin.departments'))
 
 
+@admin_bp.route('/departments/bulk-delete', methods=['POST'])
+@login_required
+@admin_required
+def bulk_delete_departments():
+    cid = _admin_college_id()
+    ids = request.form.getlist('ids', type=int)
+    if not ids:
+        flash('No departments selected.', 'warning')
+        return redirect(url_for('admin.departments'))
+    # Only delete departments with no students or teachers
+    deleted, skipped = 0, 0
+    depts = Department.query.filter(Department.id.in_(ids), Department.college_id == cid).all()
+    for d in depts:
+        if d.students or d.teachers:
+            skipped += 1
+        else:
+            db.session.delete(d)
+            deleted += 1
+    db.session.commit()
+    if deleted:
+        flash(f'{deleted} department{"s" if deleted != 1 else ""} deleted.', 'success')
+    if skipped:
+        flash(f'{skipped} department{"s" if skipped != 1 else ""} skipped — still have linked students or teachers.', 'warning')
+    return redirect(url_for('admin.departments'))
+
+
 # ─── Students ────────────────────────────────────────────────────────────────
 
 def _expected_semester_from_schedules(college_id: int, dept_id: int,
@@ -761,6 +787,24 @@ def delete_student(sid):
     return redirect(url_for('admin.students'))
 
 
+@admin_bp.route('/students/bulk-delete', methods=['POST'])
+@login_required
+@admin_required
+def bulk_delete_students():
+    cid = _admin_college_id()
+    ids = request.form.getlist('ids', type=int)
+    if not ids:
+        flash('No students selected.', 'warning')
+        return redirect(url_for('admin.students'))
+    students = Student.query.filter(Student.id.in_(ids), Student.college_id == cid).all()
+    count = len(students)
+    for s in students:
+        db.session.delete(s.user)
+    db.session.commit()
+    flash(f'{count} student{"s" if count != 1 else ""} deleted.', 'success')
+    return redirect(url_for('admin.students'))
+
+
 # ─── Teachers ────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/teachers')
@@ -868,6 +912,24 @@ def delete_teacher(tid):
     return redirect(url_for('admin.teachers'))
 
 
+@admin_bp.route('/teachers/bulk-delete', methods=['POST'])
+@login_required
+@admin_required
+def bulk_delete_teachers():
+    cid = _admin_college_id()
+    ids = request.form.getlist('ids', type=int)
+    if not ids:
+        flash('No teachers selected.', 'warning')
+        return redirect(url_for('admin.teachers'))
+    teachers = Teacher.query.filter(Teacher.id.in_(ids), Teacher.college_id == cid).all()
+    count = len(teachers)
+    for t in teachers:
+        db.session.delete(t.user)
+    db.session.commit()
+    flash(f'{count} teacher{"s" if count != 1 else ""} deleted.', 'success')
+    return redirect(url_for('admin.teachers'))
+
+
 # ─── Subjects ────────────────────────────────────────────────────────────────
 
 @admin_bp.route('/subjects', methods=['GET', 'POST'])
@@ -954,6 +1016,24 @@ def delete_subject(sid):
     db.session.delete(subject)
     db.session.commit()
     flash('Subject deleted.', 'success')
+    return redirect(url_for('admin.subjects'))
+
+
+@admin_bp.route('/subjects/bulk-delete', methods=['POST'])
+@login_required
+@admin_required
+def bulk_delete_subjects():
+    cid = _admin_college_id()
+    ids = request.form.getlist('ids', type=int)
+    if not ids:
+        flash('No subjects selected.', 'warning')
+        return redirect(url_for('admin.subjects'))
+    subjects = Subject.query.filter(Subject.id.in_(ids), Subject.college_id == cid).all()
+    count = len(subjects)
+    for s in subjects:
+        db.session.delete(s)
+    db.session.commit()
+    flash(f'{count} subject{"s" if count != 1 else ""} deleted.', 'success')
     return redirect(url_for('admin.subjects'))
 
 
@@ -2202,3 +2282,47 @@ def delete_sub_admin(uid):
     db.session.commit()
     flash(f'Sub-admin {user.name} removed.', 'info')
     return redirect(url_for('admin.sub_admins'))
+
+
+# ── My Plan ───────────────────────────────────────────────────────────────────
+
+@admin_bp.route('/my-plan')
+@login_required
+@admin_required
+def my_plan():
+    from models.college import COLLEGE_PLANS
+    from utils.feature_access import FEATURE_CATALOG, FEATURE_PRESETS, college_feature_matrix
+
+    college = current_user.college
+    plan_key = college.plan or 'free'
+    plan_meta = COLLEGE_PLANS.get(plan_key, COLLEGE_PLANS['free'])
+
+    # What features are actually enabled for this college
+    feature_matrix = college_feature_matrix(college.id)
+    enabled_features = [k for k, v in feature_matrix.items() if v]
+    disabled_features = [k for k, v in feature_matrix.items() if not v]
+
+    # Days until expiry
+    days_left = None
+    if college.plan_expires_at:
+        from utils.time import utc_now_naive
+        delta = college.plan_expires_at - utc_now_naive()
+        days_left = delta.days
+
+    support_email = current_app.config.get('SUPPORT_EMAIL', 'support@smartattend.com')
+    support_phone = current_app.config.get('SUPPORT_PHONE', '')
+
+    return render_template(
+        'admin/my_plan.html',
+        college=college,
+        plan_key=plan_key,
+        plan_meta=plan_meta,
+        all_plans=COLLEGE_PLANS,
+        feature_catalog=FEATURE_CATALOG,
+        feature_presets=FEATURE_PRESETS,
+        enabled_features=enabled_features,
+        disabled_features=disabled_features,
+        days_left=days_left,
+        support_email=support_email,
+        support_phone=support_phone,
+    )

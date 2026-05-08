@@ -82,6 +82,34 @@
   </div>
 </div>
 
+{# ── Expiry Alerts ── #}
+{% if expired %}
+<div class="alert alert-danger border-0 shadow-sm mb-3">
+  <div class="d-flex align-items-center gap-3">
+    <i class="bi bi-x-octagon-fill fs-5"></i>
+    <div>
+      <div class="fw-semibold">{{ expired|length }} college{{ 's' if expired|length != 1 }} with expired plan — action required</div>
+      <div class="small">
+        {% for r in expired %}<strong>{{ r.college.name }}</strong> — expired {{ (-r.days_left) }}d ago{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% if expiring_soon %}
+<div class="alert alert-warning border-0 shadow-sm mb-3">
+  <div class="d-flex align-items-center gap-3">
+    <i class="bi bi-clock-fill fs-5"></i>
+    <div>
+      <div class="fw-semibold">{{ expiring_soon|length }} college{{ 's' if expiring_soon|length != 1 }} expiring within 14 days</div>
+      <div class="small">
+        {% for r in expiring_soon %}<strong>{{ r.college.name }}</strong> — {{ r.days_left }}d left{% if not loop.last %} &nbsp;·&nbsp; {% endif %}{% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="card shadow-sm border-0">
   <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
     <h6 class="fw-semibold mb-0">Tenant Colleges</h6>
@@ -95,13 +123,12 @@
         <thead class="table-light">
           <tr>
             <th class="px-4">College</th>
-            <th>Code</th>
+            <th>Plan</th>
+            <th>Health</th>
             <th>Status</th>
             <th>Admins</th>
-            <th>Departments</th>
-            <th>Teachers</th>
             <th>Students</th>
-            <th>Subjects</th>
+            <th>Teachers</th>
             <th>Features</th>
             <th>Setup</th>
             <th class="text-end pe-4">Actions</th>
@@ -111,33 +138,47 @@
           {% for row in college_rows %}
           <tr>
             <td class="px-4">
-              <div class="fw-semibold">{{ row.college.name }}</div>
-              <div class="text-muted small">
-                {% if row.college.subdomain %}
-                {{ row.college.subdomain }}
-                {% else %}
-                No subdomain
-                {% endif %}
-              </div>
+              <a href="{{ url_for('super_admin.college_detail', college_id=row.college.id) }}"
+                 class="fw-semibold text-dark text-decoration-none">{{ row.college.name }}</a>
+              <div class="text-muted small">{{ row.college.code }}{% if row.college.subdomain %} · {{ row.college.subdomain }}{% endif %}</div>
             </td>
-            <td><span class="badge bg-light text-dark border">{{ row.college.code }}</span></td>
+            <td>
+              <span class="badge bg-{{ row.college.plan_meta.color }}-subtle text-{{ row.college.plan_meta.color }} fw-semibold">
+                <i class="bi {{ row.college.plan_meta.icon }} me-1"></i>{{ row.college.plan_meta.label }}
+              </span>
+              {% if row.days_left is not none %}
+                {% if row.days_left < 0 %}
+                <div class="badge bg-danger" style="font-size:10px">Expired</div>
+                {% elif row.days_left <= 14 %}
+                <div class="badge bg-warning text-dark" style="font-size:10px">{{ row.days_left }}d left</div>
+                {% else %}
+                <div class="text-muted" style="font-size:10px">{{ row.college.plan_expires_at.strftime('%d %b %Y') }}</div>
+                {% endif %}
+              {% else %}
+              <div class="text-muted" style="font-size:10px">No expiry</div>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-{{ row.health.color }}-subtle text-{{ row.health.color }} fw-semibold"
+                    {% if row.health.reasons %}title="{{ row.health.reasons|join(', ') }}"{% endif %}>
+                {{ row.health.label }}
+              </span>
+            </td>
             <td>
               <span class="badge {% if row.college.is_active %}bg-success{% else %}bg-secondary{% endif %}">
                 {{ 'Active' if row.college.is_active else 'Inactive' }}
               </span>
             </td>
             <td>{{ row.admins }}</td>
-            <td>{{ row.departments }}</td>
-            <td>{{ row.teachers }}</td>
             <td>{{ row.students }}</td>
-            <td>{{ row.subjects }}</td>
+            <td>{{ row.teachers }}</td>
             <td>
               <div class="fw-semibold">{{ row.enabled_features }}/{{ feature_count }}</div>
               <div class="small text-muted">enabled</div>
             </td>
             <td>
               <div class="d-flex align-items-center gap-2">
-                <div class="progress flex-grow-1" style="height:8px; min-width:88px;">
+                <div class="progress flex-grow-1" style="height:8px; min-width:70px;">
                   <div class="progress-bar {% if row.report.is_ready %}bg-success{% else %}bg-primary{% endif %}" style="width: {{ row.report.progress }}%"></div>
                 </div>
                 <span class="small fw-semibold">{{ row.report.progress }}%</span>
@@ -351,7 +392,7 @@
           </div>
           {% else %}
           <tr>
-            <td colspan="11" class="text-center text-muted py-5">No colleges found.</td>
+            <td colspan="10" class="text-center text-muted py-5">No colleges found.</td>
           </tr>
           {% endfor %}
         </tbody>

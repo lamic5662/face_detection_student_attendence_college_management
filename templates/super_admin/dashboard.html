@@ -3,26 +3,100 @@
 {% block page_title %}<i class="bi bi-shield-lock-fill me-2"></i>Super Admin Dashboard{% endblock %}
 
 {% block content %}
+
+{# ── Platform Readiness Banner ── #}
 <div class="alert alert-dark border-0 shadow-sm mb-4">
   <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
     <div>
       <div class="fw-semibold">Platform readiness</div>
       <div class="small text-light-emphasis">
-        {{ setup_report.progress }}% ready. {{ setup_report.failures }} failures and {{ setup_report.warnings }} warnings remain at the platform level.
+        {{ setup_report.progress }}% ready · {{ setup_report.failures }} failures · {{ setup_report.warnings }} warnings
       </div>
     </div>
-    <a href="{{ url_for('super_admin.system_setup') }}" class="btn btn-light btn-sm">
-      <i class="bi bi-list-check me-1"></i>Open Platform Setup
-    </a>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('super_admin.broadcast') }}" class="btn btn-outline-light btn-sm">
+        <i class="bi bi-megaphone me-1"></i>Broadcast
+      </a>
+      <a href="{{ url_for('super_admin.system_setup') }}" class="btn btn-light btn-sm">
+        <i class="bi bi-list-check me-1"></i>Platform Setup
+      </a>
+    </div>
   </div>
 </div>
 
-<div class="row g-4 mb-4">
+{# ── Expired Plan Alert ── #}
+{% if expired %}
+<div class="alert alert-danger border-0 shadow-sm mb-3">
+  <div class="d-flex align-items-start gap-3">
+    <i class="bi bi-x-octagon-fill fs-5 mt-1"></i>
+    <div class="flex-grow-1">
+      <div class="fw-semibold">{{ expired|length }} college{{ 's' if expired|length != 1 }} with expired plan</div>
+      <div class="small mt-1 d-flex flex-wrap gap-2">
+        {% for r in expired %}
+        <a href="{{ url_for('super_admin.college_detail', college_id=r.college.id) }}"
+           class="badge bg-danger text-white text-decoration-none">
+          {{ r.college.name }} · expired {{ (-r.days_left) }}d ago
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-sm btn-outline-danger text-nowrap">
+      Manage Plans
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Expiring Soon Alert ── #}
+{% if expiring_soon %}
+<div class="alert alert-warning border-0 shadow-sm mb-3">
+  <div class="d-flex align-items-start gap-3">
+    <i class="bi bi-clock-fill fs-5 mt-1"></i>
+    <div class="flex-grow-1">
+      <div class="fw-semibold">{{ expiring_soon|length }} college{{ 's' if expiring_soon|length != 1 }} expiring within 14 days</div>
+      <div class="small mt-1 d-flex flex-wrap gap-2">
+        {% for r in expiring_soon %}
+        <a href="{{ url_for('super_admin.college_detail', college_id=r.college.id) }}"
+           class="badge bg-warning text-dark text-decoration-none">
+          {{ r.college.name }} · {{ r.days_left }}d left
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-sm btn-outline-warning text-nowrap">
+      Renew Plans
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Churn Risk Alert ── #}
+{% if at_risk %}
+<div class="alert alert-warning border-0 shadow-sm mb-4">
+  <div class="d-flex align-items-start gap-3">
+    <i class="bi bi-exclamation-triangle-fill fs-5 mt-1 text-warning"></i>
+    <div>
+      <div class="fw-semibold">{{ at_risk|length }} college{{ 's' if at_risk|length != 1 }} at churn risk</div>
+      <div class="small">
+        {% for r in at_risk[:3] %}
+        <a href="{{ url_for('super_admin.college_detail', college_id=r.college.id) }}"
+           class="fw-semibold text-dark me-2">{{ r.college.name }}</a>
+        {% endfor %}
+        {% if at_risk|length > 3 %}and {{ at_risk|length - 3 }} more…{% endif %}
+      </div>
+      <div class="small text-muted mt-1">These colleges have had no attendance activity or admin logins recently.</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Platform Stats ── #}
+<div class="row g-3 mb-4">
   <div class="col-xl-2 col-md-4 col-6">
     <div class="stat-card stat-card-blue">
       <div class="stat-icon"><i class="bi bi-buildings-fill"></i></div>
       <div class="stat-value">{{ stats.colleges }}</div>
-      <div class="stat-label">Colleges</div>
+      <div class="stat-label">Total Colleges</div>
     </div>
   </div>
   <div class="col-xl-2 col-md-4 col-6">
@@ -55,49 +129,169 @@
   </div>
   <div class="col-xl-2 col-md-4 col-6">
     <div class="stat-card stat-card-teal">
-      <div class="stat-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
-      <div class="stat-value">{{ stats.subjects }}</div>
-      <div class="stat-label">Subjects</div>
+      <div class="stat-icon"><i class="bi bi-plus-circle"></i></div>
+      <div class="stat-value">{{ stats.new_colleges_month }}</div>
+      <div class="stat-label">New This Month</div>
     </div>
   </div>
 </div>
 
-<div class="card shadow-sm border-0">
+{# ── Business Intelligence Row ── #}
+<div class="row g-4 mb-4">
+
+  {# Plan Distribution #}
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-layers text-primary me-2"></i>Plan Distribution</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        {% set plan_colors = {'free':'secondary','starter':'primary','pro':'success','enterprise':'warning'} %}
+        {% set plan_icons  = {'free':'bi-rocket-takeoff','starter':'bi-award','pro':'bi-gem','enterprise':'bi-stars'} %}
+        {% for plan_key, plan_meta in college_plans.items() %}
+        {% set count = stats.plan_counts.get(plan_key, 0) %}
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <span class="d-inline-flex align-items-center justify-content-center rounded-circle
+            bg-{{ plan_meta.color }}-subtle"
+            style="width:36px;height:36px;flex-shrink:0">
+            <i class="bi {{ plan_meta.icon }} text-{{ plan_meta.color }} small"></i>
+          </span>
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="small fw-semibold">{{ plan_meta.label }}</span>
+              <span class="fw-bold">{{ count }}</span>
+            </div>
+            {% if stats.colleges > 0 %}
+            <div class="progress" style="height:5px">
+              <div class="progress-bar bg-{{ plan_meta.color }}"
+                   style="width:{{ ((count / stats.colleges) * 100)|int }}%"></div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# Churn Risk ── #}
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2 d-flex justify-content-between align-items-center">
+        <h6 class="fw-bold mb-0"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Churn Risk</h6>
+        <span class="badge bg-warning-subtle text-warning fw-semibold">{{ at_risk|length }}</span>
+      </div>
+      <div class="card-body px-4 pb-4">
+        {% if at_risk %}
+        <div class="d-flex flex-column gap-2">
+          {% for r in at_risk[:5] %}
+          <a href="{{ url_for('super_admin.college_detail', college_id=r.college.id) }}"
+             class="d-flex align-items-center gap-3 text-decoration-none p-2 rounded-3 hover-bg">
+            <span class="d-inline-block rounded-circle bg-danger"
+                  style="width:8px;height:8px;flex-shrink:0"></span>
+            <div class="flex-grow-1 min-w-0">
+              <div class="small fw-semibold text-dark text-truncate">{{ r.college.name }}</div>
+              <div class="text-muted" style="font-size:11px">
+                {{ r.health.reasons[0] if r.health.reasons else 'Inactive' }}
+              </div>
+            </div>
+            <span class="badge bg-danger-subtle text-danger fw-semibold">{{ r.health.score }}</span>
+          </a>
+          {% endfor %}
+          {% if at_risk|length > 5 %}
+          <div class="text-muted small text-center">+{{ at_risk|length - 5 }} more</div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4 small">
+          <i class="bi bi-check-circle text-success fs-4 d-block mb-2"></i>
+          All active colleges are healthy.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Quick Actions #}
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2">
+        <h6 class="fw-bold mb-0"><i class="bi bi-lightning-charge text-primary me-2"></i>Quick Actions</h6>
+      </div>
+      <div class="card-body px-4 pb-4 d-flex flex-column gap-2">
+        <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-outline-primary text-start">
+          <i class="bi bi-plus-circle me-2"></i>Add New College
+        </a>
+        <a href="{{ url_for('super_admin.broadcast') }}" class="btn btn-outline-secondary text-start">
+          <i class="bi bi-megaphone me-2"></i>Send Broadcast
+        </a>
+        <a href="{{ url_for('super_admin.monitor') }}" class="btn btn-outline-secondary text-start">
+          <i class="bi bi-activity me-2"></i>System Monitor
+        </a>
+        <a href="{{ url_for('super_admin.audit_logs') }}" class="btn btn-outline-secondary text-start">
+          <i class="bi bi-journal-text me-2"></i>Audit Logs
+        </a>
+        <a href="{{ url_for('super_admin.system_setup') }}" class="btn btn-outline-secondary text-start">
+          <i class="bi bi-shield-check me-2"></i>System Setup
+        </a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── College Status Table ── #}
+<div class="card shadow-sm border-0 mb-4">
   <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
     <h6 class="fw-semibold mb-0"><i class="bi bi-buildings text-primary me-2"></i>College Status</h6>
     <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-sm btn-outline-secondary">View All</a>
   </div>
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0 align-middle" style="font-size:13px">
         <thead class="table-light">
           <tr>
             <th class="px-4">College</th>
-            <th>Code</th>
+            <th>Plan</th>
             <th>Status</th>
-            <th>Admins</th>
+            <th>Health</th>
             <th>Students</th>
             <th>Teachers</th>
-            <th>Progress</th>
+            <th>Setup</th>
           </tr>
         </thead>
         <tbody>
           {% for row in college_rows %}
           <tr>
-            <td class="px-4 fw-semibold">{{ row.college.name }}</td>
-            <td><span class="badge bg-light text-dark border">{{ row.college.code }}</span></td>
+            <td class="px-4">
+              <a href="{{ url_for('super_admin.college_detail', college_id=row.college.id) }}"
+                 class="fw-semibold text-dark text-decoration-none">
+                {{ row.college.name }}
+              </a>
+              <div class="text-muted small">{{ row.college.code }}</div>
+            </td>
+            <td>
+              <span class="badge bg-{{ row.college.plan_meta.color }}-subtle text-{{ row.college.plan_meta.color }} fw-semibold">
+                <i class="bi {{ row.college.plan_meta.icon }} me-1"></i>{{ row.college.plan_meta.label }}
+              </span>
+            </td>
             <td>
               <span class="badge {% if row.college.is_active %}bg-success{% else %}bg-secondary{% endif %}">
                 {{ 'Active' if row.college.is_active else 'Inactive' }}
               </span>
             </td>
-            <td>{{ row.admins }}</td>
-            <td>{{ row.students }}</td>
-            <td>{{ row.teachers }}</td>
+            <td>
+              <span class="badge bg-{{ row.health.color }}-subtle text-{{ row.health.color }} fw-semibold">
+                {{ row.health.label }}
+              </span>
+            </td>
+            <td class="fw-semibold">{{ row.students }}</td>
+            <td class="fw-semibold">{{ row.teachers }}</td>
             <td>
               <div class="d-flex align-items-center gap-2">
-                <div class="progress flex-grow-1" style="height:8px; min-width:90px;">
-                  <div class="progress-bar {% if row.report.is_ready %}bg-success{% else %}bg-primary{% endif %}" style="width: {{ row.report.progress }}%"></div>
+                <div class="progress flex-grow-1" style="height:6px;min-width:70px">
+                  <div class="progress-bar {% if row.report.is_ready %}bg-success{% else %}bg-primary{% endif %}"
+                       style="width:{{ row.report.progress }}%"></div>
                 </div>
                 <span class="small fw-semibold">{{ row.report.progress }}%</span>
               </div>
@@ -114,7 +308,8 @@
   </div>
 </div>
 
-<div class="card shadow-sm border-0 mt-4">
+{# ── Recent Audit ── #}
+<div class="card shadow-sm border-0">
   <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
     <h6 class="fw-semibold mb-0"><i class="bi bi-journal-text text-primary me-2"></i>Recent Platform Audit</h6>
     <a href="{{ url_for('super_admin.audit_logs') }}" class="btn btn-sm btn-outline-secondary">Open Audit Logs</a>
@@ -125,22 +320,25 @@
       <div class="border rounded-4 p-3 bg-light-subtle">
         <div class="d-flex justify-content-between align-items-start gap-3">
           <div>
-            <div class="fw-semibold">{{ log.summary }}</div>
-            <div class="small text-muted">
+            <div class="fw-semibold small">{{ log.summary }}</div>
+            <div class="text-muted small">
               {{ log.actor.name if log.actor else 'System' }}
               {% if log.college %} · {{ log.college.name }}{% endif %}
-              {% if log.target_type %} · {{ log.target_type|replace('_', ' ')|title }}{% endif %}
             </div>
           </div>
-          <div class="text-end small text-muted">
-            {{ log.created_at.strftime('%d %b %Y %H:%M') if log.created_at else '-' }}
+          <div class="text-end small text-muted text-nowrap">
+            {{ log.created_at.strftime('%d %b %H:%M') if log.created_at else '—' }}
           </div>
         </div>
       </div>
       {% else %}
-      <div class="text-center text-muted py-4">No platform audit entries yet.</div>
+      <div class="text-center text-muted py-4 small">No platform audit entries yet.</div>
       {% endfor %}
     </div>
   </div>
 </div>
+
+<style>
+.hover-bg:hover { background: rgba(13,110,253,.04); }
+</style>
 {% endblock %}

@@ -73,6 +73,9 @@ def login():
             if super_admin and super_admin.check_password(password):
                 login_user(super_admin, remember=remember)
                 store_login_college(super_admin.college)
+                from utils.time import utc_now_naive
+                super_admin.last_login_at = utc_now_naive()
+                db.session.commit()
                 current_app.logger.info('Super admin %s logged in from %s', super_admin.email, request.remote_addr)
                 return _post_login_destination(super_admin)
 
@@ -99,6 +102,9 @@ def login():
         if user and user.check_password(password):
             login_user(user, remember=remember)
             store_login_college(login_college)
+            from utils.time import utc_now_naive
+            user.last_login_at = utc_now_naive()
+            db.session.commit()
             current_app.logger.info('User %s logged in from %s', user.email, request.remote_addr)
             return _post_login_destination(user)
 

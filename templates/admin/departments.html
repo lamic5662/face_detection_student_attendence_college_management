@@ -38,10 +38,15 @@
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-hover mb-0">
+          <table class="table table-hover mb-0"
+                 data-bulk-url="{{ url_for('admin.bulk_delete_departments') }}"
+                 data-bulk-label="department">
             <thead class="table-light">
               <tr>
-                <th class="px-4">Code</th>
+                <th style="width:38px" class="ps-3">
+                  <input type="checkbox" data-bulk-select-all class="bulk-cb" title="Select all">
+                </th>
+                <th class="px-2">Code</th>
                 <th>Name</th>
                 <th>Students</th>
                 <th>Teachers</th>
@@ -51,7 +56,14 @@
             <tbody>
               {% for d in departments %}
               <tr>
-                <td class="px-4"><span class="badge bg-primary">{{ d.code }}</span></td>
+                <td class="ps-3">
+                  <input type="checkbox" data-bulk-item value="{{ d.id }}"
+                         data-bulk-name="{{ d.name }}" class="bulk-cb"
+                         {% if d.students|length > 0 or d.teachers|length > 0 %}
+                         title="Has linked records — will be skipped if selected"
+                         {% endif %}>
+                </td>
+                <td class="px-2"><span class="badge bg-primary">{{ d.code }}</span></td>
                 <td class="fw-semibold">{{ d.name }}</td>
                 <td>{{ d.students|length }}</td>
                 <td>{{ d.teachers|length }}</td>
@@ -102,7 +114,7 @@
                 </div>
               </div>
               {% else %}
-              <tr><td colspan="5" class="text-center text-muted py-4">No departments yet.</td></tr>
+              <tr><td colspan="6" class="text-center text-muted py-4">No departments yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>

@@ -89,10 +89,15 @@
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0"
+             data-bulk-url="{{ url_for('admin.bulk_delete_students') }}"
+             data-bulk-label="student">
         <thead class="table-light">
           <tr>
-            <th class="px-4">Roll No. / Batch</th>
+            <th style="width:38px" class="ps-3">
+              <input type="checkbox" data-bulk-select-all class="bulk-cb" title="Select all">
+            </th>
+            <th class="px-2">Roll No. / Batch</th>
             <th>Name</th>
             <th>Email</th>
             <th>Faculty</th>
@@ -106,7 +111,11 @@
         <tbody>
           {% for s, status, diff in students_with_status %}
           <tr>
-            <td class="px-4">
+            <td class="ps-3">
+              <input type="checkbox" data-bulk-item value="{{ s.id }}"
+                     data-bulk-name="{{ s.user.name }}" class="bulk-cb">
+            </td>
+            <td class="px-2">
               <span class="badge bg-secondary">{{ s.roll_number }}</span>
               {% if s.admission_year %}
               <div class="text-muted small mt-1">{{ s.admission_year }} batch</div>
@@ -230,7 +239,7 @@
           </div>
           {% else %}
           <tr>
-            <td colspan="9" class="text-center text-muted py-5">
+            <td colspan="10" class="text-center text-muted py-5">
               <i class="bi bi-people fs-1 d-block mb-2 opacity-25"></i>
               No students found{% if selected_dept or selected_sem or search %} for the selected filters{% endif %}.
             </td>

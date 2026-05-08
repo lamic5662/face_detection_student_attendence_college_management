@@ -20,8 +20,10 @@ class Teacher(db.Model):
     joining_date = db.Column(db.Date, nullable=True)
     sign_path = db.Column(db.String(255), nullable=True)
 
-    subjects = db.relationship('Subject', backref='teacher', lazy=True)
-    sessions = db.relationship('AttendanceSession', backref='teacher', lazy=True)
+    subjects = db.relationship('Subject', backref='teacher', lazy=True,
+                               cascade='all, delete-orphan')
+    sessions = db.relationship('AttendanceSession', backref='teacher', lazy=True,
+                               cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Teacher {self.employee_id}>'

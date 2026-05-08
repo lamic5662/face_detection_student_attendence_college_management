@@ -5,7 +5,7 @@
 
 {% block content %}
 
-<!-- Filters + Add button -->
+<!-- Filters + Add buttons -->
 <div class="card shadow-sm border-0 mb-4">
   <div class="card-body px-4 py-3">
     <form method="GET" class="row g-2 align-items-end">
@@ -29,8 +29,11 @@
       </div>
       <div class="col-auto ms-auto d-flex align-items-center gap-2">
         <span class="badge bg-primary-subtle text-primary px-3 py-2">{{ pagination.total }} exam{{ 's' if pagination.total != 1 }}</span>
+        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkExamModal">
+          <i class="bi bi-calendar2-plus-fill me-1"></i>Bulk Schedule
+        </button>
         <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addExamModal">
-          <i class="bi bi-plus-circle-fill me-1"></i>Schedule Exam
+          <i class="bi bi-plus-circle-fill me-1"></i>Single Exam
         </button>
       </div>
     </form>
@@ -81,13 +84,11 @@
               </span>
             </td>
             <td>
-              <form method="POST" action="{{ url_for('exam.admin_delete_exam', exam_id=e.id) }}"
-                    onsubmit="return confirm('Delete exam \'{{ e.title }}\'? All marks will be removed.')">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete exam">
-                  <i class="bi bi-trash3"></i>
-                </button>
-              </form>
+              <button type="button" class="btn btn-sm btn-outline-danger"
+                      onclick="confirmDeleteExam('{{ url_for('exam.admin_delete_exam', exam_id=e.id) }}', '{{ e.title|replace("'", "\\'") }}')"
+                      title="Delete exam">
+                <i class="bi bi-trash3"></i>
+              </button>
             </td>
           </tr>
           {% else %}
@@ -105,13 +106,15 @@
 </div>
 
 
-<!-- Schedule Exam Modal -->
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Single Exam Modal
+     ═══════════════════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="addExamModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content border-0">
       <div class="modal-header">
         <h5 class="modal-title fw-semibold">
-          <i class="bi bi-calendar-plus-fill text-primary me-2"></i>Schedule New Exam
+          <i class="bi bi-calendar-plus-fill text-primary me-2"></i>Schedule Single Exam
         </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -126,16 +129,31 @@
                      placeholder="e.g. Mid Term Examination — Database Systems">
             </div>
 
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
-              <select name="subject_id" class="form-select" required>
-                <option value="">Select subject…</option>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Department <span class="text-danger">*</span></label>
+              <select id="examDept" class="form-select" required>
+                <option value="">Select department…</option>
                 {% for d in departments %}
-                <optgroup label="{{ d.name }}">
-                  {% for s in subjects if s.department_id == d.id %}
-                  <option value="{{ s.id }}">{{ s.name }} (Sem {{ s.semester }})</option>
-                  {% endfor %}
-                </optgroup>
+                <option value="{{ d.id }}">{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Semester <span class="text-danger">*</span></label>
+              <select id="examSem" class="form-select" disabled required>
+                <option value="">Select semester…</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+              <select id="examSubject" name="subject_id" class="form-select" disabled required>
+                <option value="">Select subject…</option>
+                {% for s in subjects %}
+                <option value="{{ s.id }}" data-dept="{{ s.department_id }}" data-sem="{{ s.semester }}" style="display:none">
+                  {{ s.name }}
+                </option>
                 {% endfor %}
               </select>
             </div>
@@ -199,4 +217,391 @@
     </div>
   </div>
 </div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Delete Confirmation Modal
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="deleteExamModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-body text-center px-4 pt-4 pb-3">
+        <div class="mb-3">
+          <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger-subtle"
+                style="width:64px;height:64px">
+            <i class="bi bi-trash3-fill text-danger" style="font-size:28px"></i>
+          </span>
+        </div>
+        <h5 class="fw-bold mb-1">Delete Exam?</h5>
+        <p class="text-muted mb-0 small" id="deleteExamName" style="word-break:break-word"></p>
+        <p class="text-danger small mt-2 mb-0">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>
+          All student marks for this exam will also be deleted. This cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer border-0 d-flex gap-2 px-4 pb-4 justify-content-center">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <form id="deleteExamForm" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger px-4">
+            <i class="bi bi-trash3-fill me-1"></i>Yes, Delete
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Bulk Schedule Modal
+     ═══════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="bulkExamModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content border-0">
+      <div class="modal-header">
+        <h5 class="modal-title fw-semibold">
+          <i class="bi bi-calendar2-plus-fill text-primary me-2"></i>Bulk Schedule Exams
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('exam.admin_bulk_exams') }}" id="bulkExamForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+
+          <!-- Step 1: Select scope -->
+          <div class="card border-0 bg-light rounded-3 p-3 mb-3">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-3">
+                <label class="form-label fw-semibold small mb-1">Department <span class="text-danger">*</span></label>
+                <select id="bulkDept" class="form-select form-select-sm">
+                  <option value="">Select department…</option>
+                  {% for d in departments %}
+                  <option value="{{ d.id }}">{{ d.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label fw-semibold small mb-1">Semester <span class="text-danger">*</span></label>
+                <select id="bulkSem" class="form-select form-select-sm" disabled>
+                  <option value="">—</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold small mb-1">Exam Type <span class="text-danger">*</span></label>
+                <select id="bulkType" name="exam_type" class="form-select form-select-sm">
+                  <option value="mid_term">Mid Term</option>
+                  <option value="final">Final</option>
+                  <option value="quiz">Quiz</option>
+                  <option value="practical">Practical</option>
+                  <option value="assignment">Assignment</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small mb-1">Title Prefix</label>
+                <input type="text" id="bulkTitlePrefix" class="form-control form-control-sm" value="Mid Term Examination"
+                       placeholder="e.g. Mid Term Examination">
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Common values to prefill all rows -->
+          <div class="card border-0 border-start border-3 border-primary bg-primary-subtle rounded-3 p-3 mb-3">
+            <div class="row g-2 align-items-end">
+              <div class="col-12 mb-1">
+                <span class="fw-semibold small text-primary"><i class="bi bi-magic me-1"></i>Common Values — fill once, apply to all rows</span>
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small mb-1">Date</label>
+                <input type="date" id="cDate" class="form-control form-control-sm">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small mb-1">Start Time</label>
+                <input type="time" id="cTime" class="form-control form-control-sm">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small mb-1">Duration (min)</label>
+                <input type="number" id="cDuration" class="form-control form-control-sm" min="1" placeholder="180">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small mb-1">Total Marks</label>
+                <input type="number" id="cTotal" class="form-control form-control-sm" value="100" min="1" step="0.5">
+              </div>
+              <div class="col-md-2">
+                <label class="form-label small mb-1">Pass Marks</label>
+                <input type="number" id="cPass" class="form-control form-control-sm" min="1" step="0.5" placeholder="40">
+              </div>
+              <div class="col-md-1">
+                <label class="form-label small mb-1">Room</label>
+                <input type="text" id="cRoom" class="form-control form-control-sm" placeholder="Hall A">
+              </div>
+              <div class="col-md-1">
+                <button type="button" id="bulkApplyAll" class="btn btn-primary btn-sm w-100">
+                  <i class="bi bi-arrow-down-circle-fill"></i> Fill
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Subject rows (generated by JS) -->
+          <div id="bulkTableWrap" style="display:none">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-semibold small text-muted">
+                <i class="bi bi-list-check me-1"></i>Subjects — check the ones to schedule
+              </span>
+              <span id="bulkSelectedCount" class="badge bg-primary px-3 py-2">0 selected</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-bordered align-middle mb-0" style="font-size:13px">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width:36px" class="text-center">
+                      <input type="checkbox" id="bulkCheckAll" class="form-check-input" checked title="Select all">
+                    </th>
+                    <th style="width:160px">Subject</th>
+                    <th>Title</th>
+                    <th style="width:130px">Date <span class="text-danger">*</span></th>
+                    <th style="width:100px">Time</th>
+                    <th style="width:80px">Dur.</th>
+                    <th style="width:80px">Total</th>
+                    <th style="width:80px">Pass</th>
+                    <th style="width:90px">Room</th>
+                  </tr>
+                </thead>
+                <tbody id="bulkSubjectBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div id="bulkEmptyState" class="text-center text-muted py-4">
+            <i class="bi bi-arrow-up-circle fs-2 d-block mb-2 opacity-25"></i>
+            <p class="mb-0 small">Select a department and semester above to load subjects.</p>
+          </div>
+
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" id="bulkSubmitBtn" class="btn btn-primary" disabled>
+            <i class="bi bi-calendar2-plus-fill me-1"></i>
+            <span id="bulkSubmitLabel">Schedule Exams</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+{# Embed subjects as JSON for JS #}
+<script>
+const SUBJECTS_DATA = [
+  {% for s in subjects %}
+  {"id":{{ s.id }},"name":{{ s.name|tojson }},"code":{{ s.code|tojson }},"dept":{{ s.department_id }},"sem":{{ s.semester }}}{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+</script>
+
+<script>
+/* ── Delete Confirmation ─────────────────────────────────────────────────── */
+function confirmDeleteExam(actionUrl, examTitle) {
+  document.getElementById('deleteExamForm').action = actionUrl;
+  document.getElementById('deleteExamName').textContent = '"' + examTitle + '"';
+  new bootstrap.Modal(document.getElementById('deleteExamModal')).show();
+}
+
+/* ── Single Exam Cascade ─────────────────────────────────────────────────── */
+(function () {
+  const deptSel    = document.getElementById('examDept');
+  const semSel     = document.getElementById('examSem');
+  const subjectSel = document.getElementById('examSubject');
+  const allOpts    = Array.from(subjectSel.querySelectorAll('option[data-dept]'));
+
+  document.getElementById('addExamModal').addEventListener('hidden.bs.modal', function () {
+    deptSel.value = '';
+    semSel.innerHTML = '<option value="">Select semester…</option>';
+    semSel.disabled = true;
+    subjectSel.value = '';
+    subjectSel.disabled = true;
+    allOpts.forEach(o => o.style.display = 'none');
+  });
+
+  deptSel.addEventListener('change', function () {
+    const deptId = this.value;
+    semSel.innerHTML = '<option value="">Select semester…</option>';
+    semSel.disabled = true;
+    subjectSel.value = '';
+    subjectSel.disabled = true;
+    allOpts.forEach(o => o.style.display = 'none');
+    if (!deptId) return;
+    const sems = [...new Set(allOpts.filter(o => o.dataset.dept === deptId).map(o => +o.dataset.sem))].sort((a,b)=>a-b);
+    sems.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = 'Semester ' + s; semSel.appendChild(o); });
+    if (sems.length) semSel.disabled = false;
+  });
+
+  semSel.addEventListener('change', function () {
+    const deptId = deptSel.value, sem = this.value;
+    subjectSel.value = ''; subjectSel.disabled = true;
+    allOpts.forEach(o => o.style.display = 'none');
+    if (!sem) return;
+    let n = 0;
+    allOpts.forEach(o => { if (o.dataset.dept === deptId && o.dataset.sem === sem) { o.style.display = ''; n++; } });
+    if (n) subjectSel.disabled = false;
+  });
+})();
+
+
+/* ── Bulk Schedule Modal ─────────────────────────────────────────────────── */
+(function () {
+  const bulkDept    = document.getElementById('bulkDept');
+  const bulkSem     = document.getElementById('bulkSem');
+  const bulkType    = document.getElementById('bulkType');
+  const titlePrefix = document.getElementById('bulkTitlePrefix');
+  const tableWrap   = document.getElementById('bulkTableWrap');
+  const emptyState  = document.getElementById('bulkEmptyState');
+  const tbody       = document.getElementById('bulkSubjectBody');
+  const checkAll    = document.getElementById('bulkCheckAll');
+  const countBadge  = document.getElementById('bulkSelectedCount');
+  const submitBtn   = document.getElementById('bulkSubmitBtn');
+  const submitLabel = document.getElementById('bulkSubmitLabel');
+
+  const EXAM_LABELS = {mid_term:'Mid Term Examination',final:'Final Examination',quiz:'Quiz',practical:'Practical Exam',assignment:'Assignment'};
+
+  /* Update title prefix when exam type changes */
+  bulkType.addEventListener('change', function () {
+    titlePrefix.value = EXAM_LABELS[this.value] || this.options[this.selectedIndex].text;
+    rebuildTitles();
+  });
+  titlePrefix.addEventListener('input', rebuildTitles);
+
+  /* Department cascade */
+  bulkDept.addEventListener('change', function () {
+    const deptId = this.value;
+    bulkSem.innerHTML = '<option value="">—</option>';
+    bulkSem.disabled = true;
+    clearTable();
+    if (!deptId) return;
+    const sems = [...new Set(SUBJECTS_DATA.filter(s => s.dept == deptId).map(s => s.sem))].sort((a,b)=>a-b);
+    sems.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = 'Semester ' + s; bulkSem.appendChild(o); });
+    if (sems.length) bulkSem.disabled = false;
+  });
+
+  /* Semester selected → build table */
+  bulkSem.addEventListener('change', function () {
+    const deptId = bulkDept.value, sem = this.value;
+    clearTable();
+    if (!sem) return;
+    const filtered = SUBJECTS_DATA.filter(s => s.dept == deptId && s.sem == sem);
+    if (!filtered.length) { emptyState.style.display = ''; tableWrap.style.display = 'none'; return; }
+    buildTable(filtered);
+  });
+
+  function clearTable() {
+    tbody.innerHTML = '';
+    tableWrap.style.display = 'none';
+    emptyState.style.display = '';
+    updateCount();
+  }
+
+  function buildTable(subjects) {
+    tbody.innerHTML = '';
+    const prefix = titlePrefix.value.trim();
+    subjects.forEach(sub => {
+      const tr = document.createElement('tr');
+      tr.dataset.sid = sub.id;
+      tr.innerHTML = `
+        <td class="text-center">
+          <input type="checkbox" name="subject_id" value="${sub.id}" class="form-check-input bulk-chk" checked>
+        </td>
+        <td>
+          <div class="fw-semibold" style="font-size:12px">${escHtml(sub.name)}</div>
+          <div class="text-muted" style="font-size:11px">${escHtml(sub.code)}</div>
+        </td>
+        <td><input type="text" name="title_${sub.id}" class="form-control form-control-sm bulk-title" value="${escAttr(prefix ? prefix + ' — ' + sub.name : sub.name)}" required></td>
+        <td><input type="date" name="date_${sub.id}" class="form-control form-control-sm bulk-date" value="${g('cDate')}" required></td>
+        <td><input type="time" name="start_${sub.id}" class="form-control form-control-sm bulk-time" value="${g('cTime')}"></td>
+        <td><input type="number" name="duration_${sub.id}" class="form-control form-control-sm bulk-dur" value="${g('cDuration')}" min="1" placeholder="—"></td>
+        <td><input type="number" name="total_${sub.id}" class="form-control form-control-sm bulk-total" value="${g('cTotal') || 100}" min="1" step="0.5"></td>
+        <td><input type="number" name="pass_${sub.id}" class="form-control form-control-sm bulk-pass" value="${g('cPass')}" min="1" step="0.5" placeholder="—"></td>
+        <td><input type="text" name="room_${sub.id}" class="form-control form-control-sm bulk-room" value="${escAttr(g('cRoom'))}"></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    /* Disable row fields when unchecked */
+    tbody.querySelectorAll('.bulk-chk').forEach(chk => {
+      chk.addEventListener('change', function () {
+        const row = this.closest('tr');
+        row.querySelectorAll('input:not([type=checkbox])').forEach(i => { i.disabled = !this.checked; i.required = this.checked && ['bulk-date','bulk-title'].some(c => i.classList.contains(c)); });
+        updateCount();
+      });
+    });
+
+    tableWrap.style.display = '';
+    emptyState.style.display = 'none';
+    updateCount();
+  }
+
+  /* Apply common values to all checked rows */
+  document.getElementById('bulkApplyAll').addEventListener('click', function () {
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const chk = tr.querySelector('.bulk-chk');
+      if (!chk || !chk.checked) return;
+      const sid = tr.dataset.sid;
+      const sub = SUBJECTS_DATA.find(s => s.id == sid);
+      const pref = titlePrefix.value.trim();
+      tr.querySelector('.bulk-title').value = pref && sub ? pref + ' — ' + sub.name : (sub ? sub.name : '');
+      tr.querySelector('.bulk-date').value   = g('cDate');
+      tr.querySelector('.bulk-time').value   = g('cTime');
+      tr.querySelector('.bulk-dur').value    = g('cDuration');
+      tr.querySelector('.bulk-total').value  = g('cTotal') || 100;
+      tr.querySelector('.bulk-pass').value   = g('cPass');
+      tr.querySelector('.bulk-room').value   = g('cRoom');
+    });
+  });
+
+  /* Select/deselect all */
+  checkAll.addEventListener('change', function () {
+    tbody.querySelectorAll('.bulk-chk').forEach(chk => {
+      chk.checked = this.checked;
+      chk.dispatchEvent(new Event('change'));
+    });
+  });
+
+  function rebuildTitles() {
+    const pref = titlePrefix.value.trim();
+    tbody.querySelectorAll('tr').forEach(tr => {
+      const sub = SUBJECTS_DATA.find(s => s.id == tr.dataset.sid);
+      if (sub) tr.querySelector('.bulk-title').value = pref ? pref + ' — ' + sub.name : sub.name;
+    });
+  }
+
+  function updateCount() {
+    const checked = tbody.querySelectorAll('.bulk-chk:checked').length;
+    countBadge.textContent = checked + ' selected';
+    submitBtn.disabled = checked === 0;
+    submitLabel.textContent = checked > 0 ? `Schedule ${checked} Exam${checked !== 1 ? 's' : ''}` : 'Schedule Exams';
+  }
+
+  /* Reset on close */
+  document.getElementById('bulkExamModal').addEventListener('hidden.bs.modal', function () {
+    bulkDept.value = '';
+    bulkSem.innerHTML = '<option value="">—</option>';
+    bulkSem.disabled = true;
+    bulkType.value = 'mid_term';
+    titlePrefix.value = 'Mid Term Examination';
+    clearTable();
+  });
+
+  function g(id) { return document.getElementById(id).value; }
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escAttr(s) { return s ? s.replace(/"/g,'&quot;') : ''; }
+})();
+</script>
 {% endblock %}

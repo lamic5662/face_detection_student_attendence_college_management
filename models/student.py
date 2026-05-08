@@ -30,7 +30,8 @@ class Student(db.Model):
     face_image_path = db.Column(db.String(255), nullable=True)
     enrolled_at = db.Column(db.DateTime, default=utc_now_naive)
 
-    attendance_records = db.relationship('AttendanceRecord', backref='student', lazy=True)
+    attendance_records = db.relationship('AttendanceRecord', backref='student', lazy=True,
+                                         cascade='all, delete-orphan')
 
     def set_face_encoding(self, encoding_array):
         self.face_encoding = pickle.dumps(encoding_array)

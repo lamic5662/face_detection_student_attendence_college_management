@@ -1,19 +1,26 @@
 import csv
 import io
+import platform
 import re
+import sys
+from datetime import timedelta
 
 from flask import Blueprint, abort, current_app, flash, redirect, render_template, request, url_for, jsonify, Response
 from flask_login import current_user, login_required
 
 from extensions import db
-from models.college import College
+from models.attendance import AttendanceSession, AttendanceRecord
+from models.college import College, COLLEGE_PLANS
 from models.department import Department
+from models.exam import Exam
+from models.fee import FeePayment
 from models.platform_audit import PlatformAuditLog
 from models.setting import CollegeSetting
 from models.student import Student
 from models.subject import Subject
 from models.teacher import Teacher
 from models.user import User
+from utils.college_health import college_health
 from utils.decorators import super_admin_required
 from utils.feature_access import (
     FEATURE_CATALOG,
@@ -40,11 +47,20 @@ _STRONG_PASSWORD_RE = re.compile(
 )
 
 
+def _plan_days_left(college) -> int | None:
+    """Returns days until plan expiry. Negative = already expired. None = no expiry set."""
+    if not college.plan_expires_at:
+        return None
+    from utils.time import utc_now_naive
+    return (college.plan_expires_at - utc_now_naive()).days
+
+
 def _college_status_rows():
     rows = []
     colleges = College.query.order_by(College.created_at.desc(), College.name.asc()).all()
     for college in colleges:
         report = evaluate_production_setup(current_app, college)
+        days_left = _plan_days_left(college)
         rows.append({
             'college': college,
             'report': report,
@@ -55,6 +71,8 @@ def _college_status_rows():
             'admins': User.query.filter_by(college_id=college.id, role='admin').count(),
             'feature_matrix': college_feature_matrix(college.id),
             'enabled_features': college_enabled_feature_count(college.id),
+            'health': college_health(college.id),
+            'days_left': days_left,
         })
     return rows
 
@@ -129,8 +147,28 @@ def _filtered_audit_log_query(college_id: int | None, action: str):
 @login_required
 @super_admin_required
 def dashboard():
+    from utils.time import utc_now_naive
+    from datetime import timedelta
     setup_report = evaluate_production_setup(current_app)
     college_rows = _college_status_rows()
+    now = utc_now_naive()
+    month_ago = now - timedelta(days=30)
+
+    # Plan distribution (include any legacy 'pro' values under professional)
+    plan_counts = {}
+    for plan_key in COLLEGE_PLANS:
+        plan_counts[plan_key] = College.query.filter_by(plan=plan_key).count()
+    # Absorb legacy 'pro' into 'professional'
+    legacy_pro = College.query.filter_by(plan='pro').count()
+    if legacy_pro:
+        plan_counts['professional'] = plan_counts.get('professional', 0) + legacy_pro
+
+    # Churn risk: active colleges where health < 40
+    at_risk = [r for r in college_rows if r['college'].is_active and r['health']['score'] < 40]
+
+    # Plan expiry alerts
+    expired = [r for r in college_rows if r['days_left'] is not None and r['days_left'] < 0]
+    expiring_soon = [r for r in college_rows if r['days_left'] is not None and 0 <= r['days_left'] <= 14]
 
     stats = {
         'colleges': College.query.count(),
@@ -139,6 +177,8 @@ def dashboard():
         'students': Student.query.count(),
         'teachers': Teacher.query.count(),
         'subjects': Subject.query.count(),
+        'new_colleges_month': College.query.filter(College.created_at >= month_ago).count(),
+        'plan_counts': plan_counts,
     }
 
     return render_template(
@@ -147,6 +187,10 @@ def dashboard():
         setup_report=setup_report,
         college_rows=college_rows[:8],
         recent_logs=_recent_platform_logs(),
+        at_risk=at_risk,
+        expired=expired,
+        expiring_soon=expiring_soon,
+        college_plans=COLLEGE_PLANS,
     )
 
 
@@ -168,9 +212,13 @@ def system_setup():
 @super_admin_required
 def colleges():
     college_rows = _college_status_rows()
+    expired = [r for r in college_rows if r['days_left'] is not None and r['days_left'] < 0]
+    expiring_soon = [r for r in college_rows if r['days_left'] is not None and 0 <= r['days_left'] <= 14]
     return render_template(
         'super_admin/colleges.html',
         college_rows=college_rows,
+        expired=expired,
+        expiring_soon=expiring_soon,
         feature_catalog=FEATURE_CATALOG,
         feature_groups=FEATURE_GROUPS,
         feature_presets=FEATURE_PRESETS,
@@ -351,6 +399,8 @@ def college_detail(college_id: int):
         'total_users': User.query.filter_by(college_id=college.id).count(),
     }
 
+    days_left = _plan_days_left(college)
+
     return render_template(
         'super_admin/college_detail.html',
         college=college,
@@ -359,6 +409,7 @@ def college_detail(college_id: int):
         stats=stats,
         college_admins=college_admins,
         enabled_feature_keys=enabled_feature_keys,
+        days_left=days_left,
         disabled_feature_keys=disabled_feature_keys,
         feature_catalog=FEATURE_CATALOG,
         recent_logs=_recent_platform_logs(limit=10, college_id=college.id),
@@ -654,3 +705,308 @@ def delete_college_admin(college_id: int, admin_id: int):
     db.session.commit()
     flash(f'College admin removed: {email}', 'success')
     return redirect(url_for('super_admin.college_detail', college_id=college.id))
+
+
+# ── System Monitor ────────────────────────────────────────────────────────────
+
+def _db_status() -> dict:
+    try:
+        db.session.execute(db.text('SELECT 1'))
+        return {'ok': True, 'label': 'Connected'}
+    except Exception as e:
+        return {'ok': False, 'label': str(e)[:80]}
+
+
+def _scheduler_info() -> dict:
+    sched = current_app.extensions.get('scheduler')
+    if sched is None:
+        return {'running': False, 'jobs': []}
+    jobs = []
+    for job in sched.get_jobs():
+        jobs.append({
+            'id': job.id,
+            'name': job.name or job.id,
+            'next_run': job.next_run_time,
+            'trigger': str(job.trigger),
+        })
+    return {'running': sched.running, 'jobs': jobs}
+
+
+def _college_activity_rows():
+    from utils.time import utc_now_naive
+    from datetime import date
+    today = date.today()
+    colleges = College.query.order_by(College.name).all()
+    rows = []
+    for c in colleges:
+        sessions_today = AttendanceSession.query.filter_by(
+            college_id=c.id).filter(AttendanceSession.date == today).count()
+        active_sessions = AttendanceSession.query.filter_by(
+            college_id=c.id, status='active').count()
+        last_log = (PlatformAuditLog.query
+                    .filter_by(college_id=c.id)
+                    .order_by(PlatformAuditLog.created_at.desc())
+                    .first())
+        last_admin = (User.query
+                      .filter_by(college_id=c.id, role='admin')
+                      .filter(User.last_login_at.isnot(None))
+                      .order_by(User.last_login_at.desc())
+                      .first())
+        rows.append({
+            'college': c,
+            'students': Student.query.filter_by(college_id=c.id).count(),
+            'teachers': Teacher.query.filter_by(college_id=c.id).count(),
+            'sessions_today': sessions_today,
+            'active_sessions': active_sessions,
+            'last_activity': last_log.created_at if last_log else None,
+            'last_activity_summary': last_log.summary if last_log else None,
+            'last_admin_login': last_admin.last_login_at if last_admin else None,
+            'last_admin_name': last_admin.name if last_admin else None,
+            'health': college_health(c.id),
+        })
+    return rows
+
+
+@super_admin_bp.route('/monitor')
+@login_required
+@super_admin_required
+def monitor():
+    from utils.time import utc_now_naive
+    from datetime import date, timedelta
+
+    today = date.today()
+    now = utc_now_naive()
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    # System health
+    db_status = _db_status()
+    sched_info = _scheduler_info()
+    start_time = current_app.extensions.get('server_start_time')
+    uptime_str = None
+    if start_time:
+        delta = now - start_time
+        h, m = divmod(int(delta.total_seconds()), 3600)
+        m //= 60
+        uptime_str = f'{h}h {m}m'
+
+    # Live platform stats
+    active_sessions_now = AttendanceSession.query.filter_by(status='active').count()
+    sessions_today = AttendanceSession.query.filter(AttendanceSession.date == today).count()
+    records_today = (AttendanceRecord.query
+                     .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id)
+                     .filter(AttendanceSession.date == today).count())
+    new_users_week = User.query.filter(User.created_at >= week_ago).count()
+    payments_month = FeePayment.query.filter(FeePayment.created_at >= month_ago).count()
+    exams_total = Exam.query.count()
+    total_users = User.query.filter(User.role != 'super_admin').count()
+
+    stats = {
+        'active_sessions_now': active_sessions_now,
+        'sessions_today': sessions_today,
+        'records_today': records_today,
+        'new_users_week': new_users_week,
+        'payments_month': payments_month,
+        'exams_total': exams_total,
+        'total_users': total_users,
+        'total_colleges': College.query.count(),
+        'active_colleges': College.query.filter_by(is_active=True).count(),
+    }
+
+    college_rows = _college_activity_rows()
+    recent_logs = _recent_platform_logs(limit=15)
+
+    sys_info = {
+        'python': sys.version.split()[0],
+        'platform': platform.system() + ' ' + platform.release(),
+        'flask': __import__('flask').__version__,
+        'db_status': db_status,
+        'uptime': uptime_str or '—',
+        'start_time': start_time,
+    }
+
+    return render_template(
+        'super_admin/monitor.html',
+        stats=stats,
+        college_rows=college_rows,
+        recent_logs=recent_logs,
+        sys_info=sys_info,
+        sched_info=sched_info,
+        today=today,
+    )
+
+
+@super_admin_bp.route('/monitor/run-jobs', methods=['POST'])
+@login_required
+@super_admin_required
+def monitor_run_jobs():
+    sched = current_app.extensions.get('scheduler')
+    if sched is None:
+        flash('Scheduler is not running.', 'danger')
+        return redirect(url_for('super_admin.monitor'))
+    job_id = request.form.get('job_id', 'hourly_background_jobs')
+    job = sched.get_job(job_id)
+    if job is None:
+        flash(f'Job "{job_id}" not found.', 'danger')
+        return redirect(url_for('super_admin.monitor'))
+    job.modify(next_run_time=__import__('datetime').datetime.now(job.next_run_time.tzinfo))
+    db.session.add(log_platform_action(
+        actor=current_user,
+        action_key='monitor.run_jobs',
+        summary=f'Manually triggered job: {job_id}',
+        college=None,
+        target_type='job',
+        target_id=None,
+        details={'job_id': job_id},
+    ))
+    db.session.commit()
+    flash(f'Job "{job_id}" triggered — it will run within seconds.', 'success')
+    return redirect(url_for('super_admin.monitor'))
+
+
+# ── College Plan Management ───────────────────────────────────────────────────
+
+@super_admin_bp.route('/colleges/<int:college_id>/plan', methods=['POST'])
+@login_required
+@super_admin_required
+def update_college_plan(college_id: int):
+    college = _get_college_or_404(college_id)
+    plan = (request.form.get('plan') or 'free').strip().lower()
+    expires_raw = (request.form.get('plan_expires_at') or '').strip()
+    billing_notes = (request.form.get('billing_notes') or '').strip() or None
+
+    if plan not in COLLEGE_PLANS:
+        flash('Invalid plan selected.', 'danger')
+        return redirect(url_for('super_admin.college_detail', college_id=college.id))
+
+    from utils.time import utc_now_naive
+    import datetime
+    plan_expires_at = None
+    if expires_raw:
+        try:
+            plan_expires_at = datetime.datetime.strptime(expires_raw, '%Y-%m-%d')
+        except ValueError:
+            flash('Invalid expiry date format (use YYYY-MM-DD).', 'danger')
+            return redirect(url_for('super_admin.college_detail', college_id=college.id))
+
+    old_plan = college.plan
+    college.plan = plan
+    college.plan_expires_at = plan_expires_at
+    college.billing_notes = billing_notes
+
+    db.session.add(log_platform_action(
+        actor=current_user,
+        action_key='college.plan_updated',
+        summary=f'Plan updated for {college.name}: {old_plan} → {plan}',
+        college=college,
+        target_type='college',
+        target_id=college.id,
+        details={'old_plan': old_plan, 'new_plan': plan, 'expires': expires_raw or None},
+    ))
+    db.session.commit()
+    flash(f'Plan updated to {COLLEGE_PLANS[plan]["label"]} for {college.name}.', 'success')
+    return redirect(url_for('super_admin.college_detail', college_id=college.id))
+
+
+# ── Broadcast Announcement ────────────────────────────────────────────────────
+
+@super_admin_bp.route('/broadcast', methods=['GET', 'POST'])
+@login_required
+@super_admin_required
+def broadcast():
+    colleges = College.query.filter_by(is_active=True).order_by(College.name).all()
+
+    if request.method == 'POST':
+        subject = (request.form.get('subject') or '').strip()
+        message = (request.form.get('message') or '').strip()
+        target = request.form.get('target', 'all')
+        college_ids_raw = request.form.getlist('college_ids', type=int)
+        send_email = request.form.get('send_email') == 'on'
+
+        if not subject or not message:
+            flash('Subject and message are required.', 'danger')
+            return render_template('super_admin/broadcast.html', colleges=colleges)
+
+        # Determine target colleges
+        if target == 'specific' and college_ids_raw:
+            target_colleges = College.query.filter(
+                College.id.in_(college_ids_raw), College.is_active == True
+            ).all()
+        else:
+            target_colleges = colleges
+
+        sent_count = 0
+        failed = []
+
+        if send_email:
+            from extensions import mail
+            from flask_mail import Message as MailMessage
+            admins = (
+                User.query
+                .filter(
+                    User.college_id.in_([c.id for c in target_colleges]),
+                    User.role == 'admin',
+                    User.is_active == True,
+                )
+                .all()
+            )
+            for admin in admins:
+                try:
+                    msg = MailMessage(
+                        subject=f'[SmartAttend] {subject}',
+                        recipients=[admin.email],
+                        html=f'''
+                        <p>Dear {admin.name},</p>
+                        <p>{message.replace(chr(10), "<br>")}</p>
+                        <hr>
+                        <p style="color:#666;font-size:12px">
+                          This message was sent by the SmartAttend platform team.
+                        </p>
+                        ''',
+                    )
+                    mail.send(msg)
+                    sent_count += 1
+                except Exception as exc:
+                    current_app.logger.error('Broadcast email failed for %s: %s', admin.email, exc)
+                    failed.append(admin.email)
+
+        # Log the broadcast
+        db.session.add(log_platform_action(
+            actor=current_user,
+            action_key='broadcast.sent',
+            summary=f'Broadcast: {subject}',
+            college=None,
+            target_type='broadcast',
+            target_id=None,
+            details={
+                'subject': subject,
+                'target': target,
+                'college_count': len(target_colleges),
+                'sent_count': sent_count,
+                'send_email': send_email,
+            },
+        ))
+        db.session.commit()
+
+        if send_email:
+            if failed:
+                flash(f'Broadcast sent to {sent_count} admin(s). {len(failed)} failed.', 'warning')
+            else:
+                flash(f'Broadcast emailed to {sent_count} college admin(s) successfully.', 'success')
+        else:
+            flash(f'Broadcast logged for {len(target_colleges)} college(s). Email was not sent.', 'info')
+
+        return redirect(url_for('super_admin.broadcast'))
+
+    recent_broadcasts = (
+        PlatformAuditLog.query
+        .filter_by(action_key='broadcast.sent')
+        .order_by(PlatformAuditLog.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    return render_template(
+        'super_admin/broadcast.html',
+        colleges=colleges,
+        recent_broadcasts=recent_broadcasts,
+    )

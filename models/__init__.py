@@ -23,3 +23,4 @@ from models.assignment import AssignmentSubmission
 from models.platform_audit import PlatformAuditLog
 from models.platform_audit_read import PlatformAuditRead
 from models.sub_admin import SubAdminPermission
+from models.classroom import Classroom, ClassroomBooking

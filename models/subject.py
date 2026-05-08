@@ -16,7 +16,8 @@ class Subject(db.Model):
     semester = db.Column(db.Integer, nullable=False)
     credit_hours = db.Column(db.Integer, default=3)
 
-    sessions = db.relationship('AttendanceSession', backref='subject', lazy=True)
+    sessions = db.relationship('AttendanceSession', backref='subject', lazy=True,
+                               cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<Subject {self.code}>'

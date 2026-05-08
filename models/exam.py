@@ -26,6 +26,8 @@ class Exam(db.Model):
     instructions = db.Column(db.Text, nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey('teachers.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=utc_now_naive)
+    is_deleted = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     subject = db.relationship('Subject', backref='exams', lazy=True)
     creator = db.relationship('Teacher', backref='exams', lazy=True)

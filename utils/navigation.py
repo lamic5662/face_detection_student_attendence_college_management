@@ -40,6 +40,22 @@ NAV_ITEMS = {
             'section': 'core',
         },
         {
+            'key': 'monitor',
+            'label': 'System Monitor',
+            'icon': 'bi-activity',
+            'endpoint': 'super_admin.monitor',
+            'description': 'Live system health, active sessions, and background jobs.',
+            'section': 'core',
+        },
+        {
+            'key': 'broadcast',
+            'label': 'Broadcast',
+            'icon': 'bi-megaphone-fill',
+            'endpoint': 'super_admin.broadcast',
+            'description': 'Send announcements to all college admins.',
+            'section': 'more',
+        },
+        {
             'key': 'audit_logs',
             'label': 'Audit Logs',
             'icon': 'bi-journal-text',
@@ -282,6 +298,15 @@ NAV_ITEMS = {
             'description': 'Approve and review student ID cards.',
             'section': 'more',
             'active_contains': ['id_card'],
+            'group': 'System',
+        },
+        {
+            'key': 'my_plan',
+            'label': 'My Plan',
+            'icon': 'bi-layers-fill',
+            'endpoint': 'admin.my_plan',
+            'description': 'Your subscription plan, active modules, expiry, and how to renew.',
+            'section': 'more',
             'group': 'System',
         },
         {

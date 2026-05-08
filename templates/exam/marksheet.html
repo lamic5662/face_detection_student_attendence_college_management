@@ -105,8 +105,7 @@
     <thead>
       <tr>
         <th class="ms-th-subject">Subject</th>
-        <th class="ms-th-exam">Exam / Assessment</th>
-        <th class="ms-th-type">Type</th>
+        <th class="ms-th-exam">Assessment / Exam Title</th>
         <th class="ms-th-num">Full<br>Marks</th>
         <th class="ms-th-num">Pass<br>Marks</th>
         <th class="ms-th-num">Marks<br>Obtained</th>
@@ -122,18 +121,50 @@
     <tbody>
       {% for s in subjects %}
 
-      {% if s.exams %}
-      {% set total_rows = s.exams|length + 1 %}
-      {% for er in s.exams %}
-      <tr class="ms-exam-row">
-        {% if loop.first %}
-        <td class="ms-subject-cell" rowspan="{{ total_rows }}">
+      {% if s.grouped_exams %}
+      {% set ns = namespace(first=True) %}
+
+      {% for grp in s.grouped_exams %}
+
+      {# ── Type section divider row ─────────────────────────── #}
+      <tr class="ms-type-header-row">
+        {% if ns.first %}
+        <td class="ms-subject-cell" rowspan="{{ s.total_table_rows }}">
           <div class="ms-subj-name">{{ s.subject.name }}</div>
           <div class="ms-subj-code">{{ s.subject.code }}</div>
         </td>
         {% endif %}
-        <td>{{ er.exam.title }}</td>
-        <td><span class="ms-type-badge ms-type-{{ er.exam.exam_type }}">{{ er.exam.exam_type.replace('_',' ').title() }}</span></td>
+        <td colspan="7" class="ms-type-sep">
+          <span class="ms-type-badge ms-type-{{ grp.type }}">{{ grp.label }}</span>
+          <span class="ms-type-count">{{ grp.exams|length }} exam{{ 's' if grp.exams|length != 1 }}</span>
+        </td>
+        {% if ns.first %}
+        <td class="ms-att-cell" rowspan="{{ s.total_table_rows }}">
+          {{ s.total_classes if s.total_classes > 0 else '—' }}
+        </td>
+        <td class="ms-att-cell ms-att-present" rowspan="{{ s.total_table_rows }}">
+          {{ s.present if s.total_classes > 0 else '—' }}
+        </td>
+        <td class="ms-att-cell ms-att-absent" rowspan="{{ s.total_table_rows }}">
+          {{ s.absent if s.total_classes > 0 else '—' }}
+        </td>
+        <td class="ms-att-cell" rowspan="{{ s.total_table_rows }}">
+          {% if s.att_pct is not none %}
+          <span class="{% if s.att_pct >= 75 %}ms-att-ok{% elif s.att_pct >= 60 %}ms-att-warn{% else %}ms-att-low{% endif %}">
+            {{ s.att_pct }}%
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        {% set ns.first = False %}
+        {% endif %}
+      </tr>
+
+      {# ── Individual exam rows (no type column) ────────────── #}
+      {% for er in grp.exams %}
+      <tr class="ms-exam-row">
+        <td class="ms-exam-title {% if er.cancelled %}ms-cancelled{% endif %}">
+          {{ er.exam.title }}{% if er.cancelled %} <span class="ms-cancelled-badge">Cancelled</span>{% endif %}
+        </td>
         <td class="ms-num">{{ er.total | int }}</td>
         <td class="ms-num">{{ er.pass_marks | int if er.pass_marks else '—' }}</td>
         <td class="ms-num ms-obtained">
@@ -155,31 +186,14 @@
           {% elif er.obtained is not none %}<span class="ms-status-pass">Pass</span>
           {% else %}—{% endif %}
         </td>
-        {# Attendance — only on the first exam row of each subject (rowspan) #}
-        {% if loop.first %}
-        <td class="ms-att-cell" rowspan="{{ total_rows }}">
-          {{ s.total_classes if s.total_classes > 0 else '—' }}
-        </td>
-        <td class="ms-att-cell ms-att-present" rowspan="{{ total_rows }}">
-          {{ s.present if s.total_classes > 0 else '—' }}
-        </td>
-        <td class="ms-att-cell ms-att-absent" rowspan="{{ total_rows }}">
-          {{ s.absent if s.total_classes > 0 else '—' }}
-        </td>
-        <td class="ms-att-cell" rowspan="{{ total_rows }}">
-          {% if s.att_pct is not none %}
-          <span class="{% if s.att_pct >= 75 %}ms-att-ok{% elif s.att_pct >= 60 %}ms-att-warn{% else %}ms-att-low{% endif %}">
-            {{ s.att_pct }}%
-          </span>
-          {% else %}—{% endif %}
-        </td>
-        {% endif %}
       </tr>
       {% endfor %}
 
-      {# Subject sub-total row #}
+      {% endfor %}{# end grouped_exams loop #}
+
+      {# ── Subject sub-total row ────────────────────────────── #}
       <tr class="ms-subtotal-row">
-        <td colspan="3" class="ms-subtotal-lbl"><strong>{{ s.subject.code }} — Subject Total</strong></td>
+        <td class="ms-subtotal-lbl"><strong>{{ s.subject.code }} — Subject Total</strong></td>
         <td class="ms-num"><strong>{{ s.total | int if s.has_marks else '—' }}</strong></td>
         <td class="ms-num">—</td>
         <td class="ms-num ms-obtained"><strong>{{ s.obtained | int if s.has_marks else '—' }}</strong></td>
@@ -201,13 +215,13 @@
       </tr>
 
       {% else %}
-      {# No exams yet #}
+      {# ── No exams yet ─────────────────────────────────────── #}
       <tr class="ms-exam-row">
         <td class="ms-subject-cell">
           <div class="ms-subj-name">{{ s.subject.name }}</div>
           <div class="ms-subj-code">{{ s.subject.code }}</div>
         </td>
-        <td colspan="8" class="text-center text-muted" style="font-size:12px;font-style:italic">No exams scheduled yet</td>
+        <td colspan="7" class="text-center text-muted" style="font-size:12px;font-style:italic">No exams scheduled yet</td>
         <td class="ms-att-cell">{{ s.total_classes if s.total_classes > 0 else '—' }}</td>
         <td class="ms-att-cell ms-att-present">{{ s.present if s.total_classes > 0 else '—' }}</td>
         <td class="ms-att-cell ms-att-absent">{{ s.absent if s.total_classes > 0 else '—' }}</td>
@@ -223,7 +237,7 @@
 
       {# Grand total row #}
       <tr class="ms-grandtotal-row">
-        <td colspan="4" class="ms-grandtotal-lbl">GRAND TOTAL</td>
+        <td colspan="3" class="ms-grandtotal-lbl">GRAND TOTAL</td>
         <td class="ms-num">—</td>
         <td class="ms-num ms-obtained"><strong>{{ overall.obtained | int if overall.total > 0 else '—' }} / {{ overall.total | int if overall.total > 0 else '—' }}</strong></td>
         <td class="ms-num"><strong>{{ overall.percentage if overall.percentage is not none else '—' }}</strong></td>
@@ -341,10 +355,9 @@
 }
 .ms-th-subject { text-align: left; width: 130px; }
 .ms-th-exam    { text-align: left; }
-.ms-th-type    { width: 80px; }
-.ms-th-num     { width: 52px; }
+.ms-th-num     { width: 56px; }
 .ms-th-grade   { width: 46px; }
-.ms-th-status  { width: 52px; }
+.ms-th-status  { width: 54px; }
 .ms-th-att     { width: 46px; background: #164e35 !important; }
 
 .ms-table td { padding: 6px 8px; border: 1px solid #e2e8f0; vertical-align: middle; }
@@ -365,6 +378,12 @@
 .ms-att-ok   { color: #15803d; font-weight: 800; }
 .ms-att-warn { color: #b45309; font-weight: 800; }
 .ms-att-low  { color: #b91c1c; font-weight: 800; }
+
+/* Type section divider row */
+.ms-type-header-row td { background: #f8fafc !important; border-top: 1px solid #e2e8f0 !important; padding: 5px 8px; }
+.ms-type-sep { text-align: left; }
+.ms-type-count { font-size: 10px; color: #94a3b8; margin-left: 8px; font-weight: 500; }
+.ms-exam-title { padding-left: 18px !important; color: #334155; }
 
 /* Sub-total row */
 .ms-subtotal-row td { background: #eff6ff !important; border-top: 2px solid #bfdbfe !important; border-bottom: 2px solid #bfdbfe !important; }
@@ -391,6 +410,10 @@
 /* Status */
 .ms-status-pass { color: #15803d; font-weight: 700; font-size: 10px; }
 .ms-status-fail { color: #b91c1c; font-weight: 700; font-size: 10px; }
+
+/* Cancelled exam rows */
+.ms-cancelled { color: #94a3b8 !important; }
+.ms-cancelled-badge { display:inline-block; background:#f1f5f9; color:#94a3b8; font-size:9px; font-weight:700; padding:1px 6px; border-radius:8px; border:1px solid #e2e8f0; }
 .ms-absent  { color: #64748b; font-style: italic; font-size: 10px; }
 .ms-pending { color: #94a3b8; }
 

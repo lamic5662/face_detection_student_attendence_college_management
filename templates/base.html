@@ -90,23 +90,54 @@
         </span>
       </button>
       <div class="collapse {% if nav.more_open %}show{% endif %}" id="sidebarMoreTools">
-        <ul class="sidebar-nav sidebar-nav-secondary mt-2">
-          {% for item in nav.more_items %}
-          <li data-nav-group="more" data-nav-key="{{ item.key }}">
-            <a href="{{ item.url }}"
-               class="{% if item.active %}active{% endif %}"
-               data-bs-toggle="tooltip"
-               data-bs-placement="right"
-               title="{{ item.label }}">
-              <i class="bi {{ item.icon }}"></i>
-              <span>{{ item.label }}</span>
-              {% if item.badge %}
-              <span class="badge bg-danger ms-auto nav-badge">{{ item.badge }}</span>
-              {% endif %}
-            </a>
-          </li>
+        <div class="sidebar-search-wrap">
+          <i class="bi bi-search sidebar-search-icon"></i>
+          <input type="text" id="sidebarNavSearch" class="sidebar-search-input"
+                 placeholder="Search tools…" autocomplete="off">
+        </div>
+        <div id="sidebarSearchEmpty" class="sidebar-search-empty d-none">No results</div>
+        {% if nav.more_groups %}
+          {% for grp in nav.more_groups %}
+          <div class="sidebar-group-block">
+            <div class="sidebar-group-label">{{ grp.label }}</div>
+            <ul class="sidebar-nav sidebar-nav-secondary">
+              {% for item in grp.nav_items %}
+              <li data-nav-group="more" data-nav-key="{{ item.key }}">
+                <a href="{{ item.url }}"
+                   class="{% if item.active %}active{% endif %}"
+                   data-bs-toggle="tooltip"
+                   data-bs-placement="right"
+                   title="{{ item.label }}">
+                  <i class="bi {{ item.icon }}"></i>
+                  <span>{{ item.label }}</span>
+                  {% if item.badge %}
+                  <span class="badge bg-danger ms-auto nav-badge">{{ item.badge }}</span>
+                  {% endif %}
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
           {% endfor %}
-        </ul>
+        {% else %}
+          <ul class="sidebar-nav sidebar-nav-secondary mt-2">
+            {% for item in nav.more_items %}
+            <li data-nav-group="more" data-nav-key="{{ item.key }}">
+              <a href="{{ item.url }}"
+                 class="{% if item.active %}active{% endif %}"
+                 data-bs-toggle="tooltip"
+                 data-bs-placement="right"
+                 title="{{ item.label }}">
+                <i class="bi {{ item.icon }}"></i>
+                <span>{{ item.label }}</span>
+                {% if item.badge %}
+                <span class="badge bg-danger ms-auto nav-badge">{{ item.badge }}</span>
+                {% endif %}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
       </div>
     </div>
     {% endif %}
@@ -545,8 +576,40 @@
   sidebarPinChecks.forEach((input) => {
     input.addEventListener('change', () => enforceSidebarPinLimit(input));
   });
+
+  // ── Sidebar nav search ───────────────────────────────────────────────────
+  const navSearchInput = document.getElementById('sidebarNavSearch');
+  const navSearchEmpty = document.getElementById('sidebarSearchEmpty');
+  if (navSearchInput) {
+    navSearchInput.addEventListener('input', () => {
+      const q = navSearchInput.value.trim().toLowerCase();
+      let anyVisible = false;
+
+      document.querySelectorAll('#sidebarMoreTools li[data-nav-key]').forEach(li => {
+        const label = li.querySelector('span') ? li.querySelector('span').textContent.toLowerCase() : '';
+        const match = !q || label.includes(q);
+        li.style.display = match ? '' : 'none';
+        if (match) anyVisible = true;
+      });
+
+      // Hide group blocks where all items are hidden
+      document.querySelectorAll('#sidebarMoreTools .sidebar-group-block').forEach(block => {
+        const visible = [...block.querySelectorAll('li[data-nav-key]')].some(li => li.style.display !== 'none');
+        block.style.display = visible ? '' : 'none';
+      });
+
+      navSearchEmpty.classList.toggle('d-none', !q || anyVisible);
+    });
+
+    // Clear search when More Tools collapses
+    document.getElementById('sidebarMoreTools').addEventListener('hide.bs.collapse', () => {
+      navSearchInput.value = '';
+      navSearchInput.dispatchEvent(new Event('input'));
+    });
+  }
 </script>
 {% block scripts %}{% endblock %}
+<script src="{{ url_for('static', filename='js/bulk-select.js') }}"></script>
 
 {# ── Global Confirmation Modal ───────────────────────────────────────────── #}
 <div class="modal fade" id="saConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
@@ -848,6 +911,37 @@
     display: none;
   }
 }
+
+/* ── Bulk Select ──────────────────────────────────────────────────────── */
+.bulk-cb {
+  width: 16px; height: 16px; cursor: pointer;
+  accent-color: #0d6efd;
+}
+.bulk-row-selected td {
+  background: rgba(13,110,253,.06) !important;
+}
+#bulkActionBar {
+  position: fixed;
+  bottom: -90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1055;
+  background: #1e293b;
+  color: #f8fafc;
+  border-radius: 16px;
+  padding: 14px 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.35);
+  transition: bottom .35s cubic-bezier(.34,1.56,.64,1);
+  min-width: 340px;
+  max-width: calc(100vw - 48px);
+  white-space: nowrap;
+}
+#bulkActionBar.bulk-bar-visible { bottom: 24px; }
+.bulk-bar-inner {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 20px;
+}
+.bulk-bar-label { font-size: 14px; font-weight: 600; }
 </style>
 
 <script>

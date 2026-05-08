@@ -107,6 +107,7 @@ def _register_blueprints(app: Flask) -> None:
     from routes.parent import parent_bp
     from routes.help import help_bp
     from routes.ai import ai_bp
+    from routes.classroom import classroom_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(help_bp)
@@ -122,6 +123,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(exam_bp)
     app.register_blueprint(fee_bp)
     app.register_blueprint(parent_bp)
+    app.register_blueprint(classroom_bp)
 
 
 def _log_optional_preview_dependencies(app: Flask) -> None:
@@ -485,13 +487,26 @@ def create_app(config_override=None) -> Flask:
 
     _start_scheduler(app)
 
+    from utils.time import utc_now_naive
+    app.extensions['server_start_time'] = utc_now_naive()
+
     return app
 
 
 def _start_scheduler(app: 'Flask') -> None:
-    """Start APScheduler for background jobs. Safe under Gunicorn with multiple workers
-    by using an env-var guard so only one worker registers the scheduler."""
+    """Start APScheduler for background jobs.
+
+    In Flask debug mode, Werkzeug spawns two processes:
+      - parent (reloader): watches files, WERKZEUG_RUN_MAIN is NOT set
+      - child  (serving):  handles requests, WERKZEUG_RUN_MAIN == 'true'
+    We only start the scheduler in the serving process so it lives alongside
+    the app that handles requests. In production (no reloader) it always starts.
+    """
     import os
+    if app.debug and os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        return
+
+    # Guard against double-start on Gunicorn multi-worker pre-fork setups
     if os.environ.get('SCHEDULER_STARTED') == '1':
         return
     os.environ['SCHEDULER_STARTED'] = '1'
@@ -515,6 +530,7 @@ def _start_scheduler(app: 'Flask') -> None:
             replace_existing=True,
         )
         scheduler.start()
+        app.extensions['scheduler'] = scheduler
         import logging
         logging.getLogger(__name__).info('APScheduler started — hourly background jobs (attendance reports + fee reminders)')
 

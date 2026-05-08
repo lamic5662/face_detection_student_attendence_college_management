@@ -49,10 +49,15 @@
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0"
+             data-bulk-url="{{ url_for('admin.bulk_delete_subjects') }}"
+             data-bulk-label="subject">
         <thead class="table-light">
           <tr>
-            <th class="px-4">Code</th>
+            <th style="width:38px" class="ps-3">
+              <input type="checkbox" data-bulk-select-all class="bulk-cb" title="Select all">
+            </th>
+            <th class="px-2">Code</th>
             <th>Name</th>
             <th>Department</th>
             <th>Semester</th>
@@ -65,7 +70,11 @@
         <tbody>
           {% for s in subjects %}
           <tr>
-            <td class="px-4"><span class="badge bg-info-subtle text-info">{{ s.code }}</span></td>
+            <td class="ps-3">
+              <input type="checkbox" data-bulk-item value="{{ s.id }}"
+                     data-bulk-name="{{ s.name }}" class="bulk-cb">
+            </td>
+            <td class="px-2"><span class="badge bg-info-subtle text-info">{{ s.code }}</span></td>
             <td class="fw-semibold">{{ s.name }}</td>
             <td><span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span></td>
             <td><span class="badge bg-secondary-subtle text-secondary">Sem {{ s.semester }}</span></td>
@@ -160,7 +169,7 @@
           </script>
 
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted py-5">No subjects found.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted py-5">No subjects found.</td></tr>
           {% endfor %}
         </tbody>
       </table>

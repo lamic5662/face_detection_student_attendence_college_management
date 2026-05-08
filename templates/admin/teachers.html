@@ -56,10 +56,15 @@
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0"
+             data-bulk-url="{{ url_for('admin.bulk_delete_teachers') }}"
+             data-bulk-label="teacher">
         <thead class="table-light">
           <tr>
-            <th class="px-4">Employee ID</th>
+            <th style="width:38px" class="ps-3">
+              <input type="checkbox" data-bulk-select-all class="bulk-cb" title="Select all">
+            </th>
+            <th class="px-2">Employee ID</th>
             <th>Name</th>
             <th>Email</th>
             <th>Faculty</th>
@@ -71,7 +76,11 @@
         <tbody>
           {% for t in teachers %}
           <tr>
-            <td class="px-4"><span class="badge bg-secondary">{{ t.employee_id }}</span></td>
+            <td class="ps-3">
+              <input type="checkbox" data-bulk-item value="{{ t.id }}"
+                     data-bulk-name="{{ t.user.name }}" class="bulk-cb">
+            </td>
+            <td class="px-2"><span class="badge bg-secondary">{{ t.employee_id }}</span></td>
             <td class="fw-semibold">{{ t.user.name }}</td>
             <td>
               <div class="text-muted small">{{ t.user.email }}</div>
@@ -145,7 +154,7 @@
           </div>
           {% else %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-5">
+            <td colspan="8" class="text-center text-muted py-5">
               <i class="bi bi-person-badge fs-1 d-block mb-2 opacity-25"></i>
               No teachers found{% if selected_dept or search %} for the selected filters{% endif %}.
             </td>
