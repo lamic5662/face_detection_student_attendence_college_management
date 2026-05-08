@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}My Classrooms{% endblock %}
+{% block page_title %}<i class="bi bi-building me-2"></i>My Classrooms{% endblock %}
+
+{% block content %}
+
+{# ── Context banner ─────────────────────────────────────────────────────── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body d-flex align-items-center gap-3 py-3 px-4">
+    <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center"
+         style="width:46px;height:46px;flex-shrink:0">
+      <i class="bi bi-mortarboard-fill fs-5 text-primary"></i>
+    </div>
+    <div>
+      <div class="fw-semibold">{{ dept.name if dept else 'Department not set' }}</div>
+      <div class="text-muted small">
+        {% if student.semester %}Semester {{ student.semester }}{% else %}Semester not set{% endif %}
+        &nbsp;·&nbsp;{{ today.strftime('%A, %d %B %Y') }}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Today's rooms ──────────────────────────────────────────────────────── #}
+<h6 class="text-muted text-uppercase fw-bold small mb-3 ms-1">
+  <i class="bi bi-sun-fill me-1 text-warning"></i>Today's Rooms
+</h6>
+
+{% if today_slots %}
+<div class="row g-3 mb-4">
+  {% for b in today_slots %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card border-0 shadow-sm h-100"
+         style="border-left:4px solid {{ b.color }} !important;">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-start gap-2">
+          <i class="bi {{ b.classroom.type_icon }} fs-5 mt-1" style="color:{{ b.color }}"></i>
+          <div class="flex-fill">
+            <div class="fw-semibold">{{ b.classroom.name }}</div>
+            {% if b.classroom.block %}
+            <div class="text-muted small">{{ b.classroom.block }}</div>
+            {% endif %}
+            <div class="d-flex align-items-center gap-2 mt-2">
+              <span class="badge rounded-pill text-bg-light border">
+                <i class="bi bi-clock me-1"></i>
+                {{ b.start_time.strftime('%H:%M') }} – {{ b.end_time.strftime('%H:%M') }}
+              </span>
+              <span class="badge rounded-pill"
+                    style="background:{{ b.color }}20;color:{{ b.color }};">
+                {{ b.booking_type|title }}
+              </span>
+            </div>
+            {% if b.notes %}
+            <div class="text-muted small mt-2 fst-italic">{{ b.notes }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-door-open fs-1 mb-2 d-block opacity-25"></i>
+    No classroom scheduled for today.
+  </div>
+</div>
+{% endif %}
+
+{# ── This week ──────────────────────────────────────────────────────────── #}
+<h6 class="text-muted text-uppercase fw-bold small mb-3 ms-1">
+  <i class="bi bi-calendar3 me-1"></i>This Week
+</h6>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    {% for day in week %}
+    <div class="d-flex gap-0 {% if not loop.last %}border-bottom{% endif %} {% if day.is_today %}bg-primary bg-opacity-5{% endif %}">
+      {# Day label #}
+      <div class="px-4 py-3 text-center" style="min-width:80px;border-right:1px solid rgba(0,0,0,.07)">
+        <div class="fw-semibold small {% if day.is_today %}text-primary{% else %}text-muted{% endif %}">
+          {{ day.date.strftime('%a') }}
+        </div>
+        <div class="fw-bold {% if day.is_today %}text-primary{% else %}text-dark{% endif %}">
+          {{ day.date.day }}
+        </div>
+        {% if day.is_today %}
+        <div class="badge rounded-pill bg-primary text-white" style="font-size:.6rem">Today</div>
+        {% endif %}
+      </div>
+      {# Slots #}
+      <div class="flex-fill px-3 py-3">
+        {% if day.slots %}
+        <div class="d-flex flex-wrap gap-2">
+          {% for b in day.slots %}
+          <div class="d-flex align-items-center gap-2 border rounded px-3 py-2 bg-white"
+               style="border-left:3px solid {{ b.color }} !important">
+            <i class="bi {{ b.classroom.type_icon }} small" style="color:{{ b.color }}"></i>
+            <div>
+              <span class="fw-semibold small">{{ b.classroom.name }}</span>
+              {% if b.classroom.block %}
+              <span class="text-muted small"> · {{ b.classroom.block }}</span>
+              {% endif %}
+              <div class="text-muted" style="font-size:.75rem">
+                {{ b.start_time.strftime('%H:%M') }} – {{ b.end_time.strftime('%H:%M') }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <span class="text-muted small fst-italic">No classes</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}

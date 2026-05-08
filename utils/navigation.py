@@ -128,6 +128,7 @@ NAV_ITEMS = {
             'section': 'core',
             'active_contains': ['calendar'],
         },
+        # ── People ──────────────────────────────────────────────────────
         {
             'key': 'subjects',
             'label': 'Subjects',
@@ -135,6 +136,7 @@ NAV_ITEMS = {
             'endpoint': 'admin.subjects',
             'description': 'Course list and ownership.',
             'section': 'more',
+            'group': 'People',
         },
         {
             'key': 'departments',
@@ -143,6 +145,17 @@ NAV_ITEMS = {
             'endpoint': 'admin.departments',
             'description': 'Department structure and codes.',
             'section': 'more',
+            'group': 'People',
+        },
+        {
+            'key': 'parents',
+            'label': 'Parents',
+            'icon': 'bi-house-heart-fill',
+            'endpoint': 'admin.parents',
+            'description': 'Linked parent accounts.',
+            'section': 'more',
+            'active_contains': ['parent'],
+            'group': 'People',
         },
         {
             'key': 'all_users',
@@ -151,7 +164,9 @@ NAV_ITEMS = {
             'endpoint': 'admin.users',
             'description': 'Reset access and manage accounts.',
             'section': 'more',
+            'group': 'People',
         },
+        # ── Attendance ───────────────────────────────────────────────────
         {
             'key': 'sessions',
             'label': 'Sessions',
@@ -160,6 +175,7 @@ NAV_ITEMS = {
             'description': 'Monitor live and completed attendance sessions.',
             'section': 'more',
             'active_endpoints': ['admin.cancel_session'],
+            'group': 'Attendance',
         },
         {
             'key': 'analytics',
@@ -168,6 +184,28 @@ NAV_ITEMS = {
             'endpoint': 'admin.analytics',
             'description': 'Attendance and performance insights.',
             'section': 'more',
+            'group': 'Attendance',
+        },
+        # ── Scheduling ───────────────────────────────────────────────────
+        {
+            'key': 'timetable',
+            'label': 'Timetable',
+            'icon': 'bi-calendar3',
+            'endpoint': 'timetable.view',
+            'description': 'Weekly schedule and class timing.',
+            'section': 'more',
+            'active_contains': ['timetable'],
+            'group': 'Scheduling',
+        },
+        {
+            'key': 'classrooms',
+            'label': 'Classrooms',
+            'icon': 'bi-building',
+            'endpoint': 'classroom.classrooms',
+            'description': 'Manage rooms and room schedules.',
+            'section': 'more',
+            'active_contains': ['classrooms'],
+            'group': 'Scheduling',
         },
         {
             'key': 'leave_management',
@@ -177,7 +215,50 @@ NAV_ITEMS = {
             'description': 'Review student and teacher leave requests.',
             'section': 'more',
             'active_contains': ['leave'],
+            'group': 'Scheduling',
         },
+        # ── Exams & Records ──────────────────────────────────────────────
+        {
+            'key': 'exams',
+            'label': 'Exams',
+            'icon': 'bi-journals',
+            'endpoint': 'exam.admin_exams',
+            'description': 'Exam setup and results management.',
+            'section': 'more',
+            'group': 'Exams & Records',
+        },
+        {
+            'key': 'marksheets',
+            'label': 'Marksheets',
+            'icon': 'bi-award-fill',
+            'endpoint': 'admin.marksheet_list',
+            'description': 'Printable official marksheets.',
+            'section': 'more',
+            'active_endpoints': ['admin.admin_marksheet'],
+            'group': 'Exams & Records',
+        },
+        {
+            'key': 'signatures',
+            'label': 'Signatures',
+            'icon': 'bi-pen-fill',
+            'endpoint': 'admin.marksheet_signatures',
+            'description': 'Signature assets for official documents.',
+            'section': 'more',
+            'active_contains': ['marksheet_signature'],
+            'group': 'Exams & Records',
+        },
+        # ── Finance ──────────────────────────────────────────────────────
+        {
+            'key': 'fees',
+            'label': 'Fees',
+            'icon': 'bi-cash-stack',
+            'endpoint': 'fee.admin_fees',
+            'description': 'Fee structures and payments.',
+            'section': 'more',
+            'active_contains': ['fee'],
+            'group': 'Finance',
+        },
+        # ── System ───────────────────────────────────────────────────────
         {
             'key': 'file_manager',
             'label': 'File Manager',
@@ -191,68 +272,7 @@ NAV_ITEMS = {
                 'admin.preview_file',
                 'admin.view_file',
             ],
-        },
-        {
-            'key': 'timetable',
-            'label': 'Timetable',
-            'icon': 'bi-calendar3',
-            'endpoint': 'timetable.view',
-            'description': 'Weekly schedule and class timing.',
-            'section': 'more',
-            'active_contains': ['timetable'],
-        },
-        {
-            'key': 'exams',
-            'label': 'Exams',
-            'icon': 'bi-journals',
-            'endpoint': 'exam.admin_exams',
-            'description': 'Exam setup and results management.',
-            'section': 'more',
-        },
-        {
-            'key': 'marksheets',
-            'label': 'Marksheets',
-            'icon': 'bi-award-fill',
-            'endpoint': 'admin.marksheet_list',
-            'description': 'Printable official marksheets.',
-            'section': 'more',
-            'active_endpoints': ['admin.admin_marksheet'],
-        },
-        {
-            'key': 'signatures',
-            'label': 'Signatures',
-            'icon': 'bi-pen-fill',
-            'endpoint': 'admin.marksheet_signatures',
-            'description': 'Signature assets for official documents.',
-            'section': 'more',
-            'active_contains': ['marksheet_signature'],
-        },
-        {
-            'key': 'fees',
-            'label': 'Fees',
-            'icon': 'bi-cash-stack',
-            'endpoint': 'fee.admin_fees',
-            'description': 'Fee structures and payments.',
-            'section': 'more',
-            'active_contains': ['fee'],
-        },
-        {
-            'key': 'parents',
-            'label': 'Parents',
-            'icon': 'bi-house-heart-fill',
-            'endpoint': 'admin.parents',
-            'description': 'Linked parent accounts.',
-            'section': 'more',
-            'active_contains': ['parent'],
-        },
-        {
-            'key': 'settings',
-            'label': 'Settings',
-            'icon': 'bi-gear-fill',
-            'endpoint': 'admin.settings',
-            'description': 'College-wide configuration.',
-            'section': 'more',
-            'active_endpoints': ['admin.save_settings'],
+            'group': 'System',
         },
         {
             'key': 'digital_id_cards',
@@ -262,6 +282,17 @@ NAV_ITEMS = {
             'description': 'Approve and review student ID cards.',
             'section': 'more',
             'active_contains': ['id_card'],
+            'group': 'System',
+        },
+        {
+            'key': 'settings',
+            'label': 'Settings',
+            'icon': 'bi-gear-fill',
+            'endpoint': 'admin.settings',
+            'description': 'College-wide configuration.',
+            'section': 'more',
+            'active_endpoints': ['admin.save_settings'],
+            'group': 'System',
         },
         {
             'key': 'user_guide',
@@ -270,6 +301,7 @@ NAV_ITEMS = {
             'endpoint': 'help.guide',
             'description': 'Built-in documentation and walkthroughs.',
             'section': 'more',
+            'group': 'System',
         },
     ],
     'teacher': [
@@ -352,6 +384,15 @@ NAV_ITEMS = {
             'description': 'Assigned schedule.',
             'section': 'more',
             'active_contains': ['timetable'],
+        },
+        {
+            'key': 'classrooms',
+            'label': 'Classrooms',
+            'icon': 'bi-building',
+            'endpoint': 'classroom.teacher_classrooms',
+            'description': 'Rooms assigned to your classes this week.',
+            'section': 'more',
+            'active_contains': ['classrooms'],
         },
         {
             'key': 'exams_marks',
@@ -458,6 +499,15 @@ NAV_ITEMS = {
             'description': 'Weekly class schedule.',
             'section': 'more',
             'active_contains': ['timetable'],
+        },
+        {
+            'key': 'classrooms',
+            'label': 'Classrooms',
+            'icon': 'bi-building',
+            'endpoint': 'classroom.student_classrooms',
+            'description': 'Which room your class is in this week.',
+            'section': 'more',
+            'active_contains': ['classrooms'],
         },
         {
             'key': 'marksheet',
@@ -633,6 +683,7 @@ def build_sidebar_navigation(user, endpoint: str | None) -> dict:
             'url': url_for(spec['endpoint']),
             'active': _is_active(spec, endpoint),
             'badge': _badge_for_item(user, spec['key']),
+            'group': spec.get('group', ''),
         }
 
         if spec['section'] == 'core':
@@ -648,9 +699,17 @@ def build_sidebar_navigation(user, endpoint: str | None) -> dict:
         else:
             more_items.append(item)
 
+    # Build grouped more_items — preserving insertion order, skip empty groups
+    _groups: dict[str, list] = {}
+    for item in more_items:
+        g = item['group'] or 'Other'
+        _groups.setdefault(g, []).append(item)
+    more_groups = [{'label': label, 'nav_items': items} for label, items in _groups.items()]
+
     return {
         'quick_items': quick_items,
         'more_items': more_items,
+        'more_groups': more_groups,
         'customizable_items': customizable_items,
         'always_visible_items': always_visible_items,
         'has_customizable_items': bool(customizable_items),

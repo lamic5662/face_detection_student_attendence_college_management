@@ -1,0 +1,1159 @@
+{% extends "base.html" %}
+{% block title %}Classroom Management{% endblock %}
+{% block page_title %}<i class="bi bi-building me-2"></i>Classroom Management{% endblock %}
+
+{% block content %}
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" id="cmTabs">
+  <li class="nav-item">
+    <a class="nav-link active fw-semibold" data-bs-toggle="tab" href="#schedulePane">
+      <i class="bi bi-grid-3x3-gap-fill me-1"></i>Schedule
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link fw-semibold" data-bs-toggle="tab" href="#roomsPane" id="rooms-tab-link">
+      <i class="bi bi-door-open-fill me-1"></i>Rooms
+      <span class="badge bg-secondary ms-1">{{ rooms|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link fw-semibold" data-bs-toggle="tab" href="#bookingsPane" id="bookings-tab-link">
+      <i class="bi bi-list-check me-1"></i>All Schedules
+      <span class="badge bg-secondary ms-1">{{ all_bkgs|length }}</span>
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+<!-- ═══════════════════════  SCHEDULE TAB  ════════════════════════════════ -->
+<div class="tab-pane fade show active" id="schedulePane">
+
+  <!-- Date navigation bar -->
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body px-4 py-3 d-flex align-items-center gap-3 flex-wrap">
+
+      <div class="d-flex gap-1">
+        <a href="{{ url_for('classroom.classrooms', date=prev_date) }}"
+           class="btn btn-outline-secondary btn-sm px-2">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <a href="{{ url_for('classroom.classrooms', date=today.isoformat()) }}"
+           class="btn btn-outline-secondary btn-sm px-3 fw-semibold">Today</a>
+        <a href="{{ url_for('classroom.classrooms', date=next_date) }}"
+           class="btn btn-outline-secondary btn-sm px-2">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+
+      <div class="fw-bold" style="font-size:15px; min-width:200px">
+        {{ sel_date.strftime('%A, %d %B %Y') }}
+        {% if sel_date == today %}
+          <span class="badge bg-primary ms-2" style="font-size:11px">Today</span>
+        {% endif %}
+      </div>
+
+      <div class="d-flex gap-1 flex-wrap">
+        {% for d in week_strip %}
+        <a href="{{ url_for('classroom.classrooms', date=d.isoformat()) }}"
+           class="week-day-btn {% if d == sel_date %}active{% endif %} {% if d == today %}is-today{% endif %}">
+          <div style="font-size:10px; line-height:1.2">{{ d.strftime('%a') }}</div>
+          <div class="fw-bold" style="font-size:13px">{{ d.strftime('%d') }}</div>
+        </a>
+        {% endfor %}
+      </div>
+
+      <form method="GET" class="ms-auto d-flex align-items-center gap-2">
+        <input type="date" name="date" class="form-control form-control-sm" style="width:150px"
+               value="{{ sel_date.isoformat() }}" onchange="this.form.submit()">
+      </form>
+
+      <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addBookingModal">
+        <i class="bi bi-plus-circle-fill me-1"></i>Add Schedule
+      </button>
+    </div>
+  </div>
+
+  <!-- Timeline grid -->
+  {% if not active_rooms %}
+  <div class="card border-0 shadow-sm text-center py-5 text-muted">
+    <i class="bi bi-building fs-1 d-block mb-3 opacity-25"></i>
+    <p class="fw-semibold mb-1">No classrooms added yet.</p>
+    <p class="small mb-3">Go to the Rooms tab to add classrooms first.</p>
+    <div><a class="btn btn-primary btn-sm" data-bs-toggle="tab" href="#roomsPane">Add Rooms</a></div>
+  </div>
+  {% else %}
+
+  <div class="card border-0 shadow-sm overflow-hidden">
+    <div class="schedule-wrap">
+
+      <!-- Hour ruler -->
+      <div class="sched-row ruler-row">
+        <div class="room-col"></div>
+        <div class="timeline-col">
+          {% for h in hours %}
+          <div class="hour-label" style="left: calc({{ loop.index0 }} / {{ hours|length }} * 100%)">
+            {{ '%02d'|format(h) }}:00
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% for row in grid %}
+      {% set room = row.room %}
+      <div class="sched-row">
+        <div class="room-col">
+          <div class="fw-semibold" style="font-size:13px">{{ room.name }}</div>
+          <div class="d-flex align-items-center gap-1 mt-1">
+            <span class="room-type-badge rt-{{ room.room_type }}">
+              <i class="bi {{ room.type_icon }} me-1"></i>{{ room.type_label }}
+            </span>
+            {% if room.capacity %}
+            <span class="text-muted" style="font-size:11px">
+              <i class="bi bi-people me-1"></i>{{ room.capacity }}
+            </span>
+            {% endif %}
+          </div>
+          {% if room.block %}
+          <div class="text-muted" style="font-size:10px; margin-top:2px">{{ room.block }}</div>
+          {% endif %}
+        </div>
+
+        <div class="timeline-col"
+             onclick="openBookingFromSlot({{ room.id }}, event)"
+             title="Click to schedule this room">
+
+          {% for h in hours %}
+          <div class="grid-line" style="left: calc({{ loop.index0 }} / {{ hours|length }} * 100%)"></div>
+          {% endfor %}
+
+          {% for pos in row.bookings %}
+          {% set b = pos.booking %}
+          <div class="booking-block btype-{{ b.booking_type }}"
+               style="left: {{ pos.left }}%; width: {{ pos.width }}%"
+               data-bs-toggle="tooltip"
+               data-bs-html="true"
+               title="<strong>{{ b.title }}</strong><br>
+                      {{ b.start_time.strftime('%H:%M') }} – {{ b.end_time.strftime('%H:%M') }}<br>
+                      {% if b.department %}{{ b.department.name }}{% if b.semester %} · Sem {{ b.semester }}{% endif %}<br>{% endif %}
+                      {% if b.is_recurring %}<span style='opacity:.8'>{{ b.day_name }}s{% if not b.valid_until %} · Ongoing{% endif %}</span><br>{% endif %}
+                      {% if b.notes %}<em>{{ b.notes }}</em>{% endif %}">
+            <div class="bk-title">{{ b.title }}</div>
+            {% if b.department %}
+            <div class="bk-sub">{{ b.department.code }}{% if b.semester %} · S{{ b.semester }}{% endif %}{% if b.is_ongoing %} <i class='bi bi-arrow-repeat'></i>{% endif %}</div>
+            {% endif %}
+            <button type="button" class="bk-del" title="Remove"
+                    data-bs-toggle="modal" data-bs-target="#confirmModal"
+                    data-msg="Remove this schedule?"
+                    data-action="{{ url_for('classroom.delete_booking', bid=b.id) }}">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+          {% endfor %}
+
+        </div>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+  <div class="d-flex gap-3 mt-3 flex-wrap">
+    {% for btype, label, color in [
+      ('class', 'Class',  '#2563eb'),
+      ('exam',  'Exam',   '#dc2626'),
+      ('event', 'Event',  '#7c3aed'),
+      ('other', 'Other',  '#64748b'),
+    ] %}
+    <div class="d-flex align-items-center gap-1 small text-muted">
+      <span style="width:14px;height:14px;border-radius:3px;background:{{ color }};display:inline-block;opacity:.8"></span>
+      {{ label }}
+    </div>
+    {% endfor %}
+    <div class="ms-auto small text-muted">
+      <i class="bi bi-arrow-repeat me-1"></i>Class schedules repeat weekly until edited
+      &nbsp;·&nbsp; Click empty area to schedule · ✕ to remove
+    </div>
+  </div>
+  {% endif %}
+
+</div>{# end schedulePane #}
+
+
+<!-- ═══════════════════════  ROOMS TAB  ══════════════════════════════════ -->
+<div class="tab-pane fade" id="roomsPane">
+
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <div class="input-group input-group-sm" style="max-width:280px">
+      <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+      <input type="text" id="roomSearch" class="form-control border-start-0 ps-0"
+             placeholder="Search rooms…" oninput="filterRooms(this.value)">
+    </div>
+    <select id="roomTypeFilter" class="form-select form-select-sm" style="max-width:160px"
+            onchange="filterRooms(document.getElementById('roomSearch').value)">
+      <option value="">All types</option>
+      <option value="lecture_hall">Lecture Hall</option>
+      <option value="lab">Laboratory</option>
+      <option value="seminar">Seminar Room</option>
+      <option value="exam_hall">Exam Hall</option>
+      <option value="other">Other</option>
+    </select>
+    <button class="btn btn-primary btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#addRoomModal">
+      <i class="bi bi-plus-circle-fill me-1"></i>Add Room
+    </button>
+  </div>
+
+  {% if rooms %}
+  <div class="row g-3" id="roomsGrid">
+    {% for room in rooms %}
+    <div class="col-md-4 col-lg-3 room-card-col"
+         data-search="{{ room.name|lower }} {{ (room.block or '')|lower }} {{ room.type_label|lower }}"
+         data-type="{{ room.room_type }}">
+      <div class="card border-0 shadow-sm h-100 {% if not room.is_active %}opacity-50{% endif %}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              <div class="fw-bold" style="font-size:15px">{{ room.name }}</div>
+              {% if room.block %}<div class="text-muted small">{{ room.block }}</div>{% endif %}
+            </div>
+            {% if not room.is_active %}
+            <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+          </div>
+          <span class="room-type-badge rt-{{ room.room_type }} mb-2 d-inline-block">
+            <i class="bi {{ room.type_icon }} me-1"></i>{{ room.type_label }}
+          </span>
+          {% if room.capacity %}
+          <div class="text-muted small mt-1">
+            <i class="bi bi-people me-1"></i>Capacity: {{ room.capacity }}
+          </div>
+          {% endif %}
+          <div class="text-muted small mt-1">
+            <i class="bi bi-calendar2-check me-1"></i>
+            {{ room.bookings|length }} schedule{{ 's' if room.bookings|length != 1 }}
+          </div>
+        </div>
+        <div class="card-footer bg-transparent border-0 d-flex gap-2 pb-3 px-3">
+          <button class="btn btn-sm btn-outline-primary flex-fill"
+                  data-bs-toggle="modal"
+                  data-bs-target="#editRoomModal{{ room.id }}">
+            <i class="bi bi-pencil me-1"></i>Edit
+          </button>
+          {% if room.bookings|length == 0 %}
+          <button type="button" class="btn btn-sm btn-outline-danger"
+                  data-bs-toggle="modal" data-bs-target="#confirmModal"
+                  data-msg="Delete room &quot;{{ room.name }}&quot;? This cannot be undone."
+                  data-action="{{ url_for('classroom.delete_classroom', rid=room.id) }}">
+            <i class="bi bi-trash3"></i>
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="editRoomModal{{ room.id }}" tabindex="-1">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0">
+          <div class="modal-header">
+            <h5 class="modal-title fw-semibold">Edit Room — {{ room.name }}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <form method="POST" action="{{ url_for('classroom.edit_classroom', rid=room.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="modal-body row g-3">
+              <div class="col-12">
+                <label class="form-label fw-semibold small">Room Name <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="form-control" value="{{ room.name }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Type</label>
+                <select name="room_type" class="form-select">
+                  {% for val, lbl in [('lecture_hall','Lecture Hall'),('lab','Laboratory'),('seminar','Seminar Room'),('exam_hall','Exam Hall'),('other','Other')] %}
+                  <option value="{{ val }}" {% if room.room_type == val %}selected{% endif %}>{{ lbl }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Capacity</label>
+                <input type="number" name="capacity" class="form-control" value="{{ room.capacity or '' }}" min="1">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Block / Floor</label>
+                <input type="text" name="block" class="form-control" value="{{ room.block or '' }}" placeholder="e.g. Block A">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Status</label>
+                <select name="is_active" class="form-select">
+                  <option value="1" {% if room.is_active %}selected{% endif %}>Active</option>
+                  <option value="0" {% if not room.is_active %}selected{% endif %}>Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer border-0">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div id="roomsEmpty" class="col-12 d-none">
+    <div class="card border-0 shadow-sm text-center py-4 text-muted">
+      <i class="bi bi-search fs-2 d-block mb-2 opacity-25"></i>
+      <p class="fw-semibold mb-0 small">No rooms match your search.</p>
+    </div>
+  </div>
+  {% else %}
+  <div class="card border-0 shadow-sm text-center py-5 text-muted">
+    <i class="bi bi-building fs-1 d-block mb-3 opacity-25"></i>
+    <p class="fw-semibold mb-0">No rooms added yet.</p>
+  </div>
+  {% endif %}
+
+</div>{# end roomsPane #}
+
+
+<!-- ═══════════════════════  ALL SCHEDULES TAB  ══════════════════════════ -->
+<div class="tab-pane fade" id="bookingsPane">
+
+  {% if all_bkgs %}
+
+  {# ── Filter bar ──────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 px-3 d-flex gap-2 align-items-center flex-wrap">
+      <div class="input-group input-group-sm" style="max-width:240px">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+        <input type="text" id="bkSearch" class="form-control border-start-0 ps-0"
+               placeholder="Search schedules…" oninput="filterBookings()">
+      </div>
+      <select id="bkTypeFilter" class="form-select form-select-sm" style="max-width:130px" onchange="filterBookings()">
+        <option value="">All types</option>
+        <option value="class">Class</option>
+        <option value="exam">Exam</option>
+        <option value="event">Event</option>
+        <option value="other">Other</option>
+      </select>
+      <select id="bkRoomFilter" class="form-select form-select-sm" style="max-width:160px" onchange="filterBookings()">
+        <option value="">All rooms</option>
+        {% for room in rooms %}
+        <option value="{{ room.id }}">{{ room.name }}</option>
+        {% endfor %}
+      </select>
+      <select id="bkDeptFilter" class="form-select form-select-sm" style="max-width:180px" onchange="filterBookings()">
+        <option value="">All departments</option>
+        {% for d in departments %}
+        <option value="{{ d.id }}">{{ d.name }}</option>
+        {% endfor %}
+      </select>
+      <button id="bkClearFilters" class="btn btn-sm btn-outline-secondary d-none" onclick="clearBookingFilters()">
+        <i class="bi bi-x-circle me-1"></i>Clear
+      </button>
+
+      {# Bulk delete toolbar — shown when rows are checked #}
+      <div id="bulkBar" class="ms-auto d-none d-flex align-items-center gap-2">
+        <span id="bulkCount" class="small text-muted fw-semibold"></span>
+        <form method="POST" action="{{ url_for('classroom.bulk_delete_bookings') }}"
+              id="bulkDeleteForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div id="bulkIdsContainer"></div>
+          <button type="button" class="btn btn-sm btn-danger" onclick="triggerBulkDelete()">
+            <i class="bi bi-trash3-fill me-1"></i>Delete Selected
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# ── Table ────────────────────────────────────────────────────────────── #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size:13px" id="bkTable">
+          <thead class="table-light">
+            <tr>
+              <th class="px-3" style="width:36px">
+                <input type="checkbox" class="form-check-input" id="selectAllBk" title="Select all visible">
+              </th>
+              <th class="px-2">Title</th>
+              <th>Room</th>
+              <th>Department · Semester</th>
+              <th>Type</th>
+              <th>Schedule</th>
+              <th>Time</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in all_bkgs %}
+            <tr class="bk-row"
+                data-text="{{ b.title|lower }} {{ b.classroom.name|lower }} {{ (b.department.name if b.department else '')|lower }}"
+                data-type="{{ b.booking_type }}"
+                data-room="{{ b.classroom_id }}"
+                data-dept="{{ b.department_id or '' }}">
+              <td class="px-3">
+                <input type="checkbox" class="form-check-input bk-check" value="{{ b.id }}">
+              </td>
+              <td class="px-2 fw-semibold">{{ b.title }}</td>
+              <td class="text-muted small">
+                {{ b.classroom.name }}
+                {% if b.classroom.block %}<br><span style="font-size:11px">{{ b.classroom.block }}</span>{% endif %}
+              </td>
+              <td class="small">
+                {% if b.department %}
+                  {{ b.department.name }}
+                  {% if b.semester %}<br><span class="text-muted" style="font-size:11px">Sem {{ b.semester }}</span>{% endif %}
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="btype-badge btype-{{ b.booking_type }}">
+                  {{ b.booking_type.replace('_',' ').title() }}
+                </span>
+              </td>
+              <td class="small">
+                {% if b.is_recurring %}
+                  <div class="d-flex align-items-center gap-1 flex-wrap">
+                    <span class="badge bg-primary-subtle text-primary">
+                      <i class="bi bi-arrow-repeat me-1"></i>{{ b.day_name }}s
+                    </span>
+                    {% if b.is_ongoing %}
+                    <span class="badge bg-success-subtle text-success">Ongoing</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-muted" style="font-size:11px; margin-top:3px">
+                    From {{ b.valid_from.strftime('%d %b %Y') }}
+                    {% if b.valid_until %} – {{ b.valid_until.strftime('%d %b %Y') }}{% endif %}
+                  </div>
+                {% else %}
+                  {{ b.booking_date.strftime('%a, %d %b %Y') }}
+                {% endif %}
+              </td>
+              <td class="small fw-semibold">
+                {{ b.start_time.strftime('%H:%M') }} – {{ b.end_time.strftime('%H:%M') }}
+                <div class="text-muted fw-normal" style="font-size:11px">{{ b.duration_mins }} min</div>
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-sm btn-outline-primary"
+                          data-bs-toggle="modal" data-bs-target="#editScheduleModal"
+                          data-bid="{{ b.id }}"
+                          data-title="{{ b.title|e }}"
+                          data-room="{{ b.classroom_id }}"
+                          data-dept="{{ b.department_id or '' }}"
+                          data-sem="{{ b.semester or '' }}"
+                          data-start="{{ b.start_time.strftime('%H:%M') }}"
+                          data-end="{{ b.end_time.strftime('%H:%M') }}"
+                          data-recurring="{{ b.is_recurring|lower }}"
+                          data-from="{{ b.valid_from.strftime('%Y-%m-%d') if b.valid_from else '' }}"
+                          data-until="{{ b.valid_until.strftime('%Y-%m-%d') if b.valid_until else '' }}"
+                          data-notes="{{ b.notes|e if b.notes else '' }}">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button type="button" class="btn btn-sm btn-outline-danger"
+                          data-bs-toggle="modal" data-bs-target="#confirmModal"
+                          data-msg="Remove &quot;{{ b.title|e }}&quot;?"
+                          data-action="{{ url_for('classroom.delete_booking', bid=b.id) }}">
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div id="bkEmptyState" class="text-center py-4 text-muted d-none">
+        <i class="bi bi-search fs-2 d-block mb-2 opacity-25"></i>
+        <span class="small fw-semibold">No schedules match your filters.</span>
+        <a href="#" class="d-block small mt-1" onclick="clearBookingFilters();return false;">Clear filters</a>
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="card border-0 shadow-sm text-center py-5 text-muted">
+    <i class="bi bi-calendar2-x fs-1 d-block mb-3 opacity-25"></i>
+    <p class="fw-semibold mb-0">No schedules yet.</p>
+  </div>
+  {% endif %}
+
+</div>{# end bookingsPane #}
+
+</div>{# end tab-content #}
+
+
+<!-- Shared single-form used by all individual delete actions -->
+<form method="POST" id="sharedDeleteForm" style="display:none">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+
+<!-- ═══════════════════  CONFIRM MODAL  ════════════════════════════════ -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-body px-4 pt-4 pb-2 text-center">
+        <div id="confirmIcon" class="mb-3">
+          <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10"
+                style="width:52px;height:52px">
+            <i class="bi bi-trash3-fill fs-4 text-danger"></i>
+          </span>
+        </div>
+        <p id="confirmMessage" class="fw-semibold mb-0" style="font-size:15px"></p>
+        <p class="text-muted small mt-1 mb-0" id="confirmSub"></p>
+        <input type="hidden" id="confirmActionUrl" value="">
+      </div>
+      <div class="modal-footer border-0 justify-content-center gap-2 pb-4">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger px-4" id="confirmOkBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════  ADD ROOM MODAL  ════════════════════════════════ -->
+<div class="modal fade" id="addRoomModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0">
+      <div class="modal-header">
+        <h5 class="modal-title fw-semibold">
+          <i class="bi bi-door-open-fill text-primary me-2"></i>Add New Room
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('classroom.add_classroom') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Room Name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required placeholder="e.g. Room 101, Lab A">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Type</label>
+            <select name="room_type" class="form-select">
+              <option value="lecture_hall">Lecture Hall</option>
+              <option value="lab">Laboratory</option>
+              <option value="seminar">Seminar Room</option>
+              <option value="exam_hall">Exam Hall</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Capacity</label>
+            <input type="number" name="capacity" class="form-control" min="1" placeholder="e.g. 60">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Block / Floor</label>
+            <input type="text" name="block" class="form-control" placeholder="e.g. Block A, Ground Floor">
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-plus-circle-fill me-1"></i>Add Room
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════  ADD SCHEDULE MODAL  ═════════════════════════════ -->
+<div class="modal fade" id="addBookingModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-calendar2-plus-fill text-primary me-2"></i>Add Schedule
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <form method="POST" action="{{ url_for('classroom.add_booking') }}" id="addScheduleForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="booking_type" id="addBookingType" value="class">
+
+        <div class="modal-body">
+
+          <!-- Mode toggle -->
+          <div class="d-flex gap-2 mb-4">
+            <input type="radio" class="btn-check" name="schedModeRadio" id="modeClassRadio" autocomplete="off" checked>
+            <label class="btn btn-outline-primary sched-mode-label flex-fill" for="modeClassRadio">
+              <i class="bi bi-arrow-repeat d-block fs-5 mb-1"></i>
+              <span class="fw-semibold d-block">Class Schedule</span>
+              <small class="d-block" style="font-size:10px;opacity:.7">Repeats weekly · Dept &amp; semester</small>
+            </label>
+            <input type="radio" class="btn-check" name="schedModeRadio" id="modeOneoffRadio" autocomplete="off">
+            <label class="btn btn-outline-primary sched-mode-label flex-fill" for="modeOneoffRadio">
+              <i class="bi bi-calendar-event d-block fs-5 mb-1"></i>
+              <span class="fw-semibold d-block">One-off Event</span>
+              <small class="d-block" style="font-size:10px;opacity:.7">Exam, event, or special use</small>
+            </label>
+          </div>
+
+          <!-- ── CLASS SCHEDULE FIELDS ─────────────────────────────── -->
+          <div id="classModeFields">
+            <div class="row g-3">
+
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Room <span class="text-danger">*</span></label>
+                <select id="bkRoom" name="classroom_id" class="form-select" required>
+                  <option value="">Select room…</option>
+                  {% for room in active_rooms %}
+                  <option value="{{ room.id }}">{{ room.name }}{% if room.block %} ({{ room.block }}){% endif %}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Department <span class="text-danger">*</span></label>
+                <select name="department_id" id="classDeptSel" class="form-select" required>
+                  <option value="">Select department…</option>
+                  {% for d in departments %}
+                  <option value="{{ d.id }}">{{ d.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Semester <span class="text-danger">*</span></label>
+                <select name="semester" id="classSemSel" class="form-select" required>
+                  <option value="">Select…</option>
+                  {% for s in range(1, 9) %}
+                  <option value="{{ s }}">Semester {{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Days of week -->
+              <div class="col-12">
+                <label class="form-label fw-semibold small d-block mb-2">
+                  Days of Week <span class="text-danger">*</span>
+                  <span class="text-muted fw-normal ms-1" style="font-size:11px">Select all days this class runs</span>
+                </label>
+                <div class="d-flex gap-2 flex-wrap">
+                  {% for i, day in [(0,'Mon'),(1,'Tue'),(2,'Wed'),(3,'Thu'),(4,'Fri'),(5,'Sat'),(6,'Sun')] %}
+                  <label class="day-pill">
+                    <input type="checkbox" name="day_of_week" value="{{ i }}"
+                           {% if sel_date.weekday() == i %}checked{% endif %}>
+                    {{ day }}
+                  </label>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Start Time <span class="text-danger">*</span></label>
+                <input type="time" id="bkStart" name="start_time" class="form-control" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">End Time <span class="text-danger">*</span></label>
+                <input type="time" id="bkEnd" name="end_time" class="form-control" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Active From <span class="text-danger">*</span></label>
+                <input type="date" name="valid_from" class="form-control"
+                       value="{{ today.isoformat() }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">
+                  Active Until
+                  <span class="text-muted fw-normal" style="font-size:11px">— leave blank = ongoing</span>
+                </label>
+                <input type="date" name="valid_until" class="form-control" placeholder="Ongoing">
+              </div>
+
+              <div class="col-12">
+                <label class="form-label fw-semibold small">Notes</label>
+                <input type="text" name="notes" id="classNotes" class="form-control" placeholder="Optional…">
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ── ONE-OFF EVENT FIELDS ─────────────────────────────── -->
+          <div id="oneoffModeFields" style="display:none">
+            <div class="row g-3">
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Room <span class="text-danger">*</span></label>
+                <select id="bkRoomOneoff" class="form-select">
+                  <option value="">Select room…</option>
+                  {% for room in active_rooms %}
+                  <option value="{{ room.id }}">{{ room.name }}{% if room.block %} ({{ room.block }}){% endif %}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Event Type <span class="text-danger">*</span></label>
+                <select id="oneoffTypeSel" class="form-select" onchange="document.getElementById('addBookingType').value=this.value">
+                  <option value="exam">Exam</option>
+                  <option value="event">Event</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label fw-semibold small">Title <span class="text-danger">*</span></label>
+                <input type="text" id="oneoffTitle" class="form-control"
+                       placeholder="e.g. Mid Term Exam — Physics, Annual Function">
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Date <span class="text-danger">*</span></label>
+                <input type="date" id="bkDate" name="booking_date" class="form-control"
+                       value="{{ sel_date.isoformat() }}">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">Start Time <span class="text-danger">*</span></label>
+                <input type="time" id="bkStartOneoff" class="form-control">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold small">End Time <span class="text-danger">*</span></label>
+                <input type="time" id="bkEndOneoff" class="form-control">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Department <span class="text-muted fw-normal">(optional)</span></label>
+                <select id="oneoffDeptSel" class="form-select">
+                  <option value="">— Any —</option>
+                  {% for d in departments %}
+                  <option value="{{ d.id }}">{{ d.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Semester <span class="text-muted fw-normal">(optional)</span></label>
+                <select id="oneoffSemSel" class="form-select">
+                  <option value="">—</option>
+                  {% for s in range(1, 9) %}
+                  <option value="{{ s }}">Semester {{ s }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label fw-semibold small">Notes</label>
+                <input type="text" id="oneoffNotes" class="form-control" placeholder="Optional…">
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-calendar2-plus-fill me-1"></i>Save Schedule
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════  EDIT SCHEDULE MODAL  ════════════════════════════ -->
+<div class="modal fade" id="editScheduleModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-pencil-square text-primary me-2"></i>Edit Schedule
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" id="editScheduleForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body row g-3">
+
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Subject / Title <span class="text-danger">*</span></label>
+            <input type="text" name="title" id="editTitle" class="form-control" required>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Room <span class="text-danger">*</span></label>
+            <select name="classroom_id" id="editRoom" class="form-select" required>
+              {% for room in active_rooms %}
+              <option value="{{ room.id }}">{{ room.name }}{% if room.block %} ({{ room.block }}){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Department</label>
+            <select name="department_id" id="editDept" class="form-select">
+              <option value="">— Any —</option>
+              {% for d in departments %}
+              <option value="{{ d.id }}">{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-semibold small">Semester</label>
+            <select name="semester" id="editSem" class="form-select">
+              <option value="">—</option>
+              {% for s in range(1, 9) %}
+              <option value="{{ s }}">Semester {{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">Start Time <span class="text-danger">*</span></label>
+            <input type="time" name="start_time" id="editStart" class="form-control" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold small">End Time <span class="text-danger">*</span></label>
+            <input type="time" name="end_time" id="editEnd" class="form-control" required>
+          </div>
+
+          <!-- Only shown for recurring (class) schedules -->
+          <div id="editRecurringFields">
+            <div class="row g-3 mt-0">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">Active From</label>
+                <input type="date" name="valid_from" id="editValidFrom" class="form-control">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">
+                  Active Until
+                  <span class="text-muted fw-normal" style="font-size:11px">— blank = ongoing</span>
+                </label>
+                <input type="date" name="valid_until" id="editValidUntil" class="form-control">
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label fw-semibold small">Notes</label>
+            <input type="text" name="notes" id="editNotes" class="form-control" placeholder="Optional…">
+          </div>
+
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+{{ super() }}
+<style>
+/* ── Week-strip buttons ──────────────────────────────────────────────── */
+.week-day-btn {
+  display:flex; flex-direction:column; align-items:center;
+  padding:4px 10px; border-radius:8px; text-decoration:none;
+  color:#64748b; border:1px solid transparent; transition:.15s;
+}
+.week-day-btn:hover { background:#f1f5f9; color:#0f172a; }
+.week-day-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+.week-day-btn.is-today:not(.active) { border-color:#2563eb; color:#2563eb; }
+
+/* ── Schedule grid ────────────────────────────────────────────────────── */
+.schedule-wrap { overflow-x:auto; min-width:0; }
+.sched-row { display:flex; align-items:stretch; border-bottom:1px solid #f1f5f9; }
+.sched-row:last-child { border-bottom:none; }
+.room-col {
+  flex-shrink:0; width:180px; padding:10px 14px;
+  border-right:1px solid #e2e8f0; background:#fafbfc;
+}
+.timeline-col { flex-grow:1; position:relative; min-height:52px; cursor:crosshair; }
+.ruler-row .timeline-col { min-height:28px; background:#f8fafc; }
+.hour-label {
+  position:absolute; top:6px; font-size:10px; color:#94a3b8;
+  transform:translateX(-50%); white-space:nowrap; pointer-events:none;
+  font-weight:600; letter-spacing:.3px;
+}
+.grid-line {
+  position:absolute; top:0; bottom:0; width:1px;
+  background:#f1f5f9; pointer-events:none;
+}
+
+/* ── Booking blocks ──────────────────────────────────────────────────── */
+.booking-block {
+  position:absolute; top:6px; bottom:6px; border-radius:6px; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:center;
+  padding:2px 8px 2px 6px; border-left:3px solid rgba(0,0,0,.22);
+  cursor:default; transition:opacity .15s, box-shadow .15s; min-width:30px;
+}
+.booking-block:hover { opacity:.9; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+.btype-class { background:#dbeafe; color:#1d4ed8; }
+.btype-exam  { background:#fee2e2; color:#b91c1c; }
+.btype-event { background:#ede9fe; color:#6d28d9; }
+.btype-other { background:#f1f5f9; color:#475569; }
+.bk-title { font-size:11px; font-weight:700; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bk-sub   { font-size:10px; opacity:.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bk-del-form { position:absolute; top:2px; right:2px; margin:0; }
+.bk-del {
+  background:none; border:none; cursor:pointer; padding:0 2px;
+  font-size:10px; opacity:0; transition:opacity .15s;
+  color:inherit; line-height:1;
+}
+.booking-block:hover .bk-del { opacity:.7; }
+.bk-del:hover { opacity:1 !important; }
+
+/* ── Room type badges ─────────────────────────────────────────────────── */
+.room-type-badge {
+  display:inline-flex; align-items:center; font-size:10px; font-weight:700;
+  padding:2px 8px; border-radius:20px;
+}
+.rt-lecture_hall { background:#dbeafe; color:#1d4ed8; }
+.rt-lab          { background:#dcfce7; color:#15803d; }
+.rt-seminar      { background:#ede9fe; color:#6d28d9; }
+.rt-exam_hall    { background:#fee2e2; color:#b91c1c; }
+.rt-other        { background:#f1f5f9; color:#475569; }
+
+/* ── Booking type badges ──────────────────────────────────────────────── */
+.btype-badge {
+  display:inline-block; padding:2px 10px; border-radius:20px;
+  font-size:11px; font-weight:700;
+}
+
+/* ── Mode toggle ─────────────────────────────────────────────────────── */
+.sched-mode-label {
+  display:flex; flex-direction:column; align-items:center; padding:12px 8px;
+  border-radius:10px; transition:.15s; cursor:pointer; text-align:center;
+}
+
+/* ── Day pills ───────────────────────────────────────────────────────── */
+.day-pill {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:44px; height:36px; border-radius:8px; border:1.5px solid #e2e8f0;
+  cursor:pointer; font-size:12px; font-weight:700; color:#64748b;
+  user-select:none; transition:.15s;
+}
+.day-pill input[type=checkbox] { display:none; }
+.day-pill:has(input:checked) { background:#2563eb; color:#fff; border-color:#2563eb; }
+.day-pill:hover:not(:has(input:checked)) { border-color:#93c5fd; color:#1d4ed8; }
+</style>
+
+<script>
+/* ─── Helpers ─────────────────────────────────────────────────────────── */
+const _CSRF = '{{ csrf_token() }}';
+
+function _postTo(url, extraFields) {
+  const f = document.createElement('form');
+  f.method = 'POST'; f.action = url;
+  const addHidden = (n, v) => {
+    const i = document.createElement('input');
+    i.type = 'hidden'; i.name = n; i.value = v; f.appendChild(i);
+  };
+  addHidden('csrf_token', _CSRF);
+  (extraFields || []).forEach(([n, v]) => addHidden(n, v));
+  document.body.appendChild(f);
+  f.submit();
+}
+
+let _bulkFields = null;
+
+/* bulk delete — called from onclick on the "Delete Selected" button */
+function triggerBulkDelete() {
+  const checked = [...document.querySelectorAll('.bk-check:checked')];
+  if (!checked.length) return;
+  _bulkFields = checked.map(cb => ['booking_ids', cb.value]);
+  document.getElementById('confirmMessage').textContent =
+    'Delete ' + checked.length + ' schedule' + (checked.length > 1 ? 's' : '') + '? This cannot be undone.';
+  document.getElementById('confirmActionUrl').value = '{{ url_for("classroom.bulk_delete_bookings") }}';
+  new bootstrap.Modal(document.getElementById('confirmModal')).show();
+}
+
+/* ─── Filter helpers (called from oninput / onchange in HTML) ──────────── */
+function filterRooms(q) {
+  const typeVal = document.getElementById('roomTypeFilter')?.value || '';
+  q = (q || '').toLowerCase();
+  let visible = 0;
+  document.querySelectorAll('.room-card-col').forEach(col => {
+    const show = (!q || col.dataset.search.includes(q)) && (!typeVal || col.dataset.type === typeVal);
+    col.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('roomsEmpty')?.classList.toggle('d-none', visible > 0);
+}
+
+function filterBookings() {
+  const q    = (document.getElementById('bkSearch')?.value || '').toLowerCase();
+  const type = document.getElementById('bkTypeFilter')?.value || '';
+  const room = document.getElementById('bkRoomFilter')?.value || '';
+  const dept = document.getElementById('bkDeptFilter')?.value || '';
+  let visible = 0;
+  document.querySelectorAll('.bk-row').forEach(row => {
+    const show = (!q || row.dataset.text.includes(q))
+              && (!type || row.dataset.type === type)
+              && (!room || row.dataset.room === room)
+              && (!dept || row.dataset.dept === dept);
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('bkEmptyState')?.classList.toggle('d-none', visible > 0);
+  document.getElementById('bkClearFilters')?.classList.toggle('d-none', !q && !type && !room && !dept);
+  document.querySelectorAll('.bk-row[style*="none"] .bk-check').forEach(cb => cb.checked = false);
+  updateBulkBar();
+}
+
+function clearBookingFilters() {
+  ['bkSearch','bkTypeFilter','bkRoomFilter','bkDeptFilter'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  filterBookings();
+}
+
+function updateBulkBar() {
+  const checked = [...document.querySelectorAll('.bk-check:checked')];
+  const bar = document.getElementById('bulkBar');
+  if (!bar) return;
+  if (checked.length) {
+    bar.classList.replace('d-none', 'd-flex') || bar.classList.add('d-flex');
+    document.getElementById('bulkCount').textContent = checked.length + ' selected';
+  } else {
+    bar.classList.replace('d-flex', 'd-none') || bar.classList.add('d-none');
+  }
+}
+
+/* ─── Add-schedule mode toggle ─────────────────────────────────────────── */
+function setAddMode(mode) {
+  const isClass = mode === 'class';
+  document.getElementById('classModeFields').style.display  = isClass ? '' : 'none';
+  document.getElementById('oneoffModeFields').style.display = isClass ? 'none' : '';
+  _toggleFieldsDisabled('classModeFields',  !isClass);
+  _toggleFieldsDisabled('oneoffModeFields',  isClass);
+  document.getElementById('addBookingType').value =
+    isClass ? 'class' : (document.getElementById('oneoffTypeSel')?.value || 'exam');
+}
+
+function _toggleFieldsDisabled(sectionId, disable) {
+  document.querySelectorAll('#' + sectionId + ' input, #' + sectionId + ' select, #' + sectionId + ' textarea')
+    .forEach(el => { el.disabled = disable; });
+}
+
+/* ─── Timeline click → pre-fill add-schedule modal ────────────────────── */
+function openBookingFromSlot(roomId, event) {
+  if (event.target.closest('.booking-block')) return;
+  document.getElementById('bkRoom').value = roomId;
+  const rect  = event.currentTarget.getBoundingClientRect();
+  const frac  = (event.clientX - rect.left) / rect.width;
+  const mins  = Math.round(frac * {{ TOTAL_MINS }} / 30) * 30;
+  const start = {{ SCHEDULE_START }} * 60 + mins;
+  const fmt   = m => String(Math.floor(m / 60)).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
+  document.getElementById('bkStart').value = fmt(start);
+  document.getElementById('bkEnd').value   = fmt(start + 60);
+  document.getElementById('modeClassRadio').checked = true;
+  setAddMode('class');
+  new bootstrap.Modal(document.getElementById('addBookingModal')).show();
+}
+
+/* ─── Wire everything that needs the DOM ──────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function () {
+
+  /* Confirm modal: populate from the button that triggered it */
+  document.getElementById('confirmModal').addEventListener('show.bs.modal', function (e) {
+    if (!e.relatedTarget) return; /* bulk/timeline: already populated */
+    document.getElementById('confirmMessage').textContent  = e.relatedTarget.dataset.msg    || 'Are you sure?';
+    document.getElementById('confirmActionUrl').value      = e.relatedTarget.dataset.action || '';
+    _bulkFields = null;
+  });
+
+  /* Confirm OK → fire the POST */
+  document.getElementById('confirmOkBtn').addEventListener('click', function () {
+    const url    = document.getElementById('confirmActionUrl').value;
+    const fields = _bulkFields;
+    _bulkFields  = null;
+    bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
+    if (url) _postTo(url, fields);
+  });
+
+  /* Edit modal: populate from the button that triggered it */
+  document.getElementById('editScheduleModal').addEventListener('show.bs.modal', function (e) {
+    const btn = e.relatedTarget;
+    if (!btn) return;
+    const d = btn.dataset;
+    document.getElementById('editScheduleForm').action = '/admin/classrooms/bookings/' + d.bid + '/edit';
+    document.getElementById('editTitle').value = d.title || '';
+    document.getElementById('editRoom').value  = d.room  || '';
+    document.getElementById('editDept').value  = d.dept  || '';
+    document.getElementById('editSem').value   = d.sem   || '';
+    document.getElementById('editStart').value = d.start || '';
+    document.getElementById('editEnd').value   = d.end   || '';
+    document.getElementById('editNotes').value = d.notes || '';
+    const rf = document.getElementById('editRecurringFields');
+    if (d.recurring === 'true') {
+      rf.style.display = '';
+      document.getElementById('editValidFrom').value  = d.from  || '';
+      document.getElementById('editValidUntil').value = d.until || '';
+    } else {
+      rf.style.display = 'none';
+    }
+  });
+
+  /* Add-schedule mode toggle */
+  document.getElementById('modeClassRadio').addEventListener('change',  () => setAddMode('class'));
+  document.getElementById('modeOneoffRadio').addEventListener('change', () => setAddMode('oneoff'));
+
+  /* Add-schedule form: copy oneoff field values into named inputs */
+  document.getElementById('addScheduleForm').addEventListener('submit', function () {
+    if (document.getElementById('addBookingType').value === 'class') return;
+    const f = this;
+    const copy = (fromId, toName) => {
+      const src = document.getElementById(fromId); if (!src) return;
+      let dst = f.querySelector('[name="' + toName + '"]');
+      if (!dst) { dst = document.createElement('input'); dst.type='hidden'; dst.name=toName; f.appendChild(dst); }
+      dst.value = src.value; dst.disabled = false;
+    };
+    copy('bkRoomOneoff', 'classroom_id'); copy('oneoffTitle',   'title');
+    copy('bkStartOneoff','start_time');   copy('bkEndOneoff',   'end_time');
+    copy('oneoffDeptSel','department_id');copy('oneoffSemSel',  'semester');
+    copy('oneoffNotes',  'notes');
+  });
+
+  /* Checkboxes: select-all + bulk bar sync */
+  document.addEventListener('change', function (e) {
+    if (e.target.id === 'selectAllBk') {
+      document.querySelectorAll('.bk-row:not([style*="none"]) .bk-check')
+        .forEach(cb => cb.checked = e.target.checked);
+      updateBulkBar();
+    } else if (e.target.classList.contains('bk-check')) {
+      updateBulkBar();
+      const all  = document.querySelectorAll('.bk-row:not([style*="none"]) .bk-check');
+      const chkd = document.querySelectorAll('.bk-row:not([style*="none"]) .bk-check:checked');
+      const sa   = document.getElementById('selectAllBk');
+      if (sa) { sa.indeterminate = chkd.length > 0 && chkd.length < all.length;
+                sa.checked = all.length > 0 && chkd.length === all.length; }
+    }
+  });
+
+  /* Tab anchors (after redirect with #hash) */
+  if (location.hash === '#rooms-tab') {
+    const el = document.querySelector('[href="#roomsPane"]');
+    if (el) bootstrap.Tab.getOrCreateInstance(el).show();
+  }
+  if (location.hash === '#bookings-tab') {
+    const el = document.querySelector('[href="#bookingsPane"]');
+    if (el) bootstrap.Tab.getOrCreateInstance(el).show();
+  }
+
+  /* Tooltips on schedule blocks */
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el =>
+    new bootstrap.Tooltip(el, { placement: 'top' })
+  );
+
+  /* Init oneoff fields disabled (class mode is default) */
+  _toggleFieldsDisabled('oneoffModeFields', true);
+});
+</script>
+{% endblock %}

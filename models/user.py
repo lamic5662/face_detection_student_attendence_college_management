@@ -31,8 +31,8 @@ class User(UserMixin, db.Model):
     dashboard_widgets = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=utc_now_naive)
 
-    student_profile = db.relationship('Student', backref='user', uselist=False, lazy=True)
-    teacher_profile = db.relationship('Teacher', backref='user', uselist=False, lazy=True)
+    student_profile = db.relationship('Student', backref='user', uselist=False, lazy=True, cascade='all, delete-orphan')
+    teacher_profile = db.relationship('Teacher', backref='user', uselist=False, lazy=True, cascade='all, delete-orphan')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

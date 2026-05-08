@@ -15,6 +15,7 @@ SUBADMIN_MODULES: dict[str, str] = {
     'analytics': 'Analytics',
     'file_manager': 'File Manager',
     'reports': 'Semester Schedules & Reports',
+    'classrooms': 'Classroom Management',
 }
 
 # Map endpoint name → (module, required_action) or None (always allowed for sub-admins)
@@ -76,6 +77,7 @@ ENDPOINT_PERMISSION_MAP: dict[str, tuple[str, str] | None] = {
 
     # Exams & Marksheets
     'exam.admin_exams': ('exams', 'view'),
+    'exam.admin_bulk_exams': ('exams', 'edit'),
     'exam.admin_delete_exam': ('exams', 'delete'),
     'admin.marksheet_list': ('exams', 'view'),
     'admin.admin_marksheet': ('exams', 'view'),
@@ -107,6 +109,16 @@ ENDPOINT_PERMISSION_MAP: dict[str, tuple[str, str] | None] = {
     'timetable.manage': ('timetable', 'edit'),
     'timetable.save_slot': ('timetable', 'edit'),
     'timetable.delete_slot': ('timetable', 'delete'),
+
+    # Classroom Management
+    'classroom.classrooms': ('classrooms', 'view'),
+    'classroom.add_classroom': ('classrooms', 'edit'),
+    'classroom.edit_classroom': ('classrooms', 'edit'),
+    'classroom.delete_classroom': ('classrooms', 'delete'),
+    'classroom.add_booking': ('classrooms', 'edit'),
+    'classroom.edit_booking': ('classrooms', 'edit'),
+    'classroom.delete_booking': ('classrooms', 'delete'),
+    'classroom.bulk_delete_bookings': ('classrooms', 'delete'),
 
     # Leave Management
     'leave.admin_leaves': ('leaves', 'view'),
@@ -153,6 +165,7 @@ NAV_KEY_TO_MODULE: dict[str, str | None] = {
     'leave_management': 'leaves',
     'file_manager': 'file_manager',
     'timetable': 'timetable',
+    'classrooms': 'classrooms',
     'exams': 'exams',
     'marksheets': 'exams',
     'signatures': 'exams',

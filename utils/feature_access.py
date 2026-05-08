@@ -22,6 +22,7 @@ FEATURE_GROUPS = OrderedDict(
                     'notices',
                     'calendar',
                     'timetable',
+                    'classrooms',
                     'leaves',
                     'batch_tracker',
                 ],
@@ -83,6 +84,10 @@ FEATURE_CATALOG = {
     'timetable': {
         'label': 'Timetable',
         'description': 'Class schedule and timetable management.',
+    },
+    'classrooms': {
+        'label': 'Classroom Management',
+        'description': 'Room setup, department-semester weekly schedules, and one-off event bookings.',
     },
     'leaves': {
         'label': 'Leave Management',
@@ -158,12 +163,13 @@ FEATURE_PRESETS = OrderedDict(
                 'label': 'Standard',
                 'icon': 'bi-award',
                 'color': 'primary',
-                'description': 'Full academic experience — adds learning content, exams, leaves, batch tracking, report emails, and digital ID cards.',
+                'description': 'Full academic experience — adds learning content, exams, classrooms, leaves, batch tracking, report emails, and digital ID cards.',
                 'features': [
                     'attendance',
                     'notices',
                     'calendar',
                     'timetable',
+                    'classrooms',
                     'learning_content',
                     'exams',
                     'leaves',
@@ -185,6 +191,7 @@ FEATURE_PRESETS = OrderedDict(
                     'notices',
                     'calendar',
                     'timetable',
+                    'classrooms',
                     'learning_content',
                     'exams',
                     'leaves',
@@ -205,7 +212,7 @@ FEATURE_PRESETS = OrderedDict(
                 'label': 'Enterprise',
                 'icon': 'bi-stars',
                 'color': 'warning',
-                'description': 'All 17 modules unlocked — includes biometrics, live location, and file manager.',
+                'description': 'All modules unlocked — includes biometrics, live location, and file manager.',
                 'features': list(FEATURE_CATALOG.keys()),
             },
         ),
@@ -222,6 +229,7 @@ NAV_ITEM_FEATURES = {
         'leave_management': 'leaves',
         'file_manager': 'file_manager',
         'timetable': 'timetable',
+        'classrooms': 'classrooms',
         'exams': 'exams',
         'marksheets': 'exams',
         'signatures': 'exams',
@@ -239,6 +247,7 @@ NAV_ITEM_FEATURES = {
         'leave_management': 'leaves',
         'reports': 'attendance',
         'timetable': 'timetable',
+        'classrooms': 'classrooms',
         'exams_marks': 'exams',
     },
     'student': {
@@ -250,6 +259,7 @@ NAV_ITEM_FEATURES = {
         'face_enrollment': 'face_biometrics',
         'academic_calendar': 'calendar',
         'timetable': 'timetable',
+        'classrooms': 'classrooms',
         'marksheet': 'exams',
         'fees': 'fees',
         'my_id_card': 'digital_id_cards',
@@ -303,6 +313,7 @@ ENDPOINT_PREFIX_FEATURES = (
     ('fee.', {'fees'}),
     ('leave.', {'leaves'}),
     ('timetable.', {'timetable'}),
+    ('classroom.', {'classrooms'}),
     ('ai.', {'ai_assistant'}),
 )
 
