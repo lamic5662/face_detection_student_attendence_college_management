@@ -1,36 +1,58 @@
 # SmartAttend
 
-SmartAttend is a Flask-based college management and smart attendance system built for multi-role campus operations. It combines face-recognition attendance with student, teacher, parent, and admin workflows in one application.
+SmartAttend is a Flask-based college management and smart attendance system built for multi-role campus operations. It combines face-recognition attendance with student, teacher, parent, and admin workflows in one application. A built-in super admin layer manages multiple college tenants as a SaaS platform.
 
 ## Main Features
 
 - Face-based attendance with liveness/blink verification
 - Multi-college SaaS-ready tenant architecture
-- Multi-role login for admin, teacher, student, and parent
+- Multi-role login for super admin, admin, teacher, student, and parent
 - Attendance sessions, live marking, manual overrides, and downloadable reports
 - Student face enrollment and profile management
 - Teacher content publishing for notes, assignments, labs, and question sets
 - Assignment submission, grading, and parent tracking
 - In-app preview for notes and supported attachments
 - Leave request workflow
-- Exam scheduling, marks entry, and printable marksheets
-- Fee structures and payment tracking
+- Exam scheduling, marks entry, and printable marksheets with digital signatures
+- Fee structures, payment tracking, and automated fee reminder emails
 - Academic calendar with holidays, exam weeks, and event dates
 - Parent dashboard with attendance, fees, results, timetable, and location tracking
 - Student digital ID card request flow and admin approval
 - Real-time notice bell with read/dismiss actions
 - Notices, timetable management, analytics, and file management
+- Batch tracker for cohort semester progression monitoring and bulk promotion
+- Automated weekly attendance report emails with configurable day/hour scheduling
+- AI assistant (RAG) using Groq API for natural-language college data queries
+- Timetable slot conflict detection for teacher and room double-booking
+- Per-college feature access control: 18 modules across four tier presets
+
+### Super Admin Features
+
+- SaaS plan management: assign Free, Starter, Standard, Professional, or Enterprise plans to each college with optional expiry dates and billing notes
+- College health scoring: automated 0–100 engagement score per college based on session activity, admin login recency, student count, and platform engagement; labelled Healthy / At Risk / Inactive
+- Broadcast email: compose and send announcements to all active college admins or a selected subset
+- Platform system monitor showing scheduler status, active jobs, and deployment health
+
+### College Admin Features
+
+- My Plan dashboard showing current subscription plan, active and disabled modules, expiry warnings, and renewal instructions
+- Bulk data operations: checkbox multi-select with Select All and a floating confirmation action bar for Students, Teachers, Subjects, and Departments tables
+- Sub-admin accounts with per-module permission control
+- Classroom management
 
 ## Tech Stack
 
 - Python 3.12
 - Flask
 - Flask-SQLAlchemy
-- Flask-Migrate
+- Flask-Migrate (Alembic)
 - MySQL with `PyMySQL`
 - Flask-Login, Flask-WTF, Flask-Limiter
 - OpenCV, `face-recognition`, `dlib`
+- APScheduler (background jobs: attendance reports, fee reminders)
+- Groq API (`llama-3.3-70b-versatile`) for AI assistant
 - Pandas and OpenPyXL for exports
+- Redis for rate limiting
 
 ## Project Structure
 
@@ -44,9 +66,12 @@ smart_attendance/
 ├── services/
 ├── templates/
 ├── static/
+│   └── js/
+│       └── bulk-select.js
+├── utils/
+│   └── college_health.py
 ├── migrations/
-├── tests/
-└── utils/
+└── tests/
 ```
 
 ## Setup
@@ -92,6 +117,24 @@ Key variables:
 - `RATELIMIT_STORAGE_URI`
 - `CONTENT_UPLOAD_FOLDER`
 - `LOW_ATTENDANCE_THRESHOLD`
+- `GROQ_API_KEY` — required for the AI assistant feature
+- `SUPPORT_EMAIL`, `SUPPORT_PHONE` — shown on the college admin My Plan page
+
+## Database Schema Notes
+
+The database uses 30 tables. Every college-scoped table carries a `college_id` foreign key. Key schema additions applied via Alembic migrations:
+
+| Migration | Table | Columns Added |
+|---|---|---|
+| `m9n0o1p2q3r4` | `colleges` | `plan` VARCHAR(20), `plan_expires_at` DATETIME, `billing_notes` TEXT |
+| `l8m9n0o1p2q3` | `users` | `last_login_at` DATETIME |
+| `i5j6k7l8m9n0` | `exams` | `is_deleted` BOOLEAN, `deleted_at` DATETIME |
+
+Run all migrations before starting the app:
+
+```bash
+flask --app run.py db upgrade
+```
 
 ## CLI Commands
 
@@ -128,6 +171,17 @@ The app supports multiple colleges in one deployment.
 - Create one admin account per college with `flask --app run.py create-admin`
 - Users log in with their own `college code` plus email/password
 - Each college gets isolated users, notices, attendance, content, fees, exams, ID cards, calendar events, and settings
+- The super admin assigns a plan and controls which feature modules are enabled per college
+
+## Bulk Data Operations
+
+All major data tables (Students, Teachers, Subjects, Departments) support multi-record selection:
+
+- Click the header checkbox to **Select All** (with indeterminate state for partial selections)
+- Select individual rows with row-level checkboxes
+- A floating action bar slides up from the bottom showing the count and a **Delete** button
+- Deletion is confirmed via the global modal before submission
+- The cascade-safe deletion chain removes all child records (attendance records, sessions, etc.) automatically
 
 ## Optional File Preview Dependencies
 
@@ -190,6 +244,8 @@ The admin dashboard also shows a warning banner until the setup is in a deployab
 - Use a shared limiter backend such as Redis via `RATELIMIT_STORAGE_URI`
 - Keep `CONTENT_UPLOAD_FOLDER` and `ASSIGNMENT_UPLOAD_FOLDER` outside the public `static` directory
 - Put the app behind a reverse proxy and enable `TRUST_PROXY_HEADERS=True`
+- Set `GROQ_API_KEY` if the AI assistant feature is enabled for any college
+- Set `SUPPORT_EMAIL` and `SUPPORT_PHONE` so college admins know how to reach the platform operator
 - Run `flask --app run.py doctor` before deployment
 - Do not commit `.env`, runtime logs, or generated uploads
 - Consider moving the large dlib model file to Git LFS
@@ -360,7 +416,8 @@ gunicorn -c gunicorn.conf.py run:app
 
 10. Put the app behind Nginx, Caddy, or another HTTPS reverse proxy.
 11. Log in as the college admin and complete `System Setup` inside the app.
-12. Monitor logs, database health, backups, and Redis availability.
+12. Log in as super admin and assign plans and enabled feature modules to each college.
+13. Monitor logs, database health, backups, and Redis availability.
 
 ## How To Use In Production
 
@@ -369,11 +426,12 @@ Recommended rollout order for a real college:
 1. Deploy the server stack using the files in [`deploy/`](deploy).
 2. Set production environment variables from [.env.example](.env.example).
 3. Create the college and admin account.
-4. Log in as admin and finish `System Setup`.
-5. Add departments, teachers, students, and subjects.
-6. Configure ID card template, signatures, and college branding.
-7. Publish notices, calendar events, fee structures, and exam setup.
-8. Start live usage for attendance, assignments, fees, results, and parent access.
+4. Log in as super admin and assign the appropriate plan and feature modules to the college.
+5. Log in as admin and finish `System Setup`.
+6. Add departments, teachers, students, and subjects.
+7. Configure ID card template, signatures, and college branding.
+8. Publish notices, calendar events, fee structures, and exam setup.
+9. Start live usage for attendance, assignments, fees, results, and parent access.
 
 ## Status
 
