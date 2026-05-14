@@ -13,7 +13,7 @@ from models.attendance import AttendanceSession, AttendanceRecord
 from models.notice import Notice
 from models.exam import Exam
 from models.fee import FeeStructure, FeePayment
-from models.parent import ParentStudent
+from models.parent import ParentStudent, TeacherStatus
 from models.setting import CollegeSetting
 from models.id_card import IDCardTemplate, StudentIDCard
 from utils.decorators import admin_required, strict_admin_required
@@ -816,9 +816,17 @@ def teachers():
         page=page, per_page=15, error_out=False
     )
     departments = _scoped_department_query().order_by(Department.name).all()
+    teacher_status_map = {}
+    if pagination.items:
+        statuses = TeacherStatus.query.filter(
+            TeacherStatus.college_id == _admin_college_id(),
+            TeacherStatus.teacher_id.in_([teacher.id for teacher in pagination.items]),
+        ).all()
+        teacher_status_map = {status.teacher_id: status for status in statuses}
     return render_template('admin/teachers.html',
                            pagination=pagination,
                            teachers=pagination.items,
+                           teacher_status_map=teacher_status_map,
                            departments=departments,
                            selected_dept=dept_id,
                            search=search)

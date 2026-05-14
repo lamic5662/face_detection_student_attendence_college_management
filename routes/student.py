@@ -12,8 +12,10 @@ from models.notice import Notice
 from models.exam import Exam, Mark
 from models.fee import FeeStructure, FeePayment
 from models.location import StudentLocation
+from models.parent import TeacherStatus
 from models.content import TeacherContent, content_extension, is_allowed_content_upload
 from models.assignment import AssignmentSubmission
+from models.timetable import TimetableSlot
 from utils.decorators import student_required
 from services.face_service import (decode_base64_image, extract_face_encoding,
                                     average_encodings, save_face_image)
@@ -151,6 +153,34 @@ def dashboard():
         db.or_(Notice.expires_at == None, Notice.expires_at > utc_now_naive())
     ).order_by(Notice.is_pinned.desc(), Notice.created_at.desc()).limit(3).all()
 
+    today_slots = TimetableSlot.query.filter_by(
+        college_id=student.college_id,
+        department_id=student.department_id,
+        semester=student.semester,
+        day_of_week=today.weekday(),
+    ).order_by(TimetableSlot.period_no).all()
+    slot_statuses = []
+    for slot in today_slots:
+        teacher_status = None
+        if slot.subject and slot.subject.teacher:
+            teacher_status = TeacherStatus.query.filter_by(
+                college_id=student.college_id,
+                teacher_id=slot.subject.teacher.id,
+            ).first()
+        session_started = None
+        if slot.subject:
+            session_started = AttendanceSession.query.filter(
+                AttendanceSession.college_id == student.college_id,
+                AttendanceSession.subject_id == slot.subject_id,
+                AttendanceSession.date == today,
+                AttendanceSession.status.in_(['active', 'completed']),
+            ).first()
+        slot_statuses.append({
+            'slot': slot,
+            'teacher_status': teacher_status,
+            'session_started': session_started,
+        })
+
     location = StudentLocation.query.filter_by(college_id=student.college_id, student_id=student.id).first()
 
     return render_template('student/dashboard.html',
@@ -163,6 +193,7 @@ def dashboard():
                            upcoming_exams=upcoming_exams,
                            total_fee_due=total_due,
                            notices=notices,
+                           slot_statuses=slot_statuses,
                            location=location,
                            today=today)
 

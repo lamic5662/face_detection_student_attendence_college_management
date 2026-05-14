@@ -98,6 +98,22 @@
               <span class="badge {% if t.user.is_active %}bg-success{% else %}bg-secondary{% endif %}">
                 {{ 'Active' if t.user.is_active else 'Inactive' }}
               </span>
+              {% set live_status = teacher_status_map.get(t.id) %}
+              <div class="mt-1">
+                {% if live_status %}
+                <span class="badge bg-{{ live_status.badge_color }}">
+                  {{ live_status.label }}
+                </span>
+                {% if live_status.note %}
+                <div class="text-muted small mt-1">{{ live_status.note }}</div>
+                {% endif %}
+                <div class="text-muted" style="font-size:11px">
+                  Updated {{ live_status.updated_at.strftime('%H:%M') }}
+                </div>
+                {% else %}
+                <span class="text-muted small">No live status set</span>
+                {% endif %}
+              </div>
             </td>
             <td class="cell-actions" data-label="Actions">
               <div class="d-flex gap-1">

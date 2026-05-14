@@ -37,6 +37,81 @@
 </div>
 {% endif %}
 
+<!-- Today's Classes -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 px-4 py-3">
+    <h6 class="fw-semibold mb-0">
+      <i class="bi bi-calendar2-week-fill me-2 text-primary"></i>Today's Classes
+      <span class="text-muted small fw-normal ms-2">{{ today.strftime('%A, %d %B %Y') }}</span>
+    </h6>
+  </div>
+  <div class="card-body p-0">
+    {% if slot_statuses %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="px-4">Time</th>
+            <th>Subject</th>
+            <th>Teacher</th>
+            <th>Teacher Status</th>
+            <th>Class Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in slot_statuses %}
+          {% set slot = item.slot %}
+          <tr>
+            <td class="px-4 text-muted small fw-semibold">
+              {{ slot.start_time.strftime('%H:%M') }} – {{ slot.end_time.strftime('%H:%M') }}
+            </td>
+            <td class="fw-semibold">
+              {% if slot.subject %}{{ slot.subject.name }}
+              {% elif slot.slot_type == 'break' %}<span class="text-muted">Break</span>
+              {% else %}<span class="text-muted">Free</span>{% endif %}
+            </td>
+            <td class="text-muted small">
+              {{ slot.subject.teacher.user.name if slot.subject and slot.subject.teacher else '—' }}
+            </td>
+            <td>
+              {% if item.teacher_status %}
+              <span class="badge bg-{{ item.teacher_status.badge_color }}">
+                {{ item.teacher_status.label }}
+              </span>
+              {% if item.teacher_status.note %}
+              <div class="text-muted" style="font-size:11px">{{ item.teacher_status.note }}</div>
+              {% endif %}
+              {% else %}
+              <span class="text-muted small">No status set</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.session_started %}
+                {% if item.session_started.status == 'active' %}
+                <span class="badge bg-success"><i class="bi bi-record-circle-fill me-1"></i>In Progress</span>
+                {% else %}
+                <span class="badge bg-primary">Completed</span>
+                {% endif %}
+              {% elif slot.slot_type in ['break', 'free'] %}
+              <span class="text-muted small">—</span>
+              {% else %}
+              <span class="badge bg-secondary">Not Started</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-calendar-x fs-1 d-block mb-2 opacity-25"></i>
+      No classes scheduled for today.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
 {% if 'location_sharing' in visible_widgets %}
 <!-- Location Sharing Widget -->
 <div class="card border-0 shadow-sm mb-4" id="loc-card">

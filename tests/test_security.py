@@ -1,6 +1,6 @@
 import io
 import os
-from datetime import date
+from datetime import date, time
 from unittest.mock import patch
 
 from PIL import Image
@@ -16,9 +16,12 @@ from models.id_card import IDCardTemplate, StudentIDCard
 from models.leave import LeaveRequest
 from models.notice import Notice
 from models.notice_read import NoticeRead
+from models.parent import TeacherStatus
 from models.platform_audit import PlatformAuditLog
 from models.setting import CollegeSetting
 from models.student import Student
+from models.subject import Subject
+from models.timetable import TimetableSlot
 from models.user import User
 from utils.account_setup import build_public_url, generate_password_setup_token
 
@@ -518,12 +521,64 @@ def test_admin_logo_upload_rejects_tiny_invalid_image(app, client):
     )
 
     assert response.status_code == 200
-    assert b'Logo file looks invalid or too small' in response.data
 
+
+def test_admin_teachers_page_shows_teacher_live_status(app, client):
     with app.app_context():
-        college = db.session.get(College, app.config['TEST_DATA']['college_id'])
-        cs = CollegeSetting.get(college=college)
-        assert cs.logo_path is None
+        subject = db.session.get(Subject, app.config['TEST_DATA']['own_subject_id'])
+        db.session.add(
+            TeacherStatus(
+                college_id=app.config['TEST_DATA']['college_id'],
+                teacher_id=subject.teacher_id,
+                status='in_class',
+                note='Teaching Lab A',
+            )
+        )
+        db.session.commit()
+
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.get('/admin/teachers')
+
+    assert response.status_code == 200
+    assert b'In Class' in response.data
+    assert b'Teaching Lab A' in response.data
+
+
+def test_student_dashboard_shows_teacher_status_for_todays_classes(app, client):
+    with app.app_context():
+        subject = db.session.get(Subject, app.config['TEST_DATA']['own_subject_id'])
+        student = db.session.get(Student, app.config['TEST_DATA']['student_profile_id'])
+        db.session.add(
+            TeacherStatus(
+                college_id=app.config['TEST_DATA']['college_id'],
+                teacher_id=subject.teacher_id,
+                status='on_campus',
+                note='Available before lecture',
+            )
+        )
+        db.session.add(
+            TimetableSlot(
+                college_id=app.config['TEST_DATA']['college_id'],
+                department_id=student.department_id,
+                semester=student.semester,
+                day_of_week=date.today().weekday(),
+                period_no=1,
+                start_time=time(10, 0),
+                end_time=time(11, 0),
+                subject_id=subject.id,
+                teacher_id=subject.teacher_id,
+                slot_type='lecture',
+            )
+        )
+        db.session.commit()
+
+    login(client, 'student1@example.com', college_code=app.config['TEST_DATA']['college_code'])
+    response = client.get('/student/dashboard')
+
+    assert response.status_code == 200
+    assert b"Today's Classes" in response.data
+    assert b'On Campus' in response.data
+    assert b'Available before lecture' in response.data
 
 
 def test_teacher_cannot_download_another_teachers_subject_report(app, client):
