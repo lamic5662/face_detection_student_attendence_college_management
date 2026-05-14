@@ -17,30 +17,8 @@
         <h6 class="fw-semibold mb-0"><i class="bi bi-building-fill text-primary me-2"></i>College Information</h6>
       </div>
       <div class="card-body px-4 pb-4">
-        <form method="POST" action="{{ url_for('admin.save_settings') }}" enctype="multipart/form-data">
+        <form method="POST" action="{{ url_for('admin.save_settings') }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-          <!-- College Logo -->
-          <div class="mb-4">
-            <label class="form-label fw-semibold">College Logo</label>
-            <div class="d-flex align-items-center gap-3 mb-2">
-              {% if cs.logo_path %}
-              <img src="{{ url_for('static', filename=cs.logo_path) }}"
-                   alt="Current logo" id="logoPreview"
-                   style="width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid #e8ecf0;padding:4px;background:#fff">
-              {% else %}
-              <div id="logoPreview"
-                   style="width:56px;height:56px;border-radius:8px;border:2px dashed #cbd5e0;display:flex;align-items:center;justify-content:center;background:#f8f9fa">
-                <i class="bi bi-building text-muted fs-4"></i>
-              </div>
-              {% endif %}
-              <div class="flex-grow-1">
-                <input type="file" name="college_logo" id="logoInput" class="form-control form-control-sm"
-                       accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp">
-                <div class="form-text">PNG, JPG, SVG or WebP. Shown in the sidebar for all users. Max recommended: 200×200 px.</div>
-              </div>
-            </div>
-          </div>
 
           <div class="mb-3">
             <label class="form-label fw-semibold">College Name <span class="text-danger">*</span></label>
@@ -100,6 +78,49 @@
         <div class="text-muted small text-center mt-3">
           Last updated: {{ cs.updated_at.strftime('%d %b %Y at %H:%M') }}
         </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- College Logo -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-transparent border-0 pt-4 px-4">
+        <h6 class="fw-semibold mb-0"><i class="bi bi-image-fill text-primary me-2"></i>College Logo</h6>
+      </div>
+      <div class="card-body px-4 pb-4">
+        <form method="POST" action="{{ url_for('admin.save_logo') }}" enctype="multipart/form-data">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            {% if cs.logo_path %}
+            <img src="{{ url_for('static', filename=cs.logo_path) }}"
+                 alt="Current logo" id="logoPreview"
+                 style="width:64px;height:64px;object-fit:contain;border-radius:8px;border:1px solid #e8ecf0;padding:6px;background:#fff">
+            {% else %}
+            <div id="logoPreview"
+                 style="width:64px;height:64px;border-radius:8px;border:2px dashed #cbd5e0;display:flex;align-items:center;justify-content:center;background:#f8f9fa;flex-shrink:0">
+              <i class="bi bi-building text-muted fs-3"></i>
+            </div>
+            {% endif %}
+            <div class="small text-muted">
+              Shown in the sidebar for <strong>all users</strong> across every page.<br>
+              PNG, JPG, SVG or WebP. Recommended: 200×200 px.
+            </div>
+          </div>
+          <input type="file" name="college_logo" id="logoInput" class="form-control mb-3"
+                 accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp" required>
+          <button type="submit" class="btn btn-primary fw-semibold w-100">
+            <i class="bi bi-upload me-1"></i>Upload Logo
+          </button>
+        </form>
+        {% if cs.logo_path %}
+        <form method="POST" action="{{ url_for('admin.remove_logo') }}" class="mt-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+            <i class="bi bi-trash3 me-1"></i>Remove Logo
+          </button>
+        </form>
         {% endif %}
       </div>
     </div>
@@ -331,25 +352,28 @@
 })();
 
 // Logo live preview
-document.getElementById('logoInput').addEventListener('change', function() {
-  var file = this.files[0];
-  if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var preview = document.getElementById('logoPreview');
-    if (preview.tagName === 'IMG') {
-      preview.src = e.target.result;
-    } else {
-      var img = document.createElement('img');
-      img.src = e.target.result;
-      img.id = 'logoPreview';
-      img.alt = 'Logo preview';
-      img.style = 'width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid #e8ecf0;padding:4px;background:#fff';
-      preview.replaceWith(img);
-    }
-  };
-  reader.readAsDataURL(file);
-});
+var logoInput = document.getElementById('logoInput');
+if (logoInput) {
+  logoInput.addEventListener('change', function() {
+    var file = this.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var preview = document.getElementById('logoPreview');
+      if (preview.tagName === 'IMG') {
+        preview.src = e.target.result;
+      } else {
+        var img = document.createElement('img');
+        img.src = e.target.result;
+        img.id = 'logoPreview';
+        img.alt = 'Logo preview';
+        img.style = 'width:64px;height:64px;object-fit:contain;border-radius:8px;border:1px solid #e8ecf0;padding:6px;background:#fff;flex-shrink:0';
+        preview.replaceWith(img);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
 </script>
 
 {% endblock %}

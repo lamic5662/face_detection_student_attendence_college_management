@@ -1389,23 +1389,49 @@ def save_settings():
         flash('Invalid coordinates — please pick a location on the map.', 'danger')
         return redirect(url_for('admin.settings'))
 
-    logo_file = request.files.get('college_logo')
-    if logo_file and logo_file.filename:
-        allowed = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}
-        ext = logo_file.filename.rsplit('.', 1)[-1].lower()
-        if ext not in allowed:
-            flash('Logo must be a PNG, JPG, GIF, SVG, or WebP image.', 'danger')
-            return redirect(url_for('admin.settings'))
-        logo_dir = os.path.join(current_app.static_folder, 'uploads', 'college_logos')
-        os.makedirs(logo_dir, exist_ok=True)
-        slug = current_user.college.code.lower()
-        fname = f'{slug}_logo.{ext}'
-        logo_file.save(os.path.join(logo_dir, fname))
-        cs.logo_path = f'uploads/college_logos/{fname}'
-
     cs.updated_at = utc_now_naive()
     db.session.commit()
     flash('College settings saved successfully.', 'success')
+    return redirect(url_for('admin.settings'))
+
+
+@admin_bp.route('/settings/logo', methods=['POST'])
+@login_required
+@admin_required
+def save_logo():
+    cs = CollegeSetting.get()
+    logo_file = request.files.get('college_logo')
+    if not logo_file or not logo_file.filename:
+        flash('Please select an image file.', 'danger')
+        return redirect(url_for('admin.settings'))
+    allowed = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}
+    ext = logo_file.filename.rsplit('.', 1)[-1].lower()
+    if ext not in allowed:
+        flash('Logo must be PNG, JPG, GIF, SVG, or WebP.', 'danger')
+        return redirect(url_for('admin.settings'))
+    logo_dir = os.path.join(current_app.static_folder, 'uploads', 'college_logos')
+    os.makedirs(logo_dir, exist_ok=True)
+    slug = current_user.college.code.lower()
+    fname = f'{slug}_logo.{ext}'
+    logo_file.save(os.path.join(logo_dir, fname))
+    cs.logo_path = f'uploads/college_logos/{fname}'
+    db.session.commit()
+    flash('College logo updated.', 'success')
+    return redirect(url_for('admin.settings'))
+
+
+@admin_bp.route('/settings/logo/remove', methods=['POST'])
+@login_required
+@admin_required
+def remove_logo():
+    cs = CollegeSetting.get()
+    if cs.logo_path:
+        abs_path = os.path.join(current_app.static_folder, cs.logo_path)
+        if os.path.exists(abs_path):
+            os.remove(abs_path)
+        cs.logo_path = None
+        db.session.commit()
+        flash('College logo removed.', 'success')
     return redirect(url_for('admin.settings'))
 
 
