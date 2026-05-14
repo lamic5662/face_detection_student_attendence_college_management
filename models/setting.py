@@ -35,6 +35,14 @@ class CollegeSetting(db.Model):
 
         resolved_college = college
         if resolved_college is None and has_request_context():
+            try:
+                from flask_login import current_user
+
+                if getattr(current_user, 'is_authenticated', False) and getattr(current_user, 'college', None) is not None:
+                    resolved_college = current_user.college
+            except Exception:
+                resolved_college = None
+        if resolved_college is None and has_request_context():
             from utils.tenancy import get_current_college
 
             resolved_college = get_current_college(optional=True)

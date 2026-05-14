@@ -4,8 +4,8 @@
 {% block page_title %}<i class="bi bi-people-fill me-2"></i>Students{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <div class="d-flex align-items-center gap-2 flex-wrap">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap content-toolbar">
+  <div class="d-flex align-items-center gap-2 flex-wrap content-toolbar-group">
     <span class="badge bg-primary-subtle text-primary px-3 py-2">
       {{ pagination.total }} student(s)
     </span>
@@ -13,7 +13,7 @@
       <i class="bi bi-bar-chart-steps me-1"></i>Batch Tracker
     </a>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="d-flex gap-2 flex-wrap content-toolbar-actions">
     <a href="{{ url_for('admin.export_students') }}" class="btn btn-outline-success btn-sm">
       <i class="bi bi-download me-1"></i>Export CSV
     </a>
@@ -29,7 +29,7 @@
 <!-- Filter Bar -->
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body px-4 py-3">
-    <form method="GET" class="row g-2 align-items-end" id="filterForm">
+    <form method="GET" class="row g-2 align-items-end filter-form-compact" id="filterForm">
       <div class="col-md-3">
         <label class="form-label fw-semibold small mb-1">Faculty / Department</label>
         <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -89,7 +89,7 @@
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0"
+      <table class="table table-hover mb-0 responsive-data-table"
              data-bulk-url="{{ url_for('admin.bulk_delete_students') }}"
              data-bulk-label="student">
         <thead class="table-light">
@@ -111,18 +111,18 @@
         <tbody>
           {% for s, status, diff in students_with_status %}
           <tr>
-            <td class="ps-3">
+            <td class="ps-3 cell-control" data-label="">
               <input type="checkbox" data-bulk-item value="{{ s.id }}"
                      data-bulk-name="{{ s.user.name }}" class="bulk-cb">
             </td>
-            <td class="px-2">
+            <td class="px-2" data-label="Roll / Batch">
               <span class="badge bg-secondary">{{ s.roll_number }}</span>
               {% if s.admission_year %}
               <div class="text-muted small mt-1">{{ s.admission_year }} batch</div>
               {% endif %}
             </td>
-            <td class="fw-semibold">{{ s.user.name }}</td>
-            <td>
+            <td class="fw-semibold" data-label="Name">{{ s.user.name }}</td>
+            <td data-label="Email">
               <div class="text-muted small">{{ s.user.email }}</div>
               {% if s.user.must_change_password %}
               <span class="badge bg-warning-subtle text-warning mt-1">
@@ -132,11 +132,11 @@
               <span class="badge bg-success-subtle text-success mt-1">Password set</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Faculty">
               <span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span>
             </td>
-            <td><span class="badge bg-light text-dark border">Sem {{ s.semester }}</span></td>
-            <td>
+            <td data-label="Semester"><span class="badge bg-light text-dark border">Sem {{ s.semester }}</span></td>
+            <td data-label="Progress">
               {% if status == 'on_track' %}
                 <span class="badge bg-success-subtle text-success">
                   <i class="bi bi-check-circle-fill me-1"></i>On Track
@@ -153,14 +153,14 @@
                 <span class="badge bg-secondary-subtle text-secondary">—</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Face">
               {% if s.is_face_enrolled %}
                 <span class="badge bg-success-subtle text-success"><i class="bi bi-check-circle-fill me-1"></i>Enrolled</span>
               {% else %}
                 <span class="badge bg-warning-subtle text-warning"><i class="bi bi-exclamation-circle me-1"></i>Pending</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Attendance">
               {% set pct = s.get_attendance_percentage() %}
               <div class="d-flex align-items-center gap-2">
                 <div class="progress flex-grow-1" style="height:6px;min-width:60px">
@@ -170,7 +170,7 @@
                 <small class="fw-semibold">{{ pct }}%</small>
               </div>
             </td>
-            <td>
+            <td class="cell-actions" data-label="Actions">
               <div class="d-flex gap-1">
                 <a href="{{ url_for('admin.student_attendance', sid=s.id) }}"
                    class="btn btn-sm btn-outline-info" title="View Attendance">

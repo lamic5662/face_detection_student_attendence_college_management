@@ -7,7 +7,7 @@
 <!-- Filter Bar -->
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body px-4 py-3">
-    <form method="GET" class="row g-2 align-items-end">
+    <form method="GET" class="row g-2 align-items-end filter-form-compact">
       <div class="col-md-3">
         <label class="form-label fw-semibold small mb-1">Role</label>
         <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -42,7 +42,7 @@
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0 responsive-data-table">
         <thead class="table-light">
           <tr>
             <th class="px-4">#</th>
@@ -57,14 +57,14 @@
         <tbody>
           {% for u in users %}
           <tr>
-            <td class="px-4 text-muted small">{{ (pagination.page - 1) * pagination.per_page + loop.index }}</td>
-            <td class="fw-semibold">
+            <td class="px-4 text-muted small cell-muted" data-label="#">{{ (pagination.page - 1) * pagination.per_page + loop.index }}</td>
+            <td class="fw-semibold" data-label="Name">
               <div class="d-flex align-items-center gap-2">
                 <div class="avatar-xs">{{ u.name[0].upper() }}</div>
                 {{ u.name }}
               </div>
             </td>
-            <td>
+            <td data-label="Email">
               <div class="text-muted">{{ u.email }}</div>
               {% if u.must_change_password %}
               <span class="badge bg-warning-subtle text-warning mt-1">
@@ -74,19 +74,19 @@
               <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Role">
               <span class="badge {% if u.role == 'admin' %}bg-danger-subtle text-danger{% elif u.role == 'teacher' %}bg-primary-subtle text-primary{% elif u.role == 'parent' %}bg-warning-subtle text-warning{% else %}bg-success-subtle text-success{% endif %}">
                 <i class="bi bi-{% if u.role == 'admin' %}shield-fill{% elif u.role == 'teacher' %}person-badge{% elif u.role == 'parent' %}house-heart-fill{% else %}person{% endif %} me-1"></i>
                 {{ u.role.capitalize() }}
               </span>
             </td>
-            <td class="text-muted small">{{ u.created_at.strftime('%d %b %Y') }}</td>
-            <td>
+            <td class="text-muted small" data-label="Created">{{ u.created_at.strftime('%d %b %Y') }}</td>
+            <td data-label="Status">
               <span class="badge {% if u.is_active %}bg-success{% else %}bg-secondary{% endif %}">
                 {{ 'Active' if u.is_active else 'Inactive' }}
               </span>
             </td>
-            <td>
+            <td class="cell-actions" data-label="Actions">
               <div class="d-flex gap-2">
                 {% if u.role != 'admin' %}
                 <form method="POST" action="{{ url_for('admin.toggle_user', uid=u.id) }}">

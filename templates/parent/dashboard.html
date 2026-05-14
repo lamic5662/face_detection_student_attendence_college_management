@@ -27,12 +27,12 @@
   <!-- Header gradient banner -->
   <div class="card-header border-0 p-0">
     <div style="background:linear-gradient(135deg,#0d6efd,#6610f2);border-radius:.375rem .375rem 0 0">
-      <div class="px-4 py-4 text-white d-flex align-items-center gap-4">
+      <div class="px-4 py-4 text-white d-flex align-items-center dashboard-hero">
         <div class="rounded-circle bg-white bg-opacity-25 d-flex align-items-center justify-content-center fw-bold fs-3"
              style="width:64px;height:64px;flex-shrink:0">
           {{ student.user.name[0].upper() }}
         </div>
-        <div class="flex-grow-1">
+        <div class="flex-grow-1 dashboard-hero-meta">
           <h4 class="mb-0 fw-bold">{{ student.user.name }}</h4>
           <div class="opacity-75 small">
             {{ item.relationship.title() }} &bull;
@@ -41,7 +41,7 @@
             Semester {{ student.semester }}
           </div>
         </div>
-        <div class="d-flex gap-4 text-center">
+        <div class="d-flex gap-4 text-center dashboard-hero-score flex-wrap">
           <div>
             <div class="fw-bold fs-3
               {% if item.overall_pct >= 75 %}text-white
@@ -63,7 +63,7 @@
           </div>
           {% endif %}
         </div>
-        <div class="d-flex flex-column gap-2">
+        <div class="d-flex flex-column gap-2 dashboard-hero-actions">
           <a href="{{ url_for('parent.child_detail', student_id=student.id) }}"
              class="btn btn-light fw-semibold">
             <i class="bi bi-eye-fill me-1"></i>Full Report
@@ -121,7 +121,7 @@
     {% endif %}
 
     <!-- Subject attendance mini-grid -->
-    <div class="row g-2">
+    <div class="row g-2 dashboard-subject-grid">
       {% for s in item.att_summary %}
       <div class="col-md-4 col-6">
         <div class="p-2 rounded border {% if s.low %}border-danger{% endif %}" style="background:#f8f9fb">

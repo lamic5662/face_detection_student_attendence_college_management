@@ -7,7 +7,7 @@
 <!-- Filter bar -->
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body px-4 py-3">
-    <form method="GET" action="{{ url_for('admin.subjects') }}" class="row g-2 align-items-end">
+    <form method="GET" action="{{ url_for('admin.subjects') }}" class="row g-2 align-items-end filter-form-compact">
       <div class="col-md-4">
         <label class="form-label fw-semibold small mb-1">Faculty</label>
         <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -42,14 +42,14 @@
   </div>
 </div>
 
-<div class="d-flex align-items-center mb-3">
+<div class="d-flex align-items-center mb-3 content-toolbar">
   <span class="badge bg-primary-subtle text-primary px-3 py-2">{{ subjects|length }} subject(s)</span>
 </div>
 
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0"
+      <table class="table table-hover mb-0 responsive-data-table"
              data-bulk-url="{{ url_for('admin.bulk_delete_subjects') }}"
              data-bulk-label="subject">
         <thead class="table-light">
@@ -70,24 +70,24 @@
         <tbody>
           {% for s in subjects %}
           <tr>
-            <td class="ps-3">
+            <td class="ps-3 cell-control" data-label="">
               <input type="checkbox" data-bulk-item value="{{ s.id }}"
                      data-bulk-name="{{ s.name }}" class="bulk-cb">
             </td>
-            <td class="px-2"><span class="badge bg-info-subtle text-info">{{ s.code }}</span></td>
-            <td class="fw-semibold">{{ s.name }}</td>
-            <td><span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span></td>
-            <td><span class="badge bg-secondary-subtle text-secondary">Sem {{ s.semester }}</span></td>
-            <td>
+            <td class="px-2" data-label="Code"><span class="badge bg-info-subtle text-info">{{ s.code }}</span></td>
+            <td class="fw-semibold" data-label="Name">{{ s.name }}</td>
+            <td data-label="Department"><span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span></td>
+            <td data-label="Semester"><span class="badge bg-secondary-subtle text-secondary">Sem {{ s.semester }}</span></td>
+            <td data-label="Teacher">
               <div class="d-flex align-items-center gap-1">
                 <i class="bi bi-person-fill text-success small"></i>
                 <span>{{ s.teacher.user.name }}</span>
                 <small class="text-muted">({{ s.teacher.employee_id }})</small>
               </div>
             </td>
-            <td>{{ s.credit_hours }}</td>
-            <td>{{ s.sessions|length }}</td>
-            <td>
+            <td data-label="Credits">{{ s.credit_hours }}</td>
+            <td data-label="Sessions">{{ s.sessions|length }}</td>
+            <td class="cell-actions" data-label="Actions">
               <div class="d-flex gap-1">
                 <button class="btn btn-sm btn-outline-primary"
                         data-bs-toggle="modal" data-bs-target="#editSubjectModal{{ s.id }}" title="Edit">

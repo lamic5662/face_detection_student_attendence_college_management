@@ -33,8 +33,10 @@ logs/
 static/uploads/faces/
 static/uploads/content/
 static/uploads/id_photos/
+static/uploads/college_logos/
 static/uploads/signatures/
 static/uploads/id_templates/
+memory/
 
 # Database
 *.db

@@ -3,6 +3,7 @@ import os
 from datetime import date
 from unittest.mock import patch
 
+from PIL import Image
 from extensions import db, mail
 from models.academic_calendar import AcademicCalendarEvent
 from models.assignment import AssignmentSubmission
@@ -16,9 +17,17 @@ from models.leave import LeaveRequest
 from models.notice import Notice
 from models.notice_read import NoticeRead
 from models.platform_audit import PlatformAuditLog
+from models.setting import CollegeSetting
 from models.student import Student
 from models.user import User
 from utils.account_setup import build_public_url, generate_password_setup_token
+
+
+def make_valid_png_bytes(size=(64, 64), color=(13, 110, 253, 255)):
+    buf = io.BytesIO()
+    Image.new('RGBA', size, color).save(buf, format='PNG')
+    buf.seek(0)
+    return buf.getvalue()
 
 
 def login(client, email, password='Password@123', college_code=None):
@@ -363,6 +372,158 @@ def test_admin_can_add_parent_with_temporary_password(app, client):
         assert user.role == 'parent'
         assert user.must_change_password is True
         assert user.password_changed_at is None
+
+
+def test_admin_can_edit_subject_credit_hours_without_500(app, client):
+    from models.subject import Subject
+
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    with app.app_context():
+        subject = db.session.get(Subject, app.config['TEST_DATA']['own_subject_id'])
+        assert subject is not None
+        subject_id = subject.id
+        teacher_id = subject.teacher_id
+        department_id = subject.department_id
+
+    response = client.post(
+        f'/admin/subjects/edit/{subject_id}',
+        data={
+            'name': 'Programming Fundamentals',
+            'code': 'CS101',
+            'department_id': str(department_id),
+            'teacher_id': str(teacher_id),
+            'semester': '1',
+            'credit_hours': '4',
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'Subject CS101 updated.' in response.data
+
+    with app.app_context():
+        updated = db.session.get(Subject, subject_id)
+        assert updated.credit_hours == 4
+
+
+def test_admin_can_delete_subject_without_500(app, client):
+    from models.subject import Subject
+
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    with app.app_context():
+        base_subject = db.session.get(Subject, app.config['TEST_DATA']['own_subject_id'])
+        subject = Subject(
+            college_id=app.config['TEST_DATA']['college_id'],
+            name='Temporary Subject',
+            code='TMP401',
+            department_id=base_subject.department_id,
+            teacher_id=base_subject.teacher_id,
+            semester=1,
+            credit_hours=3,
+        )
+        db.session.add(subject)
+        db.session.commit()
+        subject_id = subject.id
+
+    response = client.post(
+        f'/admin/subjects/delete/{subject_id}',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'Subject deleted.' in response.data
+
+    with app.app_context():
+        deleted = db.session.get(Subject, subject_id)
+        assert deleted is None
+
+
+def test_admin_settings_page_renders_without_500(app, client):
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    response = client.get('/admin/settings')
+
+    assert response.status_code == 200
+    assert b'collegeSettingsForm' in response.data
+    assert b'Save Settings' in response.data
+    assert b'name="college_logo"' in response.data
+
+
+def test_admin_can_upload_college_logo_without_500(app, client):
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    response = client.post(
+        '/admin/settings/logo',
+        data={
+            'college_logo': (io.BytesIO(make_valid_png_bytes()), 'college-logo.png'),
+        },
+        content_type='multipart/form-data',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'College logo updated.' in response.data
+
+    with app.app_context():
+        college = db.session.get(College, app.config['TEST_DATA']['college_id'])
+        cs = CollegeSetting.get(college=college)
+        assert cs.logo_path
+        assert cs.logo_path.startswith('uploads/college_logos/')
+        assert os.path.exists(os.path.join(app.static_folder, cs.logo_path))
+
+
+def test_admin_can_save_settings_and_logo_in_single_submit(app, client):
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    response = client.post(
+        '/admin/settings/save',
+        data={
+            'college_name': 'Updated Alpha College',
+            'address': 'Kathmandu',
+            'latitude': '27.717200',
+            'longitude': '85.324000',
+            'college_logo': (io.BytesIO(make_valid_png_bytes()), 'single-submit-logo.png'),
+        },
+        content_type='multipart/form-data',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'College settings and logo saved successfully.' in response.data
+
+    with app.app_context():
+        college = db.session.get(College, app.config['TEST_DATA']['college_id'])
+        cs = CollegeSetting.get(college=college)
+        assert college.name == 'Updated Alpha College'
+        assert cs.college_name == 'Updated Alpha College'
+        assert cs.address == 'Kathmandu'
+        assert cs.logo_path
+        assert cs.logo_path.startswith('uploads/college_logos/')
+        assert os.path.exists(os.path.join(app.static_folder, cs.logo_path))
+
+
+def test_admin_logo_upload_rejects_tiny_invalid_image(app, client):
+    login(client, 'admin@example.com', college_code=app.config['TEST_DATA']['college_code'])
+
+    response = client.post(
+        '/admin/settings/save',
+        data={
+            'college_name': 'Alpha College',
+            'college_logo': (io.BytesIO(b'bad'), 'tiny-logo.png'),
+        },
+        content_type='multipart/form-data',
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b'Logo file looks invalid or too small' in response.data
+
+    with app.app_context():
+        college = db.session.get(College, app.config['TEST_DATA']['college_id'])
+        cs = CollegeSetting.get(college=college)
+        assert cs.logo_path is None
 
 
 def test_teacher_cannot_download_another_teachers_subject_report(app, client):
@@ -1837,6 +1998,20 @@ def test_super_admin_can_login_without_college_code(app, client):
 
     assert response.status_code == 302
     assert '/super-admin/dashboard' in response.headers['Location']
+
+
+def test_private_lan_login_page_redirects_to_public_https_url(app, client):
+    with app.app_context():
+        app.config['PUBLIC_BASE_URL'] = 'https://portal.smartattend.test'
+
+    response = client.get(
+        '/login',
+        base_url='http://192.168.1.81:8081',
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers['Location'] == 'https://portal.smartattend.test/login'
 
 
 def test_student_dashboard_hides_other_college_notice(app, client):

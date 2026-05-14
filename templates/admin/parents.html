@@ -3,9 +3,9 @@
 {% block page_title %}<i class="bi bi-house-heart-fill me-2"></i>Parent Management{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap content-toolbar">
   <p class="text-muted mb-0">Create parent accounts and link them to their children.</p>
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap content-toolbar-actions">
     <form method="POST" action="{{ url_for('admin.trigger_class_alerts') }}"
           data-confirm="Send absent-class alerts to all parents for overdue attendance slots today?" data-confirm-title="Send Alerts" data-confirm-type="info" data-confirm-ok="Send Alerts" data-confirm-icon="bi-bell-fill">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -23,7 +23,7 @@
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0">
+      <table class="table table-hover mb-0 responsive-data-table">
         <thead class="table-light">
           <tr>
             <th class="px-4">Parent Name</th>
@@ -36,7 +36,7 @@
           {% for parent in parents_list %}
           {% set children = parent_children.get(parent.id, []) %}
           <tr>
-            <td class="px-4 fw-semibold">
+            <td class="px-4 fw-semibold" data-label="Parent">
               <div class="d-flex align-items-center gap-2">
                 <div class="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center fw-bold text-primary"
                      style="width:32px;height:32px;flex-shrink:0;font-size:13px">
@@ -45,7 +45,7 @@
                 {{ parent.name }}
               </div>
             </td>
-            <td>
+            <td data-label="Email">
               <div class="text-muted small">{{ parent.email }}</div>
               {% if parent.must_change_password %}
               <span class="badge bg-warning-subtle text-warning mt-1">
@@ -55,7 +55,7 @@
               <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Children">
               {% if children %}
                 {% for link in children %}
                 <div class="d-flex align-items-center gap-1 mb-1">
@@ -82,7 +82,7 @@
                 <i class="bi bi-plus-circle me-1"></i>Link child
               </button>
             </td>
-            <td class="text-end pe-4">
+            <td class="text-end pe-4 cell-actions" data-label="Actions">
               <form method="POST" action="{{ url_for('admin.delete_parent', parent_id=parent.id) }}"
                     class="d-inline"
                     data-confirm="Delete parent account for {{ parent.name }}? This cannot be undone." data-confirm-title="Delete Parent">

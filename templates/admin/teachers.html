@@ -4,7 +4,7 @@
 {% block page_title %}<i class="bi bi-person-badge-fill me-2"></i>Teachers{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap content-toolbar">
   <span class="badge bg-primary-subtle text-primary px-3 py-2">
     {{ pagination.total }} teacher(s)
   </span>
@@ -16,7 +16,7 @@
 <!-- Filter Bar -->
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-body px-4 py-3">
-    <form method="GET" class="row g-2 align-items-end">
+    <form method="GET" class="row g-2 align-items-end filter-form-compact">
       <div class="col-md-4">
         <label class="form-label fw-semibold small mb-1">Faculty / Department</label>
         <select name="department_id" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -56,7 +56,7 @@
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">
-      <table class="table table-hover mb-0"
+      <table class="table table-hover mb-0 responsive-data-table"
              data-bulk-url="{{ url_for('admin.bulk_delete_teachers') }}"
              data-bulk-label="teacher">
         <thead class="table-light">
@@ -76,13 +76,13 @@
         <tbody>
           {% for t in teachers %}
           <tr>
-            <td class="ps-3">
+            <td class="ps-3 cell-control" data-label="">
               <input type="checkbox" data-bulk-item value="{{ t.id }}"
                      data-bulk-name="{{ t.user.name }}" class="bulk-cb">
             </td>
-            <td class="px-2"><span class="badge bg-secondary">{{ t.employee_id }}</span></td>
-            <td class="fw-semibold">{{ t.user.name }}</td>
-            <td>
+            <td class="px-2" data-label="Employee ID"><span class="badge bg-secondary">{{ t.employee_id }}</span></td>
+            <td class="fw-semibold" data-label="Name">{{ t.user.name }}</td>
+            <td data-label="Email">
               <div class="text-muted small">{{ t.user.email }}</div>
               {% if t.user.must_change_password %}
               <span class="badge bg-warning-subtle text-warning mt-1">
@@ -92,14 +92,14 @@
               <span class="badge bg-success-subtle text-success mt-1">Own password set</span>
               {% endif %}
             </td>
-            <td><span class="badge bg-primary-subtle text-primary">{{ t.department.name }}</span></td>
-            <td><span class="badge bg-info-subtle text-info">{{ t.subjects|length }}</span></td>
-            <td>
+            <td data-label="Faculty"><span class="badge bg-primary-subtle text-primary">{{ t.department.name }}</span></td>
+            <td data-label="Subjects"><span class="badge bg-info-subtle text-info">{{ t.subjects|length }}</span></td>
+            <td data-label="Status">
               <span class="badge {% if t.user.is_active %}bg-success{% else %}bg-secondary{% endif %}">
                 {{ 'Active' if t.user.is_active else 'Inactive' }}
               </span>
             </td>
-            <td>
+            <td class="cell-actions" data-label="Actions">
               <div class="d-flex gap-1">
                 <button class="btn btn-sm btn-outline-primary"
                         data-bs-toggle="modal" data-bs-target="#editModal{{ t.id }}" title="Edit">

@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from groq import Groq
 from flask import current_app
+
+try:
+    from groq import Groq
+except ModuleNotFoundError:  # pragma: no cover - depends on optional extra
+    Groq = None  # type: ignore[assignment]
 
 _SYSTEM_PROMPT = """You are SmartAttend AI — a smart assistant inside SmartAttend, a college management system. You have access to real live data from the database for the current user.
 
@@ -33,6 +37,11 @@ Be friendly, professional, and always answer based on the real data provided."""
 
 
 def _client() -> Groq:
+    if Groq is None:
+        raise RuntimeError(
+            'The optional Groq dependency is not installed. Install requirements.txt '
+            'or disable the AI assistant feature.'
+        )
     key = current_app.config.get('GROQ_API_KEY', '')
     if not key:
         raise RuntimeError('GROQ_API_KEY is not configured.')

@@ -410,6 +410,8 @@ def create_app(config_override=None) -> Flask:
             from models.setting import CollegeSetting
             from models.notice import Notice
             from models.notice_read import NoticeRead
+            if current_user.is_authenticated and current_user.role != 'super_admin' and getattr(current_user, 'college', None) is not None:
+                college = current_user.college
             cs = CollegeSetting.get(college=college) if college is not None else None
             notification_items = []
             notification_count = 0
@@ -496,6 +498,7 @@ def create_app(config_override=None) -> Flask:
                 college_lat=(cs.latitude if cs is not None and cs.latitude is not None else app.config['COLLEGE_LAT']),
                 college_lng=(cs.longitude if cs is not None and cs.longitude is not None else app.config['COLLEGE_LNG']),
                 college_logo=cs.logo_path if cs is not None else None,
+                college_logo_version=(int(cs.updated_at.timestamp()) if cs is not None and cs.logo_path and cs.updated_at else None),
                 now=_dt.now,
                 notification_items=notification_items,
                 notification_count=notification_count,
@@ -510,6 +513,7 @@ def create_app(config_override=None) -> Flask:
                 college_lat=app.config.get('COLLEGE_LAT', 27.7172),
                 college_lng=app.config.get('COLLEGE_LNG', 85.3240),
                 college_logo=None,
+                college_logo_version=None,
                 now=_dt.now,
                 notification_items=[],
                 notification_count=0,

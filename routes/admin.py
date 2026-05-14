@@ -22,6 +22,7 @@ from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
+from PIL import Image, UnidentifiedImageError
 import csv, io, os
 from utils.content_storage import is_valid_content_relpath, resolve_content_path, content_storage_dirs
 from utils.dashboard import build_dashboard_preferences
@@ -33,6 +34,8 @@ admin_bp = Blueprint('admin', __name__)
 _TEMP_PASSWORD_RE = re.compile(
     r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$'
 )
+_LOGO_MIN_DIMENSION = 24
+_LOGO_MIN_BYTES = 100
 
 
 def _admin_college_id() -> int:
@@ -68,6 +71,66 @@ def _scoped_user_query():
 
 def _validate_temporary_password(password: str) -> bool:
     return bool(_TEMP_PASSWORD_RE.match(password))
+
+
+def _delete_static_file(rel_path: str | None) -> None:
+    if not rel_path:
+        return
+    abs_path = os.path.join(current_app.static_folder, rel_path)
+    if os.path.exists(abs_path):
+        os.remove(abs_path)
+
+
+def _save_college_logo_file(logo_file, college) -> str:
+    ext = logo_file.filename.rsplit('.', 1)[-1].lower()
+    safe_code = secure_filename((college.code or f'college-{college.id}').lower()) or f'college-{college.id}'
+    logo_dir = os.path.join(current_app.static_folder, 'uploads', 'college_logos', safe_code)
+    os.makedirs(logo_dir, exist_ok=True)
+    stamp = utc_now_naive().strftime('%Y%m%d%H%M%S')
+    filename = f'logo-{stamp}.{ext}'
+    logo_file.save(os.path.join(logo_dir, filename))
+    return f'uploads/college_logos/{safe_code}/{filename}'
+
+
+def _validate_logo_upload(logo_file, ext: str) -> None:
+    logo_file.stream.seek(0)
+    raw = logo_file.stream.read()
+    logo_file.stream.seek(0)
+
+    if len(raw) < _LOGO_MIN_BYTES:
+        raise ValueError('Logo file looks invalid or too small. Please upload a proper image.')
+
+    if ext == 'svg':
+        header = raw[:512].decode('utf-8', errors='ignore').lower()
+        if '<svg' not in header:
+            raise ValueError('SVG logo file is invalid.')
+        return
+
+    try:
+        with Image.open(io.BytesIO(raw)) as img:
+            img.verify()
+        with Image.open(io.BytesIO(raw)) as img:
+            width, height = img.size
+    except (UnidentifiedImageError, OSError, ValueError):
+        raise ValueError('Logo file is not a valid image.')
+
+    if width < _LOGO_MIN_DIMENSION or height < _LOGO_MIN_DIMENSION:
+        raise ValueError(f'Logo must be at least {_LOGO_MIN_DIMENSION}x{_LOGO_MIN_DIMENSION} pixels.')
+
+
+def _process_college_logo_upload(cs, logo_file):
+    if not logo_file or not logo_file.filename:
+        return False, None, None
+    allowed = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}
+    ext = logo_file.filename.rsplit('.', 1)[-1].lower()
+    if ext not in allowed:
+        raise ValueError('Logo must be PNG, JPG, GIF, SVG, or WebP.')
+    _validate_logo_upload(logo_file, ext)
+
+    old_logo_path = cs.logo_path
+    new_logo_path = _save_college_logo_file(logo_file, current_user.college)
+    cs.logo_path = new_logo_path
+    return True, old_logo_path, new_logo_path
 
 
 @admin_bp.route('/dashboard')
@@ -1365,7 +1428,7 @@ def trigger_class_alerts():
 @login_required
 @admin_required
 def settings():
-    cs = CollegeSetting.get()
+    cs = CollegeSetting.get(college=current_user.college)
     return render_template('admin/settings.html', cs=cs)
 
 
@@ -1373,8 +1436,11 @@ def settings():
 @login_required
 @admin_required
 def save_settings():
-    cs = CollegeSetting.get()
-    cs.college_name = request.form.get('college_name', '').strip() or cs.college_name
+    cs = CollegeSetting.get(college=current_user.college)
+    college_name = request.form.get('college_name', '').strip()
+    if college_name:
+        cs.college_name = college_name
+        current_user.college.name = college_name
     cs.address = request.form.get('address', '').strip() or None
 
     lat = request.form.get('latitude', '').strip()
@@ -1389,9 +1455,31 @@ def save_settings():
         flash('Invalid coordinates — please pick a location on the map.', 'danger')
         return redirect(url_for('admin.settings'))
 
+    logo_uploaded = False
+    old_logo_path = None
+    new_logo_path = None
+    logo_file = request.files.get('college_logo')
+    try:
+        logo_uploaded, old_logo_path, new_logo_path = _process_college_logo_upload(cs, logo_file)
+    except ValueError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('admin.settings'))
+
     cs.updated_at = utc_now_naive()
-    db.session.commit()
-    flash('College settings saved successfully.', 'success')
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        if new_logo_path:
+            _delete_static_file(new_logo_path)
+        flash('Could not save college settings right now. Please try again.', 'danger')
+        return redirect(url_for('admin.settings'))
+    if old_logo_path:
+        _delete_static_file(old_logo_path)
+    if logo_uploaded:
+        flash('College settings and logo saved successfully.', 'success')
+    else:
+        flash('College settings saved successfully.', 'success')
     return redirect(url_for('admin.settings'))
 
 
@@ -1399,23 +1487,29 @@ def save_settings():
 @login_required
 @admin_required
 def save_logo():
-    cs = CollegeSetting.get()
+    cs = CollegeSetting.get(college=current_user.college)
     logo_file = request.files.get('college_logo')
     if not logo_file or not logo_file.filename:
         flash('Please select an image file.', 'danger')
         return redirect(url_for('admin.settings'))
-    allowed = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}
-    ext = logo_file.filename.rsplit('.', 1)[-1].lower()
-    if ext not in allowed:
-        flash('Logo must be PNG, JPG, GIF, SVG, or WebP.', 'danger')
+    old_logo_path = None
+    new_logo_path = None
+    try:
+        _, old_logo_path, new_logo_path = _process_college_logo_upload(cs, logo_file)
+    except ValueError as exc:
+        flash(str(exc), 'danger')
         return redirect(url_for('admin.settings'))
-    logo_dir = os.path.join(current_app.static_folder, 'uploads', 'college_logos')
-    os.makedirs(logo_dir, exist_ok=True)
-    slug = current_user.college.code.lower()
-    fname = f'{slug}_logo.{ext}'
-    logo_file.save(os.path.join(logo_dir, fname))
-    cs.logo_path = f'uploads/college_logos/{fname}'
-    db.session.commit()
+    cs.updated_at = utc_now_naive()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        if new_logo_path:
+            _delete_static_file(new_logo_path)
+        flash('Could not save the college logo right now. Please try again.', 'danger')
+        return redirect(url_for('admin.settings'))
+    if old_logo_path:
+        _delete_static_file(old_logo_path)
     flash('College logo updated.', 'success')
     return redirect(url_for('admin.settings'))
 
@@ -1424,13 +1518,13 @@ def save_logo():
 @login_required
 @admin_required
 def remove_logo():
-    cs = CollegeSetting.get()
+    cs = CollegeSetting.get(college=current_user.college)
     if cs.logo_path:
-        abs_path = os.path.join(current_app.static_folder, cs.logo_path)
-        if os.path.exists(abs_path):
-            os.remove(abs_path)
+        old_logo_path = cs.logo_path
         cs.logo_path = None
+        cs.updated_at = utc_now_naive()
         db.session.commit()
+        _delete_static_file(old_logo_path)
         flash('College logo removed.', 'success')
     return redirect(url_for('admin.settings'))
 

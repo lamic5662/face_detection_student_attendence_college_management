@@ -18,13 +18,20 @@
 <div class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     {% if college_logo %}
-    <img src="{{ url_for('static', filename=college_logo) }}"
-         alt="{{ college_name }}"
-         class="sidebar-college-logo">
+    <div class="sidebar-college-logo-wrap">
+      <img src="{{ url_for('static', filename=college_logo, v=college_logo_version) }}"
+           alt="{{ college_name }}"
+           class="sidebar-college-logo">
+    </div>
     {% else %}
-    <i class="bi bi-mortarboard-fill fs-3 text-primary"></i>
+    <div class="sidebar-college-logo-wrap sidebar-college-logo-fallback">
+      <i class="bi bi-mortarboard-fill fs-3 text-primary"></i>
+    </div>
     {% endif %}
-    <span class="ms-2 fw-bold sidebar-brand-name">{{ college_name }}</span>
+    <div class="sidebar-brand-copy">
+      <div class="sidebar-brand-kicker">SmartAttend</div>
+      <div class="fw-bold sidebar-brand-name" title="{{ college_name }}">{{ college_name }}</div>
+    </div>
   </div>
   <hr class="sidebar-divider">
   {% set nav = sidebar_navigation %}

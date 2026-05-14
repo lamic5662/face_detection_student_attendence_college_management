@@ -17,19 +17,17 @@
         <h6 class="fw-semibold mb-0"><i class="bi bi-building-fill text-primary me-2"></i>College Information</h6>
       </div>
       <div class="card-body px-4 pb-4">
-        <form method="POST" action="{{ url_for('admin.save_settings') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
           <div class="mb-3">
             <label class="form-label fw-semibold">College Name <span class="text-danger">*</span></label>
             <input type="text" name="college_name" class="form-control form-control-lg"
+                   form="collegeSettingsForm"
                    value="{{ cs.college_name }}" required placeholder="e.g. ABC College of Technology">
             <div class="form-text">Shown on the parent's live map and notifications.</div>
           </div>
 
           <div class="mb-4">
             <label class="form-label fw-semibold">Address</label>
-            <textarea name="address" class="form-control" rows="2"
+            <textarea name="address" class="form-control" rows="2" form="collegeSettingsForm"
                       placeholder="e.g. Kathmandu, Bagmati Province, Nepal">{{ cs.address or '' }}</textarea>
           </div>
 
@@ -46,12 +44,14 @@
             <div class="col-6">
               <label class="form-label small fw-semibold">Latitude</label>
               <input type="text" id="lat-input" name="latitude" class="form-control font-monospace"
+                     form="collegeSettingsForm"
                      value="{{ '%.6f'|format(cs.latitude) if cs.latitude else '' }}"
                      placeholder="e.g. 27.717200" readonly>
             </div>
             <div class="col-6">
               <label class="form-label small fw-semibold">Longitude</label>
               <input type="text" id="lng-input" name="longitude" class="form-control font-monospace"
+                     form="collegeSettingsForm"
                      value="{{ '%.6f'|format(cs.longitude) if cs.longitude else '' }}"
                      placeholder="e.g. 85.324000" readonly>
             </div>
@@ -69,10 +69,9 @@
           </div>
           {% endif %}
 
-          <button type="submit" class="btn btn-primary fw-semibold w-100">
+          <button type="submit" class="btn btn-primary fw-semibold w-100" form="collegeSettingsForm">
             <i class="bi bi-check-lg me-1"></i>Save Settings
           </button>
-        </form>
 
         {% if cs.updated_at %}
         <div class="text-muted small text-center mt-3">
@@ -90,37 +89,37 @@
         <h6 class="fw-semibold mb-0"><i class="bi bi-image-fill text-primary me-2"></i>College Logo</h6>
       </div>
       <div class="card-body px-4 pb-4">
-        <form method="POST" action="{{ url_for('admin.save_logo') }}" enctype="multipart/form-data">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <div class="d-flex align-items-center gap-3 mb-3">
-            {% if cs.logo_path %}
-            <img src="{{ url_for('static', filename=cs.logo_path) }}"
-                 alt="Current logo" id="logoPreview"
-                 style="width:64px;height:64px;object-fit:contain;border-radius:8px;border:1px solid #e8ecf0;padding:6px;background:#fff">
-            {% else %}
-            <div id="logoPreview"
-                 style="width:64px;height:64px;border-radius:8px;border:2px dashed #cbd5e0;display:flex;align-items:center;justify-content:center;background:#f8f9fa;flex-shrink:0">
-              <i class="bi bi-building text-muted fs-3"></i>
-            </div>
-            {% endif %}
-            <div class="small text-muted">
-              Shown in the sidebar for <strong>all users</strong> across every page.<br>
-              PNG, JPG, SVG or WebP. Recommended: 200×200 px.
-            </div>
+        <div class="d-flex align-items-center gap-3 mb-3">
+          {% if cs.logo_path %}
+          <img src="{{ url_for('static', filename=cs.logo_path, v=(cs.updated_at.timestamp()|int if cs.updated_at else None)) }}"
+               alt="Current logo" id="logoPreview"
+               style="width:64px;height:64px;object-fit:contain;border-radius:8px;border:1px solid #e8ecf0;padding:6px;background:#fff">
+          {% else %}
+          <div id="logoPreview"
+               style="width:64px;height:64px;border-radius:8px;border:2px dashed #cbd5e0;display:flex;align-items:center;justify-content:center;background:#f8f9fa;flex-shrink:0">
+            <i class="bi bi-building text-muted fs-3"></i>
           </div>
-          <input type="file" name="college_logo" id="logoInput" class="form-control mb-3"
-                 accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp" required>
-          <button type="submit" class="btn btn-primary fw-semibold w-100">
-            <i class="bi bi-upload me-1"></i>Upload Logo
-          </button>
-        </form>
+          {% endif %}
+          <div class="small text-muted">
+            Shown in the sidebar for <strong>all users</strong> across every page.<br>
+            PNG, JPG, SVG or WebP. Recommended: 200×200 px.
+          </div>
+        </div>
+        <input type="file" name="college_logo" id="logoInput" class="form-control mb-3"
+               form="logoUploadForm"
+               accept="image/png,image/jpeg,image/gif,image/svg+xml,image/webp" required>
+        <button type="submit" class="btn btn-primary fw-semibold w-100" form="logoUploadForm">
+          <i class="bi bi-upload me-1"></i>Upload Logo
+        </button>
+        <div class="small text-muted mt-2">
+          Upload the logo separately after choosing the file.
+        </div>
         {% if cs.logo_path %}
-        <form method="POST" action="{{ url_for('admin.remove_logo') }}" class="mt-2">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button type="submit" class="btn btn-outline-danger btn-sm w-100">
+          <button type="submit"
+                  class="btn btn-outline-danger btn-sm w-100 mt-2"
+                  form="removeLogoForm">
             <i class="bi bi-trash3 me-1"></i>Remove Logo
           </button>
-        </form>
         {% endif %}
       </div>
     </div>
@@ -172,6 +171,17 @@
   </div>
 
 </div>
+<form id="collegeSettingsForm" method="POST" action="{{ url_for('admin.save_settings') }}" class="d-none">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+<form id="logoUploadForm" method="POST" action="{{ url_for('admin.save_logo') }}" enctype="multipart/form-data" class="d-none">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% if cs.logo_path %}
+<form id="removeLogoForm" method="POST" action="{{ url_for('admin.remove_logo') }}" class="d-none">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+</form>
+{% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
