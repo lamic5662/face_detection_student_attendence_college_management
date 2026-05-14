@@ -18,7 +18,6 @@ from models.setting import CollegeSetting
 from models.id_card import IDCardTemplate, StudentIDCard
 from utils.decorators import admin_required, strict_admin_required
 from utils.subadmin import SUBADMIN_MODULES
-from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 from sqlalchemy import func
 from datetime import datetime, date, timedelta
@@ -26,7 +25,6 @@ from PIL import Image, UnidentifiedImageError
 import csv, io, os
 from utils.content_storage import is_valid_content_relpath, resolve_content_path, content_storage_dirs
 from utils.dashboard import build_dashboard_preferences
-from utils.tenancy import current_college_id
 from utils.time import utc_now_naive
 import re
 
@@ -497,79 +495,6 @@ def students():
                            selected_adm_year=adm_year,
                            search=search,
                            now=datetime.now())
-
-
-@admin_bp.route('/batch-overview')
-@login_required
-@admin_required
-def batch_overview():
-    """Batch-wise analysis — shows all admission-year batches with progress tracking."""
-    college_id   = _admin_college_id()
-    current_year = datetime.now().year
-    dept_filter  = request.args.get('department_id', type=int)
-    year_filter  = request.args.get('admission_year', type=int)
-
-    base_q = Student.query.join(User).filter(Student.college_id == college_id)
-    if dept_filter:
-        base_q = base_q.filter(Student.department_id == dept_filter)
-    if year_filter:
-        base_q = base_q.filter(Student.admission_year == year_filter)
-
-    all_students = base_q.order_by(Student.admission_year, Student.department_id, Student.roll_number).all()
-    departments  = _scoped_department_query().order_by(Department.name).all()
-    dept_map     = {d.id: d for d in departments}
-
-    adm_years = [
-        r[0] for r in
-        db.session.query(Student.admission_year)
-        .filter(Student.college_id == college_id, Student.admission_year.isnot(None))
-        .distinct().order_by(Student.admission_year.desc()).all()
-    ]
-
-    # Build batch groups: {(adm_year, dept_id): [students]}
-    from collections import defaultdict
-    groups = defaultdict(list)
-    for s in all_students:
-        key = (s.admission_year or 0, s.department_id)
-        groups[key].append(s)
-
-    batches = []
-    for (adm_year, dept_id), sts in sorted(groups.items(), key=lambda x: (-x[0][0], x[0][1])):
-        dept   = dept_map.get(dept_id)
-        years_elapsed = max(0, current_year - adm_year) if adm_year else 0
-        expected_sem  = min(years_elapsed * 2 + 1, 8) if adm_year else None
-
-        counts = {'on_track': 0, 'behind': 0, 'far_behind': 0, 'unknown': 0}
-        student_rows = []
-        for s in sts:
-            status, diff = _student_track_status(s, current_year)
-            counts[status] += 1
-            student_rows.append({
-                'student': s,
-                'status':  status,
-                'diff':    diff,
-                'expected_sem': expected_sem,
-            })
-
-        batches.append({
-            'adm_year':     adm_year,
-            'dept':         dept,
-            'dept_id':      dept_id,
-            'expected_sem': expected_sem,
-            'total':        len(sts),
-            'counts':       counts,
-            'students':     student_rows,
-            'year_label':   f"Year {years_elapsed + 1}" if adm_year else 'Unknown',
-        })
-
-    return render_template('admin/batch_overview.html',
-                           batches=batches,
-                           departments=departments,
-                           adm_years=adm_years,
-                           dept_filter=dept_filter,
-                           year_filter=year_filter,
-                           current_year=current_year)
-
 
 @admin_bp.route('/batch-promote', methods=['POST'])
 @login_required
@@ -1102,45 +1027,6 @@ def bulk_delete_subjects():
 
 # ─── Session Management ──────────────────────────────────────────────────────
 
-@admin_bp.route('/sessions')
-@login_required
-@admin_required
-def sessions():
-    subject_id = request.args.get('subject_id', type=int)
-    status_filter = request.args.get('status', '')
-    date_from = request.args.get('date_from', '')
-    date_to   = request.args.get('date_to', '')
-
-    query = AttendanceSession.query.join(Subject).filter(Subject.college_id == _admin_college_id())
-    if subject_id:
-        query = query.filter_by(subject_id=subject_id)
-    if status_filter:
-        query = query.filter_by(status=status_filter)
-    if date_from:
-        try:
-            query = query.filter(AttendanceSession.date >= date.fromisoformat(date_from))
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            query = query.filter(AttendanceSession.date <= date.fromisoformat(date_to))
-        except ValueError:
-            pass
-
-    page = request.args.get('page', 1, type=int)
-    pagination = query.order_by(
-        AttendanceSession.date.desc(), AttendanceSession.start_time.desc()
-    ).paginate(page=page, per_page=15, error_out=False)
-    subjects = _scoped_subject_query().all()
-    return render_template('admin/sessions.html',
-                           pagination=pagination,
-                           sessions=pagination.items,
-                           subjects=subjects,
-                           selected_subject_id=subject_id,
-                           selected_status=status_filter,
-                           date_from=date_from, date_to=date_to)
-
-
 @admin_bp.route('/sessions/<int:sid>/cancel', methods=['POST'])
 @login_required
 @admin_required
@@ -1156,69 +1042,6 @@ def cancel_session(sid):
         db.session.commit()
         flash('Session cancelled.', 'info')
     return redirect(url_for('admin.attendance_hub', tab='sessions'))
-
-
-# ─── Analytics ───────────────────────────────────────────────────────────────
-
-@admin_bp.route('/analytics')
-@login_required
-@admin_required
-def analytics():
-    departments = _scoped_department_query().all()
-    subjects = _scoped_subject_query().all()
-
-    # Overall stats
-    total_records = AttendanceRecord.query.join(AttendanceSession).join(Subject).filter(
-        Subject.college_id == _admin_college_id(),
-        AttendanceSession.status == 'completed'
-    ).count()
-    present_records = AttendanceRecord.query.join(AttendanceSession).join(Subject).filter(
-        Subject.college_id == _admin_college_id(),
-        AttendanceSession.status == 'completed',
-        AttendanceRecord.status == 'present'
-    ).count()
-    overall_rate = round(present_records / total_records * 100, 1) if total_records > 0 else 0
-
-    # Students below threshold
-    threshold = 75
-    low_attendance_students = []
-    for student in _scoped_student_query().all():
-        pct = student.get_attendance_percentage()
-        if pct < threshold:
-            low_attendance_students.append({
-                'name': student.user.name,
-                'roll': student.roll_number,
-                'dept': student.department.name,
-                'percentage': pct,
-            })
-    low_attendance_students.sort(key=lambda x: x['percentage'])
-
-    # Monthly trend (last 6 months)
-    monthly = []
-    for i in range(5, -1, -1):
-        month_start = date.today().replace(day=1) - timedelta(days=i * 30)
-        month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
-        sessions = AttendanceSession.query.join(Subject).filter(
-            Subject.college_id == _admin_college_id(),
-            AttendanceSession.date >= month_start,
-            AttendanceSession.date < month_end,
-            AttendanceSession.status == 'completed'
-        ).all()
-        total = sum(s.total_students for s in sessions)
-        present = sum(s.present_count for s in sessions)
-        monthly.append({
-            'month': month_start.strftime('%b %Y'),
-            'rate': round(present / total * 100, 1) if total > 0 else 0,
-        })
-
-    return render_template('admin/analytics.html',
-                           overall_rate=overall_rate,
-                           total_records=total_records,
-                           low_attendance_students=low_attendance_students,
-                           monthly=monthly,
-                           departments=departments,
-                           subjects=subjects)
-
 
 # ─── Parent Management ────────────────────────────────────────────────────────
 
