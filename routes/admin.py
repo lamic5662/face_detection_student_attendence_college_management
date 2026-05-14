@@ -284,15 +284,15 @@ def edit_department(did):
     code = request.form.get('code', '').strip().upper()
     if not name or not code:
         flash('Name and code are required.', 'danger')
-        return redirect(url_for('admin.departments'))
+        return redirect(url_for('admin.people_hub', tab='departments'))
     if code != dept.code and _scoped_department_query().filter_by(code=code).first():
         flash('Department code already exists.', 'danger')
-        return redirect(url_for('admin.departments'))
+        return redirect(url_for('admin.people_hub', tab='departments'))
     dept.name = name
     dept.code = code
     db.session.commit()
     flash(f'Department {code} updated.', 'success')
-    return redirect(url_for('admin.departments'))
+    return redirect(url_for('admin.people_hub', tab='departments'))
 
 
 @admin_bp.route('/departments/delete/<int:did>', methods=['POST'])
@@ -303,7 +303,7 @@ def delete_department(did):
     db.session.delete(dept)
     db.session.commit()
     flash('Department deleted.', 'success')
-    return redirect(url_for('admin.departments'))
+    return redirect(url_for('admin.people_hub', tab='departments'))
 
 
 @admin_bp.route('/departments/bulk-delete', methods=['POST'])
@@ -314,7 +314,7 @@ def bulk_delete_departments():
     ids = request.form.getlist('ids', type=int)
     if not ids:
         flash('No departments selected.', 'warning')
-        return redirect(url_for('admin.departments'))
+        return redirect(url_for('admin.people_hub', tab='departments'))
     # Only delete departments with no students or teachers
     deleted, skipped = 0, 0
     depts = Department.query.filter(Department.id.in_(ids), Department.college_id == cid).all()
@@ -329,7 +329,7 @@ def bulk_delete_departments():
         flash(f'{deleted} department{"s" if deleted != 1 else ""} deleted.', 'success')
     if skipped:
         flash(f'{skipped} department{"s" if skipped != 1 else ""} skipped — still have linked students or teachers.', 'warning')
-    return redirect(url_for('admin.departments'))
+    return redirect(url_for('admin.people_hub', tab='departments'))
 
 
 # ─── Students ────────────────────────────────────────────────────────────────
@@ -520,7 +520,7 @@ def batch_promote():
 
     if not dept_id or not adm_year:
         flash('Invalid batch.', 'danger')
-        return redirect(url_for('admin.batch_overview'))
+        return redirect(url_for('admin.attendance_hub', tab='batch_tracker'))
 
     students_in_batch = Student.query.filter_by(
         college_id=college_id, department_id=dept_id, admission_year=adm_year
@@ -544,7 +544,7 @@ def batch_promote():
         f'{skipped} skipped (behind schedule or already at Semester 8).',
         'success'
     )
-    return redirect(url_for('admin.batch_overview',
+    return redirect(url_for('admin.attendance_hub', tab='batch_tracker',
                             admission_year=adm_year, department_id=dept_id))
 
 
@@ -578,19 +578,19 @@ def add_student():
 
     if not all([name, email, password, dept_id, semester]):
         flash('All fields are required.', 'danger')
-        return redirect(url_for('admin.students', **reopen_target))
+        return redirect(url_for('admin.people_hub', tab='students', **reopen_target))
 
     if not auto_id and not roll:
         flash('Enter a roll number or choose Auto Generate.', 'danger')
-        return redirect(url_for('admin.students', **reopen_target))
+        return redirect(url_for('admin.people_hub', tab='students', **reopen_target))
 
     if not _validate_temporary_password(password):
         flash('Temporary password must be at least 8 characters and include uppercase, lowercase, a digit, and a special character.', 'danger')
-        return redirect(url_for('admin.students', **reopen_target))
+        return redirect(url_for('admin.people_hub', tab='students', **reopen_target))
 
     if _scoped_user_query().filter_by(email=email).first():
         flash('Email already registered.', 'danger')
-        return redirect(url_for('admin.students', **reopen_target))
+        return redirect(url_for('admin.people_hub', tab='students', **reopen_target))
 
     department = _scoped_model_or_404(Department, dept_id)
 
@@ -599,7 +599,7 @@ def add_student():
     else:
         if _scoped_student_query().filter_by(roll_number=roll).first():
             flash('Roll number already exists.', 'danger')
-            return redirect(url_for('admin.students', **reopen_target))
+            return redirect(url_for('admin.people_hub', tab='students', **reopen_target))
 
     user = User(college_id=_admin_college_id(), name=name, email=email, role='student')
     user.set_temporary_password(password)
@@ -617,7 +617,7 @@ def add_student():
     db.session.add(student)
     db.session.commit()
     flash(f'Student {roll} added with a temporary password. The student will be prompted to set a personal password on first login.', 'success')
-    return redirect(url_for('admin.students'))
+    return redirect(url_for('admin.people_hub', tab='students'))
 
 
 @admin_bp.route('/students/edit/<int:sid>', methods=['POST'])
@@ -634,11 +634,11 @@ def edit_student(sid):
     if new_email and new_email != student.user.email:
         if _scoped_user_query().filter(User.email == new_email, User.id != student.user_id).first():
             flash('Email already in use.', 'danger')
-            return redirect(url_for('admin.students'))
+            return redirect(url_for('admin.people_hub', tab='students'))
         student.user.email = new_email
     db.session.commit()
     flash(f'Student {student.roll_number} updated.', 'success')
-    return redirect(url_for('admin.students'))
+    return redirect(url_for('admin.people_hub', tab='students'))
 
 
 @admin_bp.route('/students/import', methods=['POST'])
@@ -651,7 +651,7 @@ def import_students():
     f = request.files.get('csv_file')
     if not f or not f.filename.endswith('.csv'):
         flash('Please upload a valid CSV file.', 'danger')
-        return redirect(url_for('admin.students'))
+        return redirect(url_for('admin.people_hub', tab='students'))
 
     stream = io.StringIO(f.stream.read().decode('utf-8-sig'))
     reader = csv.DictReader(stream)
@@ -711,7 +711,7 @@ def import_students():
 
     db.session.commit()
     flash(f'Import complete: {added} added, {skipped} skipped (duplicates), {errors} errors.', 'info')
-    return redirect(url_for('admin.students'))
+    return redirect(url_for('admin.people_hub', tab='students'))
 
 
 @admin_bp.route('/students/export')
@@ -784,7 +784,7 @@ def delete_student(sid):
     db.session.delete(student.user)
     db.session.commit()
     flash('Student removed.', 'success')
-    return redirect(url_for('admin.students'))
+    return redirect(url_for('admin.people_hub', tab='students'))
 
 
 @admin_bp.route('/students/bulk-delete', methods=['POST'])
@@ -795,14 +795,14 @@ def bulk_delete_students():
     ids = request.form.getlist('ids', type=int)
     if not ids:
         flash('No students selected.', 'warning')
-        return redirect(url_for('admin.students'))
+        return redirect(url_for('admin.people_hub', tab='students'))
     students = Student.query.filter(Student.id.in_(ids), Student.college_id == cid).all()
     count = len(students)
     for s in students:
         db.session.delete(s.user)
     db.session.commit()
     flash(f'{count} student{"s" if count != 1 else ""} deleted.', 'success')
-    return redirect(url_for('admin.students'))
+    return redirect(url_for('admin.people_hub', tab='students'))
 
 
 # ─── Teachers ────────────────────────────────────────────────────────────────
@@ -848,19 +848,19 @@ def add_teacher():
 
     if not all([name, email, password, emp_id, dept_id]):
         flash('All fields are required.', 'danger')
-        return redirect(url_for('admin.teachers'))
+        return redirect(url_for('admin.people_hub', tab='teachers'))
 
     if not _validate_temporary_password(password):
         flash('Temporary password must be at least 8 characters and include uppercase, lowercase, a digit, and a special character.', 'danger')
-        return redirect(url_for('admin.teachers'))
+        return redirect(url_for('admin.people_hub', tab='teachers'))
 
     if _scoped_user_query().filter_by(email=email).first():
         flash('Email already registered.', 'danger')
-        return redirect(url_for('admin.teachers'))
+        return redirect(url_for('admin.people_hub', tab='teachers'))
 
     if _scoped_teacher_query().filter_by(employee_id=emp_id).first():
         flash('Employee ID already exists.', 'danger')
-        return redirect(url_for('admin.teachers'))
+        return redirect(url_for('admin.people_hub', tab='teachers'))
 
     department = _scoped_model_or_404(Department, dept_id)
 
@@ -878,7 +878,7 @@ def add_teacher():
     db.session.add(teacher)
     db.session.commit()
     flash(f'Teacher {emp_id} added with a temporary password. The teacher will be prompted to set a personal password on first login.', 'success')
-    return redirect(url_for('admin.teachers'))
+    return redirect(url_for('admin.people_hub', tab='teachers'))
 
 
 @admin_bp.route('/teachers/edit/<int:tid>', methods=['POST'])
@@ -894,11 +894,11 @@ def edit_teacher(tid):
     if new_email and new_email != teacher.user.email:
         if _scoped_user_query().filter(User.email == new_email, User.id != teacher.user_id).first():
             flash('Email already in use.', 'danger')
-            return redirect(url_for('admin.teachers'))
+            return redirect(url_for('admin.people_hub', tab='teachers'))
         teacher.user.email = new_email
     db.session.commit()
     flash(f'Teacher {teacher.employee_id} updated.', 'success')
-    return redirect(url_for('admin.teachers'))
+    return redirect(url_for('admin.people_hub', tab='teachers'))
 
 
 @admin_bp.route('/teachers/delete/<int:tid>', methods=['POST'])
@@ -909,7 +909,7 @@ def delete_teacher(tid):
     db.session.delete(teacher.user)
     db.session.commit()
     flash('Teacher removed.', 'success')
-    return redirect(url_for('admin.teachers'))
+    return redirect(url_for('admin.people_hub', tab='teachers'))
 
 
 @admin_bp.route('/teachers/bulk-delete', methods=['POST'])
@@ -920,14 +920,14 @@ def bulk_delete_teachers():
     ids = request.form.getlist('ids', type=int)
     if not ids:
         flash('No teachers selected.', 'warning')
-        return redirect(url_for('admin.teachers'))
+        return redirect(url_for('admin.people_hub', tab='teachers'))
     teachers = Teacher.query.filter(Teacher.id.in_(ids), Teacher.college_id == cid).all()
     count = len(teachers)
     for t in teachers:
         db.session.delete(t.user)
     db.session.commit()
     flash(f'{count} teacher{"s" if count != 1 else ""} deleted.', 'success')
-    return redirect(url_for('admin.teachers'))
+    return redirect(url_for('admin.people_hub', tab='teachers'))
 
 
 # ─── Subjects ────────────────────────────────────────────────────────────────
@@ -955,7 +955,7 @@ def subjects():
                                    credit_hours=credits))
             db.session.commit()
             flash(f'Subject {code} added.', 'success')
-        return redirect(url_for('admin.subjects',
+        return redirect(url_for('admin.academics_hub', tab='subjects',
                                 department_id=request.form.get('department_id'),
                                 semester=request.form.get('semester')))
 
@@ -989,7 +989,7 @@ def edit_subject(sid):
     if new_code and new_code != subject.code:
         if _scoped_subject_query().filter(Subject.code == new_code, Subject.id != sid).first():
             flash('Subject code already in use.', 'danger')
-            return redirect(url_for('admin.subjects'))
+            return redirect(url_for('admin.academics_hub', tab='subjects'))
         subject.code = new_code
     dept_id = request.form.get('department_id', type=int)
     if dept_id:
@@ -1005,7 +1005,7 @@ def edit_subject(sid):
         subject.credit_hours = credits
     db.session.commit()
     flash(f'Subject {subject.code} updated.', 'success')
-    return redirect(url_for('admin.subjects'))
+    return redirect(url_for('admin.academics_hub', tab='subjects'))
 
 
 @admin_bp.route('/subjects/delete/<int:sid>', methods=['POST'])
@@ -1016,7 +1016,7 @@ def delete_subject(sid):
     db.session.delete(subject)
     db.session.commit()
     flash('Subject deleted.', 'success')
-    return redirect(url_for('admin.subjects'))
+    return redirect(url_for('admin.academics_hub', tab='subjects'))
 
 
 @admin_bp.route('/subjects/bulk-delete', methods=['POST'])
@@ -1027,14 +1027,14 @@ def bulk_delete_subjects():
     ids = request.form.getlist('ids', type=int)
     if not ids:
         flash('No subjects selected.', 'warning')
-        return redirect(url_for('admin.subjects'))
+        return redirect(url_for('admin.academics_hub', tab='subjects'))
     subjects = Subject.query.filter(Subject.id.in_(ids), Subject.college_id == cid).all()
     count = len(subjects)
     for s in subjects:
         db.session.delete(s)
     db.session.commit()
     flash(f'{count} subject{"s" if count != 1 else ""} deleted.', 'success')
-    return redirect(url_for('admin.subjects'))
+    return redirect(url_for('admin.academics_hub', tab='subjects'))
 
 
 # ─── Session Management ──────────────────────────────────────────────────────
@@ -1092,7 +1092,7 @@ def cancel_session(sid):
         session.end_time = utc_now_naive().time()
         db.session.commit()
         flash('Session cancelled.', 'info')
-    return redirect(url_for('admin.sessions'))
+    return redirect(url_for('admin.attendance_hub', tab='sessions'))
 
 
 # ─── Analytics ───────────────────────────────────────────────────────────────
@@ -1193,20 +1193,20 @@ def add_parent():
 
     if not all([name, email, password, student_id]):
         flash('Name, email, password and student are required.', 'danger')
-        return redirect(url_for('admin.parents'))
+        return redirect(url_for('admin.people_hub', tab='parents'))
 
     if not _validate_temporary_password(password):
         flash('Temporary password must be at least 8 characters and include uppercase, lowercase, a digit, and a special character.', 'danger')
-        return redirect(url_for('admin.parents'))
+        return redirect(url_for('admin.people_hub', tab='parents'))
 
     if _scoped_user_query().filter_by(email=email).first():
         flash(f'Email {email} is already registered.', 'danger')
-        return redirect(url_for('admin.parents'))
+        return redirect(url_for('admin.people_hub', tab='parents'))
 
     student = db.session.get(Student, student_id)
     if not student or student.college_id != _admin_college_id():
         flash('Student not found.', 'danger')
-        return redirect(url_for('admin.parents'))
+        return redirect(url_for('admin.people_hub', tab='parents'))
 
     user = User(college_id=_admin_college_id(), name=name, email=email, role='parent', is_active=True)
     user.set_temporary_password(password)
@@ -1218,7 +1218,7 @@ def add_parent():
     db.session.add(link)
     db.session.commit()
     flash(f'Parent {name} created and linked to {student.user.name}. They will be prompted to set a personal password on first login.', 'success')
-    return redirect(url_for('admin.parents'))
+    return redirect(url_for('admin.people_hub', tab='parents'))
 
 
 @admin_bp.route('/parents/<int:parent_id>/link', methods=['POST'])
@@ -1231,22 +1231,22 @@ def link_parent_child(parent_id):
 
     if not student_id:
         flash('Select a student to link.', 'danger')
-        return redirect(url_for('admin.parents'))
+        return redirect(url_for('admin.people_hub', tab='parents'))
 
     if ParentStudent.query.filter_by(parent_id=parent_id, student_id=student_id).first():
         flash('This child is already linked to this parent.', 'warning')
-        return redirect(url_for('admin.parents'))
+        return redirect(url_for('admin.people_hub', tab='parents'))
 
     student = db.session.get(Student, student_id)
     if not student or student.college_id != _admin_college_id():
         flash('Student not found.', 'danger')
-        return redirect(url_for('admin.parents'))
+        return redirect(url_for('admin.people_hub', tab='parents'))
 
     db.session.add(ParentStudent(college_id=_admin_college_id(), parent_id=parent_id, student_id=student_id,
                                   relationship=relationship))
     db.session.commit()
     flash(f'Linked {student.user.name} to {parent_user.name}.', 'success')
-    return redirect(url_for('admin.parents'))
+    return redirect(url_for('admin.people_hub', tab='parents'))
 
 
 @admin_bp.route('/parents/unlink/<int:link_id>', methods=['POST'])
@@ -1260,7 +1260,7 @@ def unlink_parent_child(link_id):
     db.session.delete(link)
     db.session.commit()
     flash(f'Unlinked {child_name} from parent.', 'success')
-    return redirect(url_for('admin.parents'))
+    return redirect(url_for('admin.people_hub', tab='parents'))
 
 
 @admin_bp.route('/parents/delete/<int:parent_id>', methods=['POST'])
@@ -1272,7 +1272,7 @@ def delete_parent(parent_id):
     db.session.delete(user)
     db.session.commit()
     flash('Parent account deleted.', 'success')
-    return redirect(url_for('admin.parents'))
+    return redirect(url_for('admin.people_hub', tab='parents'))
 
 
 # ─── Class Alert Trigger ──────────────────────────────────────────────────────
@@ -1356,7 +1356,7 @@ def trigger_class_alerts():
         total_sent += sent
 
     flash(f'Class alerts sent: {total_sent} notifications dispatched.', 'success')
-    return redirect(url_for('admin.parents'))
+    return redirect(url_for('admin.people_hub', tab='parents'))
 
 
 # ─── College Settings ─────────────────────────────────────────────────────────
@@ -1388,6 +1388,20 @@ def save_settings():
     except ValueError:
         flash('Invalid coordinates — please pick a location on the map.', 'danger')
         return redirect(url_for('admin.settings'))
+
+    logo_file = request.files.get('college_logo')
+    if logo_file and logo_file.filename:
+        allowed = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}
+        ext = logo_file.filename.rsplit('.', 1)[-1].lower()
+        if ext not in allowed:
+            flash('Logo must be a PNG, JPG, GIF, SVG, or WebP image.', 'danger')
+            return redirect(url_for('admin.settings'))
+        logo_dir = os.path.join(current_app.static_folder, 'uploads', 'college_logos')
+        os.makedirs(logo_dir, exist_ok=True)
+        slug = current_user.college.code.lower()
+        fname = f'{slug}_logo.{ext}'
+        logo_file.save(os.path.join(logo_dir, fname))
+        cs.logo_path = f'uploads/college_logos/{fname}'
 
     cs.updated_at = utc_now_naive()
     db.session.commit()
@@ -1941,17 +1955,17 @@ def save_marksheet_signature():
 
     if role not in ('principal', 'hod'):
         flash('Invalid role.', 'danger')
-        return redirect(url_for('admin.marksheet_signatures'))
+        return redirect(url_for('admin.academics_hub', tab='signatures'))
 
     if role == 'principal':
         dept_id = None
         if not name:
             flash('Name is required for Principal.', 'danger')
-            return redirect(url_for('admin.marksheet_signatures'))
+            return redirect(url_for('admin.academics_hub', tab='signatures'))
     elif role == 'hod':
         if not dept_id or not name:
             flash('Department and name are required for HoD.', 'danger')
-            return redirect(url_for('admin.marksheet_signatures'))
+            return redirect(url_for('admin.academics_hub', tab='signatures'))
 
     # Upsert
     sig = MarksheetSignature.query.filter_by(
@@ -1978,7 +1992,7 @@ def save_marksheet_signature():
 
     db.session.commit()
     flash(f'Signature for {sig.role_label} saved.', 'success')
-    return redirect(url_for('admin.marksheet_signatures'))
+    return redirect(url_for('admin.academics_hub', tab='signatures'))
 
 
 @admin_bp.route('/marksheet-signatures/<int:sig_id>/delete', methods=['POST'])
@@ -1996,7 +2010,7 @@ def delete_marksheet_signature(sig_id):
     db.session.delete(sig)
     db.session.commit()
     flash('Signature removed.', 'info')
-    return redirect(url_for('admin.marksheet_signatures'))
+    return redirect(url_for('admin.academics_hub', tab='signatures'))
 
 
 # ─── Reports ──────────────────────────────────────────────────────────────────
@@ -2195,15 +2209,15 @@ def add_sub_admin():
 
     if not name or not email or not temp_password:
         flash('Name, email, and temporary password are required.', 'danger')
-        return redirect(url_for('admin.sub_admins'))
+        return redirect(url_for('admin.people_hub', tab='sub_admins'))
 
     if not _validate_temporary_password(temp_password):
         flash('Temporary password must be at least 8 characters with uppercase, lowercase, digit, and special character.', 'danger')
-        return redirect(url_for('admin.sub_admins'))
+        return redirect(url_for('admin.people_hub', tab='sub_admins'))
 
     if User.query.filter_by(college_id=cid, email=email).first():
         flash('A user with that email already exists in this college.', 'danger')
-        return redirect(url_for('admin.sub_admins'))
+        return redirect(url_for('admin.people_hub', tab='sub_admins'))
 
     user = User(
         college_id=cid,
@@ -2232,7 +2246,7 @@ def add_sub_admin():
 
     db.session.commit()
     flash(f'Sub-admin {name} created successfully.', 'success')
-    return redirect(url_for('admin.sub_admins'))
+    return redirect(url_for('admin.people_hub', tab='sub_admins'))
 
 
 @admin_bp.route('/sub-admins/<int:uid>/edit', methods=['POST'])
@@ -2267,7 +2281,7 @@ def edit_sub_admin(uid):
 
     db.session.commit()
     flash(f'Permissions updated for {user.name}.', 'success')
-    return redirect(url_for('admin.sub_admins'))
+    return redirect(url_for('admin.people_hub', tab='sub_admins'))
 
 
 @admin_bp.route('/sub-admins/<int:uid>/delete', methods=['POST'])
@@ -2281,7 +2295,291 @@ def delete_sub_admin(uid):
     db.session.delete(user)
     db.session.commit()
     flash(f'Sub-admin {user.name} removed.', 'info')
-    return redirect(url_for('admin.sub_admins'))
+    return redirect(url_for('admin.people_hub', tab='sub_admins'))
+
+
+# ── Hub: People ──────────────────────────────────────────────────────────────
+
+@admin_bp.route('/people')
+@login_required
+@admin_required
+def people_hub():
+    from models.sub_admin import SubAdminPermission
+    tab = request.args.get('tab', 'students')
+    ctx: dict = {'active_tab': tab}
+
+    if tab == 'students':
+        page     = request.args.get('page', 1, type=int)
+        dept_id  = request.args.get('department_id', type=int)
+        semester = request.args.get('semester', type=int)
+        adm_year = request.args.get('admission_year', type=int)
+        search   = request.args.get('q', '').strip()
+        query = Student.query.join(User).filter(Student.college_id == _admin_college_id())
+        if dept_id:
+            query = query.filter(Student.department_id == dept_id)
+        if semester:
+            query = query.filter(Student.semester == semester)
+        if adm_year:
+            query = query.filter(Student.admission_year == adm_year)
+        if search:
+            query = query.filter(
+                db.or_(User.name.ilike(f'%{search}%'),
+                       Student.roll_number.ilike(f'%{search}%'))
+            )
+        pagination = query.order_by(Student.roll_number).paginate(page=page, per_page=15, error_out=False)
+        departments = _scoped_department_query().order_by(Department.name).all()
+        current_year = datetime.now().year
+        adm_years = [
+            r[0] for r in
+            db.session.query(Student.admission_year)
+            .filter(Student.college_id == _admin_college_id(), Student.admission_year.isnot(None))
+            .distinct().order_by(Student.admission_year.desc()).all()
+        ]
+        students_with_status = [(s, *_student_track_status(s, current_year)) for s in pagination.items]
+        ctx.update(pagination=pagination, students_with_status=students_with_status,
+                   departments=departments, adm_years=adm_years,
+                   selected_dept=dept_id, selected_sem=semester,
+                   selected_adm_year=adm_year, search=search, now=datetime.now())
+
+    elif tab == 'teachers':
+        page    = request.args.get('page', 1, type=int)
+        dept_id = request.args.get('department_id', type=int)
+        search  = request.args.get('q', '').strip()
+        query = Teacher.query.join(User).filter(Teacher.college_id == _admin_college_id())
+        if dept_id:
+            query = query.filter(Teacher.department_id == dept_id)
+        if search:
+            query = query.filter(
+                db.or_(User.name.ilike(f'%{search}%'),
+                       Teacher.employee_id.ilike(f'%{search}%'))
+            )
+        pagination = query.order_by(Teacher.employee_id).paginate(page=page, per_page=15, error_out=False)
+        departments = _scoped_department_query().order_by(Department.name).all()
+        ctx.update(pagination=pagination, teachers=pagination.items,
+                   departments=departments, selected_dept=dept_id, search=search)
+
+    elif tab == 'departments':
+        ctx['departments_list'] = _scoped_department_query().order_by(Department.name).all()
+
+    elif tab == 'parents':
+        parents_list = _scoped_user_query().filter_by(role='parent', is_active=True).all()
+        all_students = _scoped_student_query().order_by(Student.roll_number).all()
+        links = (ParentStudent.query
+                 .join(Student, ParentStudent.student_id == Student.id)
+                 .filter(Student.college_id == _admin_college_id()).all())
+        parent_children = {}
+        for link in links:
+            parent_children.setdefault(link.parent_id, []).append(link)
+        ctx.update(parents_list=parents_list, students=all_students, parent_children=parent_children)
+
+    elif tab == 'sub_admins':
+        cid = _admin_college_id()
+        sub_admin_users = User.query.filter_by(college_id=cid, role='sub_admin', is_active=True).all()
+        perm_map: dict = {}
+        for u in sub_admin_users:
+            perms = SubAdminPermission.query.filter_by(user_id=u.id, college_id=cid).all()
+            perm_map[u.id] = {p.module: p for p in perms}
+        ctx.update(sub_admin_users=sub_admin_users, perm_map=perm_map, modules=SUBADMIN_MODULES)
+
+    template_map = {
+        'students': 'admin/students.html',
+        'teachers': 'admin/teachers.html',
+        'departments': 'admin/departments.html',
+        'parents': 'admin/parents.html',
+        'sub_admins': 'admin/sub_admins.html',
+    }
+    return render_template(template_map.get(tab, 'admin/students.html'), **ctx)
+
+
+# ── Hub: Academics ────────────────────────────────────────────────────────────
+
+@admin_bp.route('/academics')
+@login_required
+@admin_required
+def academics_hub():
+    tab = request.args.get('tab', 'subjects')
+    ctx: dict = {'active_tab': tab}
+
+    if tab == 'subjects':
+        selected_dept = request.args.get('department_id', type=int)
+        selected_sem  = request.args.get('semester', type=int)
+        query = _scoped_subject_query()
+        if selected_dept:
+            query = query.filter_by(department_id=selected_dept)
+        if selected_sem:
+            query = query.filter_by(semester=selected_sem)
+        all_subjects = query.order_by(Subject.department_id, Subject.semester, Subject.name).all()
+        departments = _scoped_department_query().order_by(Department.name).all()
+        teachers = Teacher.query.join(User).filter(Teacher.college_id == _admin_college_id()).order_by(User.name).all()
+        ctx.update(subjects=all_subjects, departments=departments, teachers=teachers,
+                   selected_dept=selected_dept, selected_sem=selected_sem)
+
+    elif tab == 'exams':
+        from models.exam import Exam
+        cid = _admin_college_id()
+        dept_id    = request.args.get('department_id', type=int)
+        subject_id = request.args.get('subject_id', type=int)
+        page       = request.args.get('page', 1, type=int)
+        departments = _scoped_department_query().order_by(Department.name).all()
+        subjects    = _scoped_subject_query().order_by(Subject.name).all()
+        query = Exam.query.filter_by(college_id=cid, is_deleted=False)
+        if subject_id:
+            query = query.filter_by(subject_id=subject_id)
+        elif dept_id:
+            sub_ids = [s.id for s in Subject.query.filter_by(college_id=cid, department_id=dept_id).all()]
+            query = query.filter(Exam.subject_id.in_(sub_ids))
+        pagination = query.order_by(Exam.exam_date.desc()).paginate(page=page, per_page=20, error_out=False)
+        ctx.update(pagination=pagination, exams=pagination.items, departments=departments,
+                   subjects=subjects, selected_dept=dept_id, selected_subject=subject_id)
+
+    elif tab == 'marksheets':
+        q       = request.args.get('q', '').strip()
+        dept_id = request.args.get('dept_id', type=int)
+        sem     = request.args.get('sem', type=int)
+        query = Student.query.join(User, Student.user_id == User.id).filter(Student.college_id == _admin_college_id())
+        if q:
+            query = query.filter(db.or_(User.name.ilike(f'%{q}%'), Student.roll_number.ilike(f'%{q}%')))
+        if dept_id:
+            query = query.filter(Student.department_id == dept_id)
+        if sem:
+            query = query.filter(Student.semester == sem)
+        students    = query.order_by(Student.roll_number).all()
+        departments = _scoped_department_query().order_by(Department.name).all()
+        semesters   = sorted({s.semester for s in _scoped_student_query().all()})
+        ctx.update(students=students, departments=departments, semesters=semesters, q=q,
+                   dept_id=dept_id, sem=sem)
+
+    elif tab == 'signatures':
+        from models.marksheet_signature import MarksheetSignature
+        departments = _scoped_department_query().order_by(Department.name).all()
+        principal   = MarksheetSignature.query.filter_by(college_id=_admin_college_id(), role='principal').first()
+        hod_map     = {s.department_id: s for s in
+                       MarksheetSignature.query.filter_by(college_id=_admin_college_id(), role='hod').all()}
+        ctx.update(departments=departments, principal=principal, hod_map=hod_map)
+
+    if tab == 'exams':
+        return redirect(url_for('exam.admin_exams'))
+
+    template_map = {
+        'subjects': 'admin/subjects.html',
+        'marksheets': 'admin/marksheets.html',
+        'signatures': 'admin/marksheet_signatures.html',
+    }
+    return render_template(template_map.get(tab, 'admin/subjects.html'), **ctx)
+
+
+# ── Hub: Attendance ───────────────────────────────────────────────────────────
+
+@admin_bp.route('/attendance-hub')
+@login_required
+@admin_required
+def attendance_hub():
+    tab = request.args.get('tab', 'sessions')
+    ctx: dict = {'active_tab': tab}
+
+    if tab == 'sessions':
+        subject_id    = request.args.get('subject_id', type=int)
+        status_filter = request.args.get('status', '')
+        date_from     = request.args.get('date_from', '')
+        date_to       = request.args.get('date_to', '')
+        page          = request.args.get('page', 1, type=int)
+        query = AttendanceSession.query.join(Subject).filter(Subject.college_id == _admin_college_id())
+        if subject_id:
+            query = query.filter(AttendanceSession.subject_id == subject_id)
+        if status_filter:
+            query = query.filter(AttendanceSession.status == status_filter)
+        if date_from:
+            try:
+                query = query.filter(AttendanceSession.date >= date.fromisoformat(date_from))
+            except ValueError:
+                pass
+        if date_to:
+            try:
+                query = query.filter(AttendanceSession.date <= date.fromisoformat(date_to))
+            except ValueError:
+                pass
+        pagination = query.order_by(AttendanceSession.date.desc(), AttendanceSession.start_time.desc()).paginate(page=page, per_page=15, error_out=False)
+        subjects = _scoped_subject_query().all()
+        ctx.update(pagination=pagination, sessions=pagination.items, subjects=subjects,
+                   selected_subject_id=subject_id, selected_status=status_filter,
+                   date_from=date_from, date_to=date_to)
+
+    elif tab == 'analytics':
+        total_records = AttendanceRecord.query.join(AttendanceSession).join(Subject).filter(
+            Subject.college_id == _admin_college_id(), AttendanceSession.status == 'completed').count()
+        present_records = AttendanceRecord.query.join(AttendanceSession).join(Subject).filter(
+            Subject.college_id == _admin_college_id(), AttendanceSession.status == 'completed',
+            AttendanceRecord.status == 'present').count()
+        overall_rate = round(present_records / total_records * 100, 1) if total_records > 0 else 0
+        threshold = 75
+        low_attendance_students = []
+        for student in _scoped_student_query().all():
+            pct = student.get_attendance_percentage()
+            if pct < threshold:
+                low_attendance_students.append({
+                    'name': student.user.name, 'roll': student.roll_number,
+                    'dept': student.department.name, 'percentage': pct,
+                })
+        low_attendance_students.sort(key=lambda x: x['percentage'])
+        monthly = []
+        for i in range(5, -1, -1):
+            month_start = date.today().replace(day=1) - timedelta(days=i * 30)
+            month_end = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+            sessions = AttendanceSession.query.join(Subject).filter(
+                Subject.college_id == _admin_college_id(),
+                AttendanceSession.date >= month_start,
+                AttendanceSession.date < month_end,
+                AttendanceSession.status == 'completed').all()
+            total = sum(s.total_students for s in sessions)
+            present = sum(s.present_count for s in sessions)
+            monthly.append({'month': month_start.strftime('%b %Y'),
+                            'rate': round(present / total * 100, 1) if total > 0 else 0})
+        ctx.update(overall_rate=overall_rate, total_records=total_records,
+                   low_attendance_students=low_attendance_students, monthly=monthly)
+
+    elif tab == 'batch_tracker':
+        college_id   = _admin_college_id()
+        current_year = datetime.now().year
+        dept_filter  = request.args.get('department_id', type=int)
+        year_filter  = request.args.get('admission_year', type=int)
+        base_q = Student.query.join(User).filter(Student.college_id == college_id)
+        if dept_filter:
+            base_q = base_q.filter(Student.department_id == dept_filter)
+        if year_filter:
+            base_q = base_q.filter(Student.admission_year == year_filter)
+        all_students = base_q.order_by(Student.admission_year, Student.department_id, Student.roll_number).all()
+        departments  = _scoped_department_query().order_by(Department.name).all()
+        dept_map     = {d.id: d for d in departments}
+        adm_years = [
+            r[0] for r in
+            db.session.query(Student.admission_year)
+            .filter(Student.college_id == college_id, Student.admission_year.isnot(None))
+            .distinct().order_by(Student.admission_year.desc()).all()
+        ]
+        from collections import defaultdict
+        groups: dict = defaultdict(list)
+        for s in all_students:
+            key = (s.admission_year or 0, s.department_id)
+            groups[key].append(s)
+        batches = []
+        for (adm_year, dept_id), sts in sorted(groups.items(), key=lambda x: (-x[0][0], x[0][1])):
+            dept = dept_map.get(dept_id)
+            years_elapsed = max(0, current_year - adm_year) if adm_year else 0
+            expected_sem  = min(years_elapsed * 2 + 1, 8) if adm_year else None
+            counts = {'on_track': 0, 'behind': 0, 'far_behind': 0, 'unknown': 0}
+            student_rows = []
+            for s in sts:
+                status, diff = _student_track_status(s, current_year)
+                counts[status] += 1
+                student_rows.append({'student': s, 'status': status, 'diff': diff, 'expected_sem': expected_sem})
+            batches.append({'adm_year': adm_year, 'dept': dept, 'dept_id': dept_id,
+                            'expected_sem': expected_sem, 'total': len(sts), 'counts': counts,
+                            'students': student_rows,
+                            'year_label': f"Year {years_elapsed + 1}" if adm_year else 'Unknown'})
+        ctx.update(batches=batches, departments=departments, adm_years=adm_years,
+                   dept_filter=dept_filter, year_filter=year_filter, current_year=current_year)
+
+    return render_template('admin/hub_attendance.html', **ctx)
 
 
 # ── My Plan ───────────────────────────────────────────────────────────────────

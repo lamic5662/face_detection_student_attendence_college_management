@@ -1,5 +1,6 @@
 import os
 import logging
+import ipaddress
 from logging.handlers import RotatingFileHandler
 from datetime import timedelta
 from urllib.parse import urlparse
@@ -45,6 +46,34 @@ def _effective_allowed_hosts(app: Flask) -> list[str]:
         if parsed.hostname:
             allowed_hosts.append(parsed.hostname.lower())
     return allowed_hosts
+
+
+def _private_ip_http_redirect_target(app: Flask):
+    public_base_url = (app.config.get('PUBLIC_BASE_URL') or '').strip().rstrip('/')
+    if not public_base_url:
+        return None
+
+    parsed_public = urlparse(public_base_url)
+    if parsed_public.scheme != 'https':
+        return None
+
+    host = (request.host or '').split(':', 1)[0].lower()
+    if host in {'localhost', '127.0.0.1'} or request.is_secure:
+        return None
+
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return None
+
+    if not ip.is_private:
+        return None
+
+    query = request.query_string.decode('utf-8', errors='ignore')
+    target = f'{public_base_url}{request.path}'
+    if query:
+        target = f'{target}?{query}'
+    return target
 
 
 def _configure_logging(app: Flask) -> None:
@@ -339,6 +368,9 @@ def create_app(config_override=None) -> Flask:
     @app.before_request
     def _csrf_exempt_ajax():
         load_request_college()
+        redirect_target = _private_ip_http_redirect_target(app)
+        if redirect_target and request.method in {'GET', 'HEAD'}:
+            return redirect(redirect_target, code=302)
         if not app.debug and not app.testing:
             allowed_hosts = _effective_allowed_hosts(app)
             if allowed_hosts and not _host_is_allowed(request.host, allowed_hosts):
@@ -463,6 +495,7 @@ def create_app(config_override=None) -> Flask:
                 college_name=cs.college_name if cs is not None else app.config.get('COLLEGE_NAME', 'College'),
                 college_lat=(cs.latitude if cs is not None and cs.latitude is not None else app.config['COLLEGE_LAT']),
                 college_lng=(cs.longitude if cs is not None and cs.longitude is not None else app.config['COLLEGE_LNG']),
+                college_logo=cs.logo_path if cs is not None else None,
                 now=_dt.now,
                 notification_items=notification_items,
                 notification_count=notification_count,
@@ -476,6 +509,7 @@ def create_app(config_override=None) -> Flask:
                 college_name=app.config.get('COLLEGE_NAME', 'College'),
                 college_lat=app.config.get('COLLEGE_LAT', 27.7172),
                 college_lng=app.config.get('COLLEGE_LNG', 85.3240),
+                college_logo=None,
                 now=_dt.now,
                 notification_items=[],
                 notification_count=0,

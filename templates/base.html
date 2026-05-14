@@ -17,8 +17,14 @@
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
   <div class="sidebar-brand">
+    {% if college_logo %}
+    <img src="{{ url_for('static', filename=college_logo) }}"
+         alt="{{ college_name }}"
+         class="sidebar-college-logo">
+    {% else %}
     <i class="bi bi-mortarboard-fill fs-3 text-primary"></i>
-    <span class="ms-2 fw-bold">SmartAttend</span>
+    {% endif %}
+    <span class="ms-2 fw-bold sidebar-brand-name">{{ college_name }}</span>
   </div>
   <hr class="sidebar-divider">
   {% set nav = sidebar_navigation %}
@@ -174,7 +180,7 @@
       <i class="bi bi-list fs-5"></i>
     </button>
     <div class="topbar-title">{% block page_title %}{% endblock %}</div>
-    <div class="ms-auto d-flex align-items-center gap-3">
+    <div class="ms-auto d-flex align-items-center gap-3 topbar-actions">
       {% if notices_enabled %}
       <div class="dropdown">
         <button class="btn btn-light position-relative topbar-bell" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="topbarBellButton">
@@ -272,7 +278,7 @@
         </div>
       </div>
       {% endif %}
-      <span class="badge bg-primary-subtle text-primary text-capitalize px-3 py-2">
+      <span class="badge bg-primary-subtle text-primary text-capitalize px-3 py-2 topbar-role-badge">
         <i class="bi bi-circle-fill text-success me-1" style="font-size:8px"></i>
         {{ current_user.role.replace('_', ' ') }}
       </span>
@@ -907,8 +913,62 @@
 .sa-confirm-ok-btn     { min-width: 130px; }
 
 @media (max-width: 768px) {
+  .topbar-actions {
+    gap: 8px !important;
+    margin-left: auto !important;
+    flex-wrap: nowrap;
+  }
+  .topbar-role-badge {
+    padding: 0.55rem 0.75rem !important;
+    font-size: 11px;
+  }
+  .topbar-notice-menu {
+    width: min(360px, calc(100vw - 1.25rem));
+  }
+  .sidebar-more-wrap {
+    padding-inline: 8px;
+  }
   .sidebar-section-copy {
     display: none;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .topbar-actions {
+    width: auto;
+  }
+  .topbar-role-badge {
+    display: none;
+  }
+  .topbar-notice-menu {
+    position: fixed !important;
+    top: 68px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto;
+    transform: none !important;
+  }
+  .sidebar-footer {
+    padding: 14px 12px;
+  }
+  .sidebar-user-text .fw-semibold {
+    max-width: 120px !important;
+  }
+  .sidebar-footer-btns .btn {
+    min-height: 36px;
+  }
+  #bulkActionBar {
+    min-width: 0;
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    padding: 12px 14px;
+  }
+  .bulk-bar-inner {
+    gap: 12px;
+  }
+  .bulk-bar-label {
+    font-size: 13px;
+    white-space: normal;
   }
 }
 

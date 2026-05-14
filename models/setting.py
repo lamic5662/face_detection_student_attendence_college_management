@@ -13,6 +13,9 @@ class CollegeSetting(db.Model):
     longitude    = db.Column(db.Float, nullable=True)
     updated_at   = db.Column(db.DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
+    # College logo
+    logo_path = db.Column(db.String(255), nullable=True)
+
     # Digital signatures
     principal_name      = db.Column(db.String(100), nullable=True)
     principal_sign_path = db.Column(db.String(255), nullable=True)
