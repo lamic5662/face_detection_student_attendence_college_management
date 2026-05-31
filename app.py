@@ -25,10 +25,20 @@ def _host_is_allowed(host: str, allowed_hosts: list[str]) -> bool:
     host = (host or '').split(':', 1)[0].lower()
     if not host:
         return False
+    try:
+        host_ip = ipaddress.ip_address(host)
+    except ValueError:
+        host_ip = None
     for allowed in allowed_hosts:
-        candidate = allowed.lower()
+        candidate = allowed.strip().lower()
         if candidate == '*':
             return True
+        if '/' in candidate and host_ip is not None:
+            try:
+                if host_ip in ipaddress.ip_network(candidate, strict=False):
+                    return True
+            except ValueError:
+                pass
         if candidate.startswith('.'):
             suffix = candidate[1:]
             if host == suffix or host.endswith(f'.{suffix}'):
