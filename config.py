@@ -8,6 +8,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 def _db_uri(echo=False):
     return (
         f"mysql+pymysql://{quote_plus(os.environ.get('DB_USER', 'root'))}:"
@@ -86,6 +93,7 @@ class Config:
     ALLOWED_HOSTS = [host.strip().lower() for host in os.environ.get('ALLOWED_HOSTS', '').split(',') if host.strip()]
     TRUST_PROXY_HEADERS = os.environ.get('TRUST_PROXY_HEADERS', 'True') == 'True'
     TRUSTED_PROXY_HOPS = int(os.environ.get('TRUSTED_PROXY_HOPS', 1))
+    ALLOW_INSECURE_LOCAL_HTTP = _env_bool('ALLOW_INSECURE_LOCAL_HTTP', False)
     GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
     FACE_RECOGNITION_TOLERANCE = float(os.environ.get('FACE_RECOGNITION_TOLERANCE', 0.5))
     SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@smartattend.com')
@@ -123,8 +131,8 @@ class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
     PREFERRED_URL_SCHEME = 'https'
-    SESSION_COOKIE_SECURE = True
-    REMEMBER_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = _env_bool('SESSION_COOKIE_SECURE', True)
+    REMEMBER_COOKIE_SECURE = _env_bool('REMEMBER_COOKIE_SECURE', True)
     # Enforce strong key in prod
     SECRET_KEY = os.environ['SECRET_KEY']
     LOG_LEVEL = 'WARNING'

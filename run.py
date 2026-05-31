@@ -170,6 +170,9 @@ def _start_cluster_instance(port: int) -> tuple[int, Path]:
     log_path = _cluster_log_path(port)
     env = os.environ.copy()
     env['FLASK_ENV'] = 'production'
+    env['ALLOW_INSECURE_LOCAL_HTTP'] = 'True'
+    env['SESSION_COOKIE_SECURE'] = 'False'
+    env['REMEMBER_COOKIE_SECURE'] = 'False'
     env['GUNICORN_BIND'] = f'127.0.0.1:{port}'
     env['GUNICORN_WORKERS'] = str(_cluster_workers())
     env['GUNICORN_THREADS'] = str(_cluster_threads())

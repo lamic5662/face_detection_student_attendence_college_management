@@ -58,6 +58,24 @@ def _effective_allowed_hosts(app: Flask) -> list[str]:
     return allowed_hosts
 
 
+def _allow_insecure_cookies_for_local_http(app: Flask) -> bool:
+    if not app.config.get('ALLOW_INSECURE_LOCAL_HTTP'):
+        return False
+
+    public_base_url = (app.config.get('PUBLIC_BASE_URL') or '').strip()
+    parsed = urlparse(public_base_url)
+    if parsed.scheme != 'http' or not parsed.hostname:
+        return False
+
+    host = parsed.hostname.lower()
+    if host in {'localhost', '127.0.0.1'}:
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
 def _private_ip_http_redirect_target(app: Flask):
     public_base_url = (app.config.get('PUBLIC_BASE_URL') or '').strip().rstrip('/')
     if not public_base_url:
@@ -268,9 +286,10 @@ def _validate_runtime_config(app: Flask) -> None:
         raise RuntimeError('ASSIGNMENT_UPLOAD_FOLDER is invalid or unsafe.')
 
     if not app.debug and not app.testing:
-        if not app.config.get('SESSION_COOKIE_SECURE'):
+        allow_insecure_local_http = _allow_insecure_cookies_for_local_http(app)
+        if not app.config.get('SESSION_COOKIE_SECURE') and not allow_insecure_local_http:
             raise RuntimeError('SESSION_COOKIE_SECURE must be enabled outside development/testing.')
-        if not app.config.get('REMEMBER_COOKIE_SECURE'):
+        if not app.config.get('REMEMBER_COOKIE_SECURE') and not allow_insecure_local_http:
             raise RuntimeError('REMEMBER_COOKIE_SECURE must be enabled outside development/testing.')
 
         storage_uri = app.config.get('RATELIMIT_STORAGE_URI', 'memory://')
