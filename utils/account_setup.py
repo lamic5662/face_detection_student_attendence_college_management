@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from urllib.parse import urlparse, urlunparse
 from flask import current_app, url_for
 from flask_mail import Message
 
 from extensions import db, mail
+from models.college import College
 from models.user import User
 
 
@@ -12,8 +14,34 @@ def _serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
 
 
-def build_public_url(endpoint: str, **values) -> str:
+def _subdomain_base_url(college: College | None) -> str:
     base_url = (current_app.config.get('PUBLIC_BASE_URL') or '').rstrip('/')
+    if not base_url:
+        return ''
+
+    root_domain = (current_app.config.get('MULTI_COLLEGE_ROOT_DOMAIN') or '').strip().lower().lstrip('.')
+    subdomain = (getattr(college, 'subdomain', None) or '').strip().lower()
+    if not root_domain or not subdomain:
+        return base_url
+
+    parsed = urlparse(base_url)
+    hostname = (parsed.hostname or '').strip().lower()
+    if not hostname:
+        return base_url
+
+    if hostname == root_domain or hostname.endswith(f'.{root_domain}'):
+        target_host = f'{subdomain}.{root_domain}'
+        if parsed.port:
+            netloc = f'{target_host}:{parsed.port}'
+        else:
+            netloc = target_host
+        return urlunparse(parsed._replace(netloc=netloc)).rstrip('/')
+
+    return base_url
+
+
+def build_public_url(endpoint: str, *, college: College | None = None, **values) -> str:
+    base_url = _subdomain_base_url(college)
     if base_url:
         with current_app.test_request_context(base_url=base_url):
             path = url_for(endpoint, **values)
@@ -51,7 +79,7 @@ def verify_password_setup_token(token: str, *, max_age: int | None = None) -> Us
 
 def send_password_setup_email(user: User) -> None:
     token = generate_password_setup_token(user)
-    setup_link = build_public_url('auth.set_password_from_email', token=token)
+    setup_link = build_public_url('auth.set_password_from_email', college=user.college, token=token)
     college_name = user.college.name if user.college else current_app.config.get('COLLEGE_NAME', 'College')
 
     local_note = """
@@ -109,7 +137,7 @@ def send_password_setup_email(user: User) -> None:
 
 def send_password_reset_email(user: User) -> None:
     token = generate_password_setup_token(user)
-    reset_link = build_public_url('auth.set_password_from_email', token=token, mode='reset')
+    reset_link = build_public_url('auth.set_password_from_email', college=user.college, token=token, mode='reset')
     college_name = user.college.name if user.college else current_app.config.get('COLLEGE_NAME', 'College')
 
     local_note = """

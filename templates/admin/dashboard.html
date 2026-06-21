@@ -4,274 +4,478 @@
 
 {% block content %}
 {% set visible_widgets = dashboard_prefs.visible_widget_keys if dashboard_prefs else [] %}
-{% set ordered_optional = dashboard_prefs.selected_optional_keys if dashboard_prefs else [] %}
+{% set today_trend = trend[-1] if trend else None %}
+{% set collection_pct = ((total_fee_collected / total_fee_expected) * 100) if total_fee_expected > 0 else 0 %}
+{% set top_department = dept_stats|sort(attribute='avg_rate', reverse=true)|first if dept_stats else None %}
+{% set outstanding_fee = (total_fee_expected - total_fee_collected) if total_fee_expected > total_fee_collected else 0 %}
+{% set show_dashboard_customize_trigger = false %}
 {% include "partials/dashboard_customize.html" %}
 
-{% if 'stats_overview' in visible_widgets %}
-<!-- Stats Cards -->
-<div class="row g-4 mb-4">
-  <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-blue">
-      <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
-      <div class="stat-value">{{ stats.total_students }}</div>
-      <div class="stat-label">Students</div>
-    </div>
-  </div>
-  <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-green">
-      <div class="stat-icon"><i class="bi bi-person-badge-fill"></i></div>
-      <div class="stat-value">{{ stats.total_teachers }}</div>
-      <div class="stat-label">Teachers</div>
-    </div>
-  </div>
-  <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-purple">
-      <div class="stat-icon"><i class="bi bi-journal-bookmark-fill"></i></div>
-      <div class="stat-value">{{ stats.total_subjects }}</div>
-      <div class="stat-label">Subjects</div>
-    </div>
-  </div>
-  <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-orange">
-      <div class="stat-icon"><i class="bi bi-building-fill"></i></div>
-      <div class="stat-value">{{ stats.departments }}</div>
-      <div class="stat-label">Departments</div>
-    </div>
-  </div>
-  <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-teal">
-      <div class="stat-icon"><i class="bi bi-camera-video-fill"></i></div>
-      <div class="stat-value">{{ stats.total_sessions }}</div>
-      <div class="stat-label">Total Sessions</div>
-    </div>
-  </div>
-  <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-red">
-      <div class="stat-icon"><i class="bi bi-record-circle-fill"></i></div>
-      <div class="stat-value">{{ stats.active_sessions }}</div>
-      <div class="stat-label">Live Now</div>
-    </div>
-  </div>
-</div>
-{% endif %}
+<div class="admin-workspace-shell">
+  <section class="card border-0 shadow-sm admin-workspace-hero mb-4">
+    <div class="card-body p-4 p-xl-5">
+      <div class="admin-workspace-grid">
+        <div class="admin-workspace-main">
+          <span class="admin-workspace-kicker">Operations Desk</span>
+          <h2 class="mb-2">Keep the college running smoothly today.</h2>
+          <p class="text-muted mb-4">
+            Start with attendance, approvals, notices, exams, and fees. Use the shortcuts below when something needs action immediately.
+          </p>
 
-{% if 'attendance_trend' in visible_widgets or 'department_attendance' in visible_widgets %}
-<div class="row g-4 mb-4">
-  {% if 'attendance_trend' in visible_widgets %}
-  <div class="col-lg-8">
-    <div class="card shadow-sm border-0 h-100">
-      <div class="card-header bg-transparent border-0 pt-4 px-4">
-        <h6 class="fw-semibold mb-0"><i class="bi bi-graph-up text-primary me-2"></i>7-Day Attendance Trend</h6>
-      </div>
-      <div class="card-body px-4">
-        <canvas id="trendChart" height="100"></canvas>
+          <div class="admin-workspace-actions">
+            <a href="{{ url_for('admin.students') }}" class="btn btn-primary">
+              <i class="bi bi-people-fill me-2"></i>Students
+            </a>
+            <a href="{{ url_for('admin.teachers') }}" class="btn btn-outline-primary">
+              <i class="bi bi-person-badge-fill me-2"></i>Teachers
+            </a>
+            <a href="{{ url_for('exam.admin_exams') }}" class="btn btn-outline-dark">
+              <i class="bi bi-journals me-2"></i>Exams
+            </a>
+            <a href="{{ url_for('notice.create') }}" class="btn btn-outline-dark">
+              <i class="bi bi-megaphone-fill me-2"></i>Post Notice
+            </a>
+          </div>
+
+          <div class="admin-workspace-tags mt-4">
+            <span><i class="bi bi-people-fill"></i>{{ stats.total_students }} students</span>
+            <span><i class="bi bi-person-badge-fill"></i>{{ stats.total_teachers }} teachers</span>
+            <span><i class="bi bi-building-fill"></i>{{ stats.departments }} departments</span>
+            <span><i class="bi bi-journal-bookmark-fill"></i>{{ stats.total_subjects }} subjects</span>
+          </div>
+        </div>
+
+        <aside class="admin-workspace-side">
+          <div class="admin-snapshot-card">
+            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+              <div>
+                <div class="admin-panel-kicker">Live Snapshot</div>
+                <h5 class="mb-0">Today</h5>
+              </div>
+              {% if dashboard_prefs and dashboard_prefs.has_optional_items %}
+              <button type="button" class="btn btn-sm btn-outline-secondary admin-dashboard-customize-btn"
+                      data-bs-toggle="modal" data-bs-target="#dashboardCustomizeModal">
+                <i class="bi bi-sliders2 me-1"></i>Customize
+              </button>
+              {% endif %}
+            </div>
+
+            <div class="admin-snapshot-list">
+              <div class="admin-snapshot-item">
+                <span>Attendance</span>
+                <strong>{{ today_trend.rate if today_trend else 0 }}%</strong>
+                <small>
+                  {% if today_trend %}
+                  {{ today_trend.present }} present from {{ today_trend.total }} records
+                  {% else %}
+                  no completed records yet
+                  {% endif %}
+                </small>
+              </div>
+              <div class="admin-snapshot-item">
+                <span>Live Sessions</span>
+                <strong>{{ stats.active_sessions }}</strong>
+                <small>attendance sessions currently active</small>
+              </div>
+              <div class="admin-snapshot-item">
+                <span>Pending Leaves</span>
+                <strong>{{ pending_leaves }}</strong>
+                <small>requests waiting for review</small>
+              </div>
+              <div class="admin-snapshot-item">
+                <span>Outstanding Fees</span>
+                <strong>Rs. {{ '{:,.0f}'.format(outstanding_fee) }}</strong>
+                <small>{{ '%.1f'|format(collection_pct) }}% collected so far</small>
+              </div>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
-  </div>
+  </section>
+
+  {% if 'stats_overview' in visible_widgets %}
+  <section class="admin-metric-row mb-4">
+    <div class="admin-metric-card">
+      <span>Students</span>
+      <strong>{{ stats.total_students }}</strong>
+      <small>active learner records</small>
+    </div>
+    <div class="admin-metric-card">
+      <span>Teachers</span>
+      <strong>{{ stats.total_teachers }}</strong>
+      <small>assigned faculty accounts</small>
+    </div>
+    <div class="admin-metric-card">
+      <span>Subjects</span>
+      <strong>{{ stats.total_subjects }}</strong>
+      <small>academic subjects configured</small>
+    </div>
+    <div class="admin-metric-card">
+      <span>Departments</span>
+      <strong>{{ stats.departments }}</strong>
+      <small>units currently active</small>
+    </div>
+    <div class="admin-metric-card">
+      <span>Total Sessions</span>
+      <strong>{{ stats.total_sessions }}</strong>
+      <small>attendance sessions created</small>
+    </div>
+    <div class="admin-metric-card">
+      <span>Live Now</span>
+      <strong>{{ stats.active_sessions }}</strong>
+      <small>sessions in progress</small>
+    </div>
+  </section>
   {% endif %}
 
-  {% if 'department_attendance' in visible_widgets %}
-  <div class="col-lg-4">
-    <div class="card shadow-sm border-0 h-100">
-      <div class="card-header bg-transparent border-0 pt-4 px-4">
-        <h6 class="fw-semibold mb-0"><i class="bi bi-building text-primary me-2"></i>Department Attendance</h6>
-      </div>
-      <div class="card-body px-4">
-        {% for dept in dept_stats %}
-        <div class="mb-3">
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold small">{{ dept.name }}</span>
-            <span class="badge {% if dept.avg_rate >= 75 %}bg-success{% elif dept.avg_rate >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
-              {{ dept.avg_rate }}%
-            </span>
+  <section class="row g-4 mb-4">
+    <div class="col-xl-8">
+      <div class="card border-0 shadow-sm admin-surface-panel h-100">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div class="admin-panel-kicker">Attendance Trend</div>
+              <h5 class="mb-1">Seven-day movement</h5>
+              <div class="text-muted small">Use trend movement to judge whether today needs intervention.</div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <a href="{{ url_for('admin.attendance_hub', tab='sessions') }}" class="btn btn-sm btn-outline-primary">Sessions</a>
+              <a href="{{ url_for('admin.attendance_hub', tab='analytics') }}" class="btn btn-sm btn-outline-secondary">Analytics</a>
+            </div>
           </div>
-          <div class="progress" style="height:6px">
-            <div class="progress-bar {% if dept.avg_rate >= 75 %}bg-success{% elif dept.avg_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}"
-                 style="width:{{ dept.avg_rate }}%"></div>
-          </div>
-          <small class="text-muted">{{ dept.student_count }} students</small>
-        </div>
-        {% else %}
-        <p class="text-muted text-center py-4">No attendance data yet.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-  {% endif %}
-</div>
-{% endif %}
 
-<!-- College Management Row -->
-{% if 'recent_notices' in visible_widgets or ordered_optional %}
-<div class="row g-4 mb-4">
-  {% if 'recent_notices' in visible_widgets %}
-  <div class="col-lg-4">
-    <div class="card shadow-sm border-0 h-100">
-      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-        <h6 class="fw-semibold mb-0"><i class="bi bi-megaphone-fill text-warning me-2"></i>Recent Notices</h6>
-        <a href="{{ url_for('notice.list_notices') }}" class="btn btn-sm btn-outline-secondary">View All</a>
-      </div>
-      <div class="card-body px-4 py-2">
-        {% for n in recent_notices %}
-        <div class="py-2 {% if not loop.last %}border-bottom{% endif %}">
-          <div class="d-flex align-items-center gap-2">
-            {% if n.is_pinned %}<i class="bi bi-pin-fill text-warning" title="Pinned"></i>{% endif %}
-            <a href="{{ url_for('notice.detail', nid=n.id) }}" class="fw-semibold small text-decoration-none text-truncate" style="max-width:180px">{{ n.title }}</a>
-            <span class="badge bg-{{ {'general':'primary','exam':'warning','holiday':'success','event':'info','fee':'danger','urgent':'danger'}[n.category] }}-subtle text-{{ {'general':'primary','exam':'warning','holiday':'success','event':'info','fee':'danger','urgent':'danger'}[n.category] }} ms-auto">{{ n.category }}</span>
+          {% if 'attendance_trend' in visible_widgets %}
+          <div class="admin-chart-wrap mb-3">
+            <canvas id="trendChart" height="110"></canvas>
           </div>
-          <div class="text-muted" style="font-size:11px">{{ n.created_at.strftime('%d %b') }}</div>
-        </div>
-        {% else %}
-        <p class="text-muted text-center py-3 small">No active notices.</p>
-        {% endfor %}
-      </div>
-      <div class="card-footer bg-transparent border-0 pb-3 px-4">
-        <a href="{{ url_for('notice.create') }}" class="btn btn-sm btn-warning w-100">
-          <i class="bi bi-plus-circle me-1"></i>Post Notice
-        </a>
-      </div>
-    </div>
-  </div>
-  {% endif %}
+          {% else %}
+          <div class="admin-empty-panel mb-3">
+            <i class="bi bi-graph-up-arrow"></i>
+            <span>Attendance trend is hidden in dashboard customization.</span>
+          </div>
+          {% endif %}
 
-  {% for widget_key in ordered_optional %}
-  {% if widget_key in ('upcoming_exams', 'fee_collection') %}
-  <div class="col-lg-4">
-    {% if widget_key == 'upcoming_exams' %}
-    <div class="card shadow-sm border-0 h-100">
-      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-        <h6 class="fw-semibold mb-0"><i class="bi bi-journals text-info me-2"></i>Upcoming Exams</h6>
-        <a href="{{ url_for('exam.admin_exams') }}" class="btn btn-sm btn-outline-secondary">View All</a>
-      </div>
-      <div class="card-body px-4 py-2">
-        {% for e in upcoming_exams %}
-        <div class="py-2 {% if not loop.last %}border-bottom{% endif %} d-flex justify-content-between align-items-center">
-          <div>
-            <div class="fw-semibold small">{{ e.title }}</div>
-            <div class="text-muted" style="font-size:11px">{{ e.subject.name }}</div>
-          </div>
-          <div class="text-end">
-            <div class="badge bg-info-subtle text-info">{{ e.exam_date.strftime('%d %b') }}</div>
-            <div style="font-size:10px" class="text-muted">{{ e.exam_type.replace('_',' ').title() }}</div>
+          <div class="admin-compact-summary">
+            <div>
+              <span>Today</span>
+              <strong>{{ today_trend.rate if today_trend else 0 }}%</strong>
+            </div>
+            <div>
+              <span>Upcoming Exams</span>
+              <strong>{{ upcoming_exams|length }}</strong>
+            </div>
+            <div>
+              <span>Collection</span>
+              <strong>{{ '%.1f'|format(collection_pct) }}%</strong>
+            </div>
+            <div>
+              <span>Top Department</span>
+              <strong>{{ top_department.name if top_department else '—' }}</strong>
+            </div>
           </div>
         </div>
-        {% else %}
-        <p class="text-muted text-center py-3 small">No exams in the next 7 days.</p>
-        {% endfor %}
       </div>
     </div>
-    {% elif widget_key == 'fee_collection' %}
-    <div class="card shadow-sm border-0 h-100">
-      <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
-        <h6 class="fw-semibold mb-0"><i class="bi bi-cash-stack text-success me-2"></i>Fee Collection</h6>
-        <a href="{{ url_for('fee.admin_fees') }}" class="btn btn-sm btn-outline-secondary">Manage</a>
+
+    <div class="col-xl-4">
+      <div class="card border-0 shadow-sm admin-surface-panel h-100">
+        <div class="card-body p-4">
+          <div class="admin-panel-kicker">Focus Queue</div>
+          <h5 class="mb-3">Needs attention</h5>
+
+          <div class="admin-focus-list">
+            <div class="admin-focus-item">
+              <div>
+                <strong>{{ pending_leaves }} leave request{{ 's' if pending_leaves != 1 else '' }}</strong>
+                <small>student leave approvals are waiting</small>
+              </div>
+              <a href="{{ url_for('leave.admin_leaves') }}" class="btn btn-sm btn-outline-secondary">Review</a>
+            </div>
+            <div class="admin-focus-item">
+              <div>
+                <strong>{{ stats.active_sessions }} live session{{ 's' if stats.active_sessions != 1 else '' }}</strong>
+                <small>monitor classes before they are closed</small>
+              </div>
+              <a href="{{ url_for('admin.attendance_hub', tab='sessions') }}" class="btn btn-sm btn-outline-secondary">Open</a>
+            </div>
+            <div class="admin-focus-item">
+              <div>
+                <strong>{{ upcoming_exams|length }} exam{{ 's' if upcoming_exams|length != 1 else '' }} coming soon</strong>
+                <small>confirm rooms, schedules, and notices</small>
+              </div>
+              <a href="{{ url_for('exam.admin_exams') }}" class="btn btn-sm btn-outline-secondary">Check</a>
+            </div>
+            <div class="admin-focus-item">
+              <div>
+                <strong>Rs. {{ '{:,.0f}'.format(outstanding_fee) }} still outstanding</strong>
+                <small>review unpaid and partial fee records</small>
+              </div>
+              <a href="{{ url_for('fee.admin_fees') }}" class="btn btn-sm btn-outline-secondary">Open</a>
+            </div>
+          </div>
+
+          {% if top_department %}
+          <div class="admin-focus-highlight mt-4">
+            <span>Best Attendance</span>
+            <strong>{{ top_department.name }}</strong>
+            <small>{{ top_department.student_count }} students · {{ top_department.avg_rate }}% average attendance</small>
+          </div>
+          {% endif %}
+        </div>
       </div>
-      <div class="card-body px-4">
-        {% set pct = (total_fee_collected / total_fee_expected * 100) if total_fee_expected > 0 else 0 %}
-        <div class="text-center mb-3">
-          <div class="fw-bold fs-3 text-success">Rs. {{ '{:,.0f}'.format(total_fee_collected) }}</div>
-          <div class="text-muted small">of Rs. {{ '{:,.0f}'.format(total_fee_expected) }} expected</div>
+    </div>
+  </section>
+
+  <section class="row g-4 mb-4">
+    {% if 'recent_notices' in visible_widgets %}
+    <div class="col-xl-4">
+      <div class="card border-0 shadow-sm admin-surface-panel h-100">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div class="admin-panel-kicker">Communications</div>
+              <h5 class="mb-1">Notice board</h5>
+            </div>
+            <a href="{{ url_for('notice.list_notices') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+          </div>
+
+          <div class="admin-notice-feed">
+            {% for n in recent_notices %}
+            <a href="{{ url_for('notice.detail', nid=n.id) }}" class="admin-notice-feed-item text-decoration-none">
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  {% if n.is_pinned %}<i class="bi bi-pin-angle-fill text-warning"></i>{% endif %}
+                  <strong class="text-dark">{{ n.title }}</strong>
+                </div>
+                <small class="text-muted">{{ n.created_at.strftime('%d %b %Y') }}</small>
+              </div>
+              <span class="badge bg-{{ {'general':'primary','exam':'warning','holiday':'success','event':'info','fee':'danger','urgent':'danger'}[n.category] }}-subtle text-{{ {'general':'primary','exam':'warning','holiday':'success','event':'info','fee':'danger','urgent':'danger'}[n.category] }}">
+                {{ n.category }}
+              </span>
+            </a>
+            {% else %}
+            <div class="admin-empty-panel">
+              <i class="bi bi-megaphone"></i>
+              <span>No active notices.</span>
+            </div>
+            {% endfor %}
+          </div>
         </div>
-        <div class="progress mb-2" style="height:10px">
-          <div class="progress-bar bg-success" style="width:{{ [pct, 100] | min }}%"></div>
-        </div>
-        <div class="d-flex justify-content-between small text-muted">
-          <span>{{ '%.1f' | format(pct) }}% collected</span>
-          <span>Rs. {{ '{:,.0f}'.format(total_fee_expected - total_fee_collected) }} outstanding</span>
-        </div>
-        {% if pending_leaves > 0 %}
-        <div class="alert alert-warning border-0 py-2 px-3 mt-3 small mb-0">
-          <i class="bi bi-calendar-x-fill me-1"></i>
-          <strong>{{ pending_leaves }}</strong> pending leave requests
-        </div>
-        {% endif %}
       </div>
     </div>
     {% endif %}
-  </div>
-  {% endif %}
-  {% endfor %}
-</div>
-{% endif %}
 
-<!-- Recent Sessions -->
-{% if 'recent_sessions' in visible_widgets %}
-<div class="card shadow-sm border-0">
-  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between">
-    <h6 class="fw-semibold mb-0"><i class="bi bi-clock-history text-primary me-2"></i>Recent Sessions</h6>
-  </div>
-  <div class="card-body p-0">
-    <div class="table-responsive">
-      <table class="table table-hover mb-0">
-        <thead class="table-light">
-          <tr>
-            <th class="px-4">Subject</th>
-            <th>Teacher</th>
-            <th>Date</th>
-            <th>Present</th>
-            <th>Total</th>
-            <th>Rate</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in recent_sessions %}
-          <tr>
-            <td class="px-4 fw-semibold">{{ s.subject.name }}</td>
-            <td>{{ s.teacher.user.name }}</td>
-            <td>{{ s.date.strftime('%d %b %Y') }}</td>
-            <td class="text-success fw-semibold">{{ s.present_count }}</td>
-            <td>{{ s.total_students }}</td>
-            <td>
-              {% set rate = (s.present_count / s.total_students * 100) if s.total_students > 0 else 0 %}
-              <span class="badge {% if rate >= 75 %}bg-success{% elif rate >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
-                {{ "%.0f"|format(rate) }}%
-              </span>
-            </td>
-            <td>
-              <span class="badge {% if s.status == 'active' %}bg-success{% elif s.status == 'completed' %}bg-primary{% else %}bg-secondary{% endif %}">
-                {{ s.status.capitalize() }}
-              </span>
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="7" class="text-center text-muted py-4">No sessions yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    {% if 'upcoming_exams' in visible_widgets %}
+    <div class="col-xl-{% if 'recent_notices' in visible_widgets %}4{% else %}6{% endif %}">
+      <div class="card border-0 shadow-sm admin-surface-panel h-100">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div class="admin-panel-kicker">Academic Calendar</div>
+              <h5 class="mb-1">Upcoming exams</h5>
+            </div>
+            <a href="{{ url_for('exam.admin_exams') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+          </div>
+
+          <div class="admin-stack-list">
+            {% for e in upcoming_exams %}
+            <div class="admin-stack-item">
+              <div>
+                <strong>{{ e.title }}</strong>
+                <small>{{ e.subject.name }}</small>
+              </div>
+              <div class="text-end">
+                <span class="badge bg-info-subtle text-info">{{ e.exam_date.strftime('%d %b') }}</span>
+                <small class="d-block text-muted mt-1">{{ e.exam_type.replace('_', ' ').title() }}</small>
+              </div>
+            </div>
+            {% else %}
+            <div class="admin-empty-panel">
+              <i class="bi bi-journals"></i>
+              <span>No exams in the next 7 days.</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
+    {% endif %}
+
+    {% if 'fee_collection' in visible_widgets %}
+    <div class="col-xl-{% if 'recent_notices' in visible_widgets and 'upcoming_exams' in visible_widgets %}4{% elif 'recent_notices' in visible_widgets or 'upcoming_exams' in visible_widgets %}6{% else %}12{% endif %}">
+      <div class="card border-0 shadow-sm admin-surface-panel h-100">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div class="admin-panel-kicker">Fee Monitoring</div>
+              <h5 class="mb-1">Collection progress</h5>
+            </div>
+            <a href="{{ url_for('fee.admin_fees') }}" class="btn btn-sm btn-outline-secondary">Manage</a>
+          </div>
+
+          <div class="fw-bold fs-4 text-success mb-1">Rs. {{ '{:,.0f}'.format(total_fee_collected) }}</div>
+          <div class="text-muted small mb-3">of Rs. {{ '{:,.0f}'.format(total_fee_expected) }} expected</div>
+          <div class="progress admin-progress mb-2">
+            <div class="progress-bar bg-success" style="width:{{ [collection_pct, 100] | min }}%"></div>
+          </div>
+          <div class="d-flex justify-content-between text-muted small mb-4">
+            <span>{{ '%.1f'|format(collection_pct) }}% collected</span>
+            <span>Rs. {{ '{:,.0f}'.format(outstanding_fee) }} outstanding</span>
+          </div>
+
+          <div class="admin-focus-highlight">
+            <span>Finance Note</span>
+            <strong>Review balances before reminders go out.</strong>
+            <small>Use fee records together with notices so messages target the right students and classes.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="row g-4">
+    {% if 'department_attendance' in visible_widgets %}
+    <div class="col-xl-4">
+      <div class="card border-0 shadow-sm admin-surface-panel h-100">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div class="admin-panel-kicker">Academic Units</div>
+              <h5 class="mb-1">Department attendance</h5>
+            </div>
+            <a href="{{ url_for('admin.departments') }}" class="btn btn-sm btn-outline-secondary">Departments</a>
+          </div>
+
+          <div class="admin-stack-list">
+            {% for dept in dept_stats %}
+            <div class="admin-department-block">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div>
+                  <strong>{{ dept.name }}</strong>
+                  <small>{{ dept.student_count }} students</small>
+                </div>
+                <span class="badge {% if dept.avg_rate >= 75 %}bg-success{% elif dept.avg_rate >= 60 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                  {{ dept.avg_rate }}%
+                </span>
+              </div>
+              <div class="progress admin-progress">
+                <div class="progress-bar {% if dept.avg_rate >= 75 %}bg-success{% elif dept.avg_rate >= 60 %}bg-warning{% else %}bg-danger{% endif %}" style="width:{{ dept.avg_rate }}%"></div>
+              </div>
+            </div>
+            {% else %}
+            <div class="admin-empty-panel">
+              <i class="bi bi-building"></i>
+              <span>No attendance data yet.</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'recent_sessions' in visible_widgets %}
+    <div class="col-xl-{% if 'department_attendance' in visible_widgets %}8{% else %}12{% endif %}">
+      <div class="card border-0 shadow-sm admin-surface-panel h-100">
+        <div class="card-body p-0">
+          <div class="d-flex justify-content-between align-items-center gap-3 p-4 pb-3">
+            <div>
+              <div class="admin-panel-kicker">Attendance Records</div>
+              <h5 class="mb-1">Recent sessions</h5>
+              <div class="text-muted small">Latest completed and active sessions across the college.</div>
+            </div>
+            <a href="{{ url_for('admin.attendance_hub', tab='sessions') }}" class="btn btn-sm btn-outline-primary">
+              Open Sessions
+            </a>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover mb-0 responsive-data-table">
+              <thead class="table-light">
+                <tr>
+                  <th class="px-4">Subject</th>
+                  <th>Teacher</th>
+                  <th>Date</th>
+                  <th>Present</th>
+                  <th>Total</th>
+                  <th>Rate</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in recent_sessions %}
+                {% set rate = (s.present_count / s.total_students * 100) if s.total_students > 0 else 0 %}
+                <tr>
+                  <td class="px-4 fw-semibold" data-label="Subject">{{ s.subject.name }}</td>
+                  <td data-label="Teacher">{{ s.teacher.user.name }}</td>
+                  <td data-label="Date">{{ s.date.strftime('%d %b %Y') }}</td>
+                  <td data-label="Present" class="text-success fw-semibold">{{ s.present_count }}</td>
+                  <td data-label="Total">{{ s.total_students }}</td>
+                  <td data-label="Rate">
+                    <span class="badge {% if rate >= 75 %}bg-success{% elif rate >= 50 %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                      {{ "%.0f"|format(rate) }}%
+                    </span>
+                  </td>
+                  <td data-label="Status">
+                    <span class="badge {% if s.status == 'active' %}bg-success{% elif s.status == 'completed' %}bg-primary{% else %}bg-secondary{% endif %}">
+                      {{ s.status.capitalize() }}
+                    </span>
+                  </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="text-center text-muted py-4">No sessions yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </section>
 </div>
-{% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
 const trendData = {{ trend | tojson }};
-new Chart(document.getElementById('trendChart'), {
-  type: 'line',
-  data: {
-    labels: trendData.map(d => d.date),
-    datasets: [{
-      label: 'Attendance Rate (%)',
-      data: trendData.map(d => d.rate),
-      borderColor: '#0d6efd',
-      backgroundColor: 'rgba(13,110,253,0.08)',
-      borderWidth: 2.5,
-      pointBackgroundColor: '#0d6efd',
-      pointRadius: 4,
-      tension: 0.4,
-      fill: true,
-    }]
-  },
-  options: {
-    responsive: true,
-    plugins: { legend: { display: false } },
-    scales: {
-      y: { min: 0, max: 100, ticks: { callback: v => v + '%' }, grid: { color: '#f0f0f0' } },
-      x: { grid: { display: false } }
+const trendCanvas = document.getElementById('trendChart');
+
+if (trendCanvas && trendData.length) {
+  new Chart(trendCanvas, {
+    type: 'line',
+    data: {
+      labels: trendData.map(d => d.date),
+      datasets: [{
+        label: 'Attendance Rate (%)',
+        data: trendData.map(d => d.rate),
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37,99,235,0.08)',
+        borderWidth: 3,
+        pointBackgroundColor: '#2563eb',
+        pointRadius: 4,
+        pointHoverRadius: 5,
+        tension: 0.38,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          min: 0,
+          max: 100,
+          ticks: { callback: v => v + '%' },
+          grid: { color: '#edf2f7' }
+        },
+        x: { grid: { display: false } }
+      }
     }
-  }
-});
+  });
+}
 </script>
 {% endblock %}

@@ -1,9 +1,11 @@
+# ruff: noqa: E402
+
 import os
 import shutil
 import sys
 import tempfile
-from pathlib import Path
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -24,7 +26,7 @@ from models.teacher import Teacher
 
 
 class TestConfig(TestingConfig):
-    SECRET_KEY = 'test-secret-key'
+    SECRET_KEY = "test-secret-key"
     SESSION_COOKIE_SECURE = False
     REMEMBER_COOKIE_SECURE = False
     RATELIMIT_ENABLED = False
@@ -33,14 +35,16 @@ class TestConfig(TestingConfig):
 
 @pytest.fixture()
 def app():
-    fd, db_path = tempfile.mkstemp(suffix='.db')
+    fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
-    upload_root = tempfile.mkdtemp(prefix='smart-attendance-content-')
-    submission_root = tempfile.mkdtemp(prefix='smart-attendance-submissions-')
+    upload_root = tempfile.mkdtemp(prefix="smart-attendance-content-")
+    library_root = tempfile.mkdtemp(prefix="smart-attendance-library-")
+    submission_root = tempfile.mkdtemp(prefix="smart-attendance-submissions-")
 
     class Config(TestConfig):
-        SQLALCHEMY_DATABASE_URI = f'sqlite:///{db_path}'
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{db_path}"
         CONTENT_UPLOAD_FOLDER = upload_root
+        LIBRARY_UPLOAD_FOLDER = library_root
         ASSIGNMENT_UPLOAD_FOLDER = submission_root
 
     app = create_app(Config)
@@ -48,35 +52,92 @@ def app():
     with app.app_context():
         db.create_all()
 
-        college = College(name='Alpha College', code='ALPHA')
+        college = College(name="Alpha College", code="ALPHA")
         db.session.add(college)
         db.session.flush()
 
-        dept = Department(college_id=college.id, name='Computer Science', code='CS')
+        dept = Department(college_id=college.id, name="Computer Science", code="CS")
         db.session.add(dept)
         db.session.flush()
 
-        teacher_user = User(college_id=college.id, name='Teacher One', email='teacher1@example.com', role='teacher')
-        teacher_user.set_password('Password@123')
-        other_teacher_user = User(college_id=college.id, name='Teacher Two', email='teacher2@example.com', role='teacher')
-        other_teacher_user.set_password('Password@123')
-        student_user = User(college_id=college.id, name='Student One', email='student1@example.com', role='student')
-        student_user.set_password('Password@123')
-        parent_user = User(college_id=college.id, name='Parent One', email='parent1@example.com', role='parent')
-        parent_user.set_password('Password@123')
-        admin_user = User(college_id=college.id, name='Admin User', email='admin@example.com', role='admin')
-        admin_user.set_password('Password@123')
-        super_admin_user = User(college_id=college.id, name='Platform Owner', email='superadmin@example.com', role='super_admin')
-        super_admin_user.set_password('Password@123')
-        db.session.add_all([teacher_user, other_teacher_user, student_user, parent_user, admin_user, super_admin_user])
+        teacher_user = User(
+            college_id=college.id,
+            name="Teacher One",
+            email="teacher1@example.com",
+            role="teacher",
+        )
+        teacher_user.set_password("Password@123")
+        other_teacher_user = User(
+            college_id=college.id,
+            name="Teacher Two",
+            email="teacher2@example.com",
+            role="teacher",
+        )
+        other_teacher_user.set_password("Password@123")
+        student_user = User(
+            college_id=college.id,
+            name="Student One",
+            email="student1@example.com",
+            role="student",
+        )
+        student_user.set_password("Password@123")
+        parent_user = User(
+            college_id=college.id,
+            name="Parent One",
+            email="parent1@example.com",
+            role="parent",
+        )
+        parent_user.set_password("Password@123")
+        librarian_user = User(
+            college_id=college.id,
+            name="Librarian One",
+            email="librarian1@example.com",
+            role="librarian",
+        )
+        librarian_user.set_password("Password@123")
+        admin_user = User(
+            college_id=college.id,
+            name="Admin User",
+            email="admin@example.com",
+            role="admin",
+        )
+        admin_user.set_password("Password@123")
+        super_admin_user = User(
+            college_id=None,
+            name="Platform Owner",
+            email="superadmin@example.com",
+            role="super_admin",
+        )
+        super_admin_user.set_password("Password@123")
+        db.session.add_all(
+            [
+                teacher_user,
+                other_teacher_user,
+                student_user,
+                parent_user,
+                librarian_user,
+                admin_user,
+                super_admin_user,
+            ]
+        )
         db.session.flush()
 
-        teacher = Teacher(college_id=college.id, user_id=teacher_user.id, employee_id='T-001', department_id=dept.id)
-        other_teacher = Teacher(college_id=college.id, user_id=other_teacher_user.id, employee_id='T-002', department_id=dept.id)
+        teacher = Teacher(
+            college_id=college.id,
+            user_id=teacher_user.id,
+            employee_id="T-001",
+            department_id=dept.id,
+        )
+        other_teacher = Teacher(
+            college_id=college.id,
+            user_id=other_teacher_user.id,
+            employee_id="T-002",
+            department_id=dept.id,
+        )
         student = Student(
             college_id=college.id,
             user_id=student_user.id,
-            roll_number='CS-001',
+            roll_number="CS-001",
             department_id=dept.id,
             semester=1,
         )
@@ -85,8 +146,8 @@ def app():
 
         own_subject = Subject(
             college_id=college.id,
-            name='Programming',
-            code='CS101',
+            name="Programming",
+            code="CS101",
             department_id=dept.id,
             teacher_id=teacher.id,
             semester=1,
@@ -94,8 +155,8 @@ def app():
         )
         other_subject = Subject(
             college_id=college.id,
-            name='Databases',
-            code='CS102',
+            name="Databases",
+            code="CS102",
             department_id=dept.id,
             teacher_id=other_teacher.id,
             semester=1,
@@ -108,16 +169,16 @@ def app():
             college_id=college.id,
             subject_id=other_subject.id,
             teacher_id=other_teacher.id,
-            status='completed',
+            status="completed",
         )
         db.session.add(foreign_session)
 
         teacher_only_notice = Notice(
             college_id=college.id,
-            title='Teachers Only',
-            content='Hidden from students',
-            category='general',
-            target_role='teacher',
+            title="Teachers Only",
+            content="Hidden from students",
+            category="general",
+            target_role="teacher",
             author_id=teacher_user.id,
         )
         db.session.add(teacher_only_notice)
@@ -128,8 +189,8 @@ def app():
             subject_id=own_subject.id,
             department_id=dept.id,
             semester=1,
-            content_type='note',
-            title='Week 1 Notes',
+            content_type="note",
+            title="Week 1 Notes",
             is_published=True,
         )
         assignment = TeacherContent(
@@ -138,31 +199,41 @@ def app():
             subject_id=own_subject.id,
             department_id=dept.id,
             semester=1,
-            content_type='assignment',
-            title='Week 1 Assignment',
-            body='Solve the first programming exercise set.',
+            content_type="assignment",
+            title="Week 1 Assignment",
+            body="Solve the first programming exercise set.",
             due_date=date.today() + timedelta(days=3),
             marks=20,
             is_published=True,
         )
         db.session.add_all([content, assignment])
-        db.session.add(ParentStudent(college_id=college.id, parent_id=parent_user.id, student_id=student.id, relationship='guardian'))
+        db.session.add(
+            ParentStudent(
+                college_id=college.id,
+                parent_id=parent_user.id,
+                student_id=student.id,
+                relationship="guardian",
+            )
+        )
         db.session.commit()
 
-        app.config['TEST_DATA'] = {
-            'college_id': college.id,
-            'college_code': college.code,
-            'teacher_user_id': teacher_user.id,
-            'student_user_id': student_user.id,
-            'student_profile_id': student.id,
-            'parent_user_id': parent_user.id,
-            'super_admin_user_id': super_admin_user.id,
-            'foreign_session_id': foreign_session.id,
-            'other_subject_id': other_subject.id,
-            'teacher_notice_id': teacher_only_notice.id,
-            'own_subject_id': own_subject.id,
-            'content_id': content.id,
-            'assignment_id': assignment.id,
+        app.config["TEST_DATA"] = {
+            "college_id": college.id,
+            "college_code": college.code,
+            "teacher_user_id": teacher_user.id,
+            "admin_user_id": admin_user.id,
+            "student_user_id": student_user.id,
+            "student_profile_id": student.id,
+            "teacher_profile_id": teacher.id,
+            "parent_user_id": parent_user.id,
+            "librarian_user_id": librarian_user.id,
+            "super_admin_user_id": super_admin_user.id,
+            "foreign_session_id": foreign_session.id,
+            "other_subject_id": other_subject.id,
+            "teacher_notice_id": teacher_only_notice.id,
+            "own_subject_id": own_subject.id,
+            "content_id": content.id,
+            "assignment_id": assignment.id,
         }
 
     yield app
@@ -173,6 +244,7 @@ def app():
 
     os.unlink(db_path)
     shutil.rmtree(upload_root, ignore_errors=True)
+    shutil.rmtree(library_root, ignore_errors=True)
     shutil.rmtree(submission_root, ignore_errors=True)
 
 
@@ -181,12 +253,12 @@ def client(app):
     return app.test_client()
 
 
-def login(client, email, password='Password@123', college_code=None):
-    data = {'email': email, 'password': password}
+def login(client, email, password="Password@123", college_code=None):
+    data = {"email": email, "password": password}
     if college_code:
-        data['college_code'] = college_code
+        data["college_code"] = college_code
     return client.post(
-        '/login',
+        "/login",
         data=data,
         follow_redirects=False,
     )

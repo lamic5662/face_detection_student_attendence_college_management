@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}<i class="bi bi-upc-scan me-2"></i>{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center gap-3 mb-4 no-print">
+  <div>
+    <h2 class="h4 mb-1">{{ title }}</h2>
+    <div class="text-muted">Printable QR labels for the library scan desk.</div>
+  </div>
+  <button onclick="window.print()" class="btn btn-primary">
+    <i class="bi bi-printer me-1"></i>Print Label{% if copies|length > 1 %}s{% endif %}
+  </button>
+</div>
+
+<div class="copy-label-grid">
+  {% for copy in copies %}
+  <div class="copy-label">
+    <div class="copy-label-title">{{ copy.book.title }}</div>
+    <div class="small text-muted mb-2">{{ copy.book.author }}</div>
+    <div class="copy-label-row"><span>Accession</span><strong>{{ copy.accession_number }}</strong></div>
+    <div class="copy-label-row"><span>Barcode</span><strong>{{ copy.barcode or copy.accession_number }}</strong></div>
+    <div class="copy-label-row"><span>Location</span><strong>{{ copy.location_label }}</strong></div>
+    <div class="copy-label-row"><span>Status</span><strong>{{ copy.status|title }}</strong></div>
+    {% if qr_map.get(copy.id) %}
+    <div class="text-center mt-3">
+      <img src="{{ qr_map.get(copy.id) }}" alt="Copy QR" class="copy-label-qr">
+      <div class="small text-muted mt-2">Scan QR or type code</div>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.copy-label-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.copy-label {
+  border: 1px dashed rgba(13, 110, 253, 0.35);
+  border-radius: 20px;
+  background: #fff;
+  padding: 1rem;
+  break-inside: avoid;
+}
+.copy-label-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.copy-label-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.92rem;
+  margin-top: 0.35rem;
+}
+.copy-label-row span {
+  color: #6c757d;
+}
+.copy-label-row strong {
+  text-align: right;
+}
+.copy-label-qr {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid rgba(13, 110, 253, 0.14);
+  border-radius: 16px;
+  padding: 0.5rem;
+}
+@media print {
+  .no-print,
+  .navbar,
+  .sidebar,
+  .page-header,
+  footer {
+    display: none !important;
+  }
+  .main-content,
+  .content-wrapper,
+  .container,
+  .container-fluid {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .copy-label-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>
+{% endblock %}

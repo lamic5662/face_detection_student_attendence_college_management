@@ -8,19 +8,23 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=style_css_version) }}">
   {% block head %}{% endblock %}
 </head>
 <body>
 
 {% if current_user.is_authenticated %}
+{% set is_platform_nav = current_user.role == 'super_admin' %}
+{% set nav_brand_name = 'SmartAttend Platform' if is_platform_nav else college_name %}
+{% set nav_brand_logo = none if is_platform_nav else college_logo %}
+{% set nav_brand_logo_version = none if is_platform_nav else college_logo_version %}
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
   <div class="sidebar-brand">
-    {% if college_logo %}
+    {% if nav_brand_logo %}
     <div class="sidebar-college-logo-wrap">
-      <img src="{{ url_for('static', filename=college_logo, v=college_logo_version) }}"
-           alt="{{ college_name }}"
+      <img src="{{ url_for('static', filename=nav_brand_logo, v=nav_brand_logo_version) }}"
+           alt="{{ nav_brand_name }}"
            class="sidebar-college-logo">
     </div>
     {% else %}
@@ -30,7 +34,7 @@
     {% endif %}
     <div class="sidebar-brand-copy">
       <div class="sidebar-brand-kicker">SmartAttend</div>
-      <div class="fw-bold sidebar-brand-name" title="{{ college_name }}">{{ college_name }}</div>
+      <div class="fw-bold sidebar-brand-name" title="{{ nav_brand_name }}">{{ nav_brand_name }}</div>
     </div>
   </div>
   <hr class="sidebar-divider">
@@ -222,7 +226,9 @@
                       {% if not notification_count %}disabled{% endif %}>
                 <i class="bi bi-check2-all"></i>
               </button>
-              <a href="{{ url_for('notice.list_notices') }}" class="btn btn-sm btn-outline-secondary">Open Board</a>
+              {% if notification_board_url %}
+              <a href="{{ notification_board_url }}" class="btn btn-sm btn-outline-secondary">Open Board</a>
+              {% endif %}
               {% else %}
               <button type="button"
                       class="btn btn-sm btn-outline-secondary topbar-delete-read-btn"
@@ -493,7 +499,6 @@
   }
 
   function updateDeleteReadState(items) {
-    if (notificationMode !== 'notice') return;
     if (!deleteReadButton) return;
     const hasReadItems = (items || []).some((notice) => notice.is_read);
     deleteReadButton.disabled = !hasReadItems;
@@ -620,6 +625,18 @@
       navSearchInput.dispatchEvent(new Event('input'));
     });
   }
+</script>
+<script>
+window.addEventListener('pageshow', function (event) {
+  var navEntries = [];
+  if (window.performance && typeof window.performance.getEntriesByType === 'function') {
+    navEntries = window.performance.getEntriesByType('navigation');
+  }
+  var restoredFromHistory = event.persisted || (navEntries.length > 0 && navEntries[0].type === 'back_forward');
+  if (restoredFromHistory) {
+    window.location.reload();
+  }
+});
 </script>
 {% block scripts %}{% endblock %}
 <script src="{{ url_for('static', filename='js/bulk-select.js') }}"></script>
@@ -1096,7 +1113,7 @@ document.querySelectorAll('.alert[data-flash]').forEach(function (el) {
 });
 </script>
 
-{% if current_user.is_authenticated %}
+{% if current_user.is_authenticated and ai_assistant_enabled %}
 <!-- ── SmartAttend AI Chat Widget ─────────────────────────────────────────── -->
 <style>
 #sa-ai-btn {

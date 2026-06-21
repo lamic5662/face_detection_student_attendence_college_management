@@ -1,0 +1,25 @@
+[Unit]
+Description=SmartAttend Gunicorn service
+After=network.target mysql.service redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/smart_attendance/current
+EnvironmentFile=/opt/smart_attendance/shared/.env
+ExecStart=/opt/smart_attendance/venv/bin/gunicorn -c gunicorn.conf.py run:app
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/smart_attendance/shared/uploads /opt/smart_attendance/shared/logs
+StandardOutput=append:/opt/smart_attendance/shared/logs/gunicorn.out.log
+StandardError=append:/opt/smart_attendance/shared/logs/gunicorn.err.log
+
+[Install]
+WantedBy=multi-user.target

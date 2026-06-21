@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from flask import current_app
 
 try:
@@ -36,28 +38,42 @@ Note summarization:
 Be friendly, professional, and always answer based on the real data provided."""
 
 
-def _client() -> Groq:
+def unavailable_reason() -> str | None:
     if Groq is None:
-        raise RuntimeError(
-            'The optional Groq dependency is not installed. Install requirements.txt '
-            'or disable the AI assistant feature.'
+        return (
+            "The optional Groq dependency is not installed. Install requirements.txt "
+            "or disable the AI assistant feature."
         )
-    key = current_app.config.get('GROQ_API_KEY', '')
-    if not key:
-        raise RuntimeError('GROQ_API_KEY is not configured.')
-    return Groq(api_key=key)
+    if not (current_app.config.get("GROQ_API_KEY") or "").strip():
+        return "GROQ_API_KEY is not configured."
+    return None
 
 
-def chat(messages: list[dict], user_role: str = '', context: str = '') -> str:
+def is_available() -> bool:
+    return unavailable_reason() is None
+
+
+def _client() -> Any:
+    reason = unavailable_reason()
+    if reason:
+        raise RuntimeError(reason)
+    key = (current_app.config.get("GROQ_API_KEY") or "").strip()
+    groq_client_cls = Groq
+    if groq_client_cls is None:
+        raise RuntimeError("The optional Groq dependency is not installed.")
+    return groq_client_cls(api_key=key)
+
+
+def chat(messages: list[dict], user_role: str = "", context: str = "") -> str:
     system = _SYSTEM_PROMPT
     if context:
-        system = context + '\n\n---\n\n' + system
+        system = context + "\n\n---\n\n" + system
     if user_role:
-        system += f'\n\nThe current user role is: {user_role}'
+        system += f"\n\nThe current user role is: {user_role}"
 
     response = _client().chat.completions.create(
-        model='llama-3.3-70b-versatile',
-        messages=[{'role': 'system', 'content': system}] + messages,
+        model="llama-3.3-70b-versatile",
+        messages=[{"role": "system", "content": system}] + messages,
         max_tokens=2048,
         temperature=0.5,
     )
@@ -75,10 +91,13 @@ def generate_notice(topic: str, college_name: str) -> str:
         "- Output only the notice text, nothing else"
     )
     response = _client().chat.completions.create(
-        model='llama-3.3-70b-versatile',
+        model="llama-3.3-70b-versatile",
         messages=[
-            {'role': 'system', 'content': 'You are a professional academic content writer.'},
-            {'role': 'user', 'content': prompt},
+            {
+                "role": "system",
+                "content": "You are a professional academic content writer.",
+            },
+            {"role": "user", "content": prompt},
         ],
         max_tokens=400,
         temperature=0.4,

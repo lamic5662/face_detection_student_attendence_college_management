@@ -17,6 +17,9 @@
       <a href="{{ url_for('super_admin.broadcast') }}" class="btn btn-outline-light btn-sm">
         <i class="bi bi-megaphone me-1"></i>Broadcast
       </a>
+      <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#planPricingModal">
+        <i class="bi bi-currency-exchange me-1"></i>Edit Plan Pricing
+      </button>
       <a href="{{ url_for('super_admin.system_setup') }}" class="btn btn-light btn-sm">
         <i class="bi bi-list-check me-1"></i>Platform Setup
       </a>
@@ -107,6 +110,13 @@
     </div>
   </div>
   <div class="col-xl-2 col-md-4 col-6">
+    <div class="stat-card stat-card-purple">
+      <div class="stat-icon"><i class="bi bi-bank2"></i></div>
+      <div class="stat-value">{{ stats.universities }}</div>
+      <div class="stat-label">Universities</div>
+    </div>
+  </div>
+  <div class="col-xl-2 col-md-4 col-6">
     <div class="stat-card stat-card-red">
       <div class="stat-icon"><i class="bi bi-person-badge-fill"></i></div>
       <div class="stat-value">{{ stats.college_admins }}</div>
@@ -114,7 +124,7 @@
     </div>
   </div>
   <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-purple">
+    <div class="stat-card stat-card-teal">
       <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
       <div class="stat-value">{{ stats.students }}</div>
       <div class="stat-label">Students</div>
@@ -128,7 +138,7 @@
     </div>
   </div>
   <div class="col-xl-2 col-md-4 col-6">
-    <div class="stat-card stat-card-teal">
+    <div class="stat-card stat-card-red">
       <div class="stat-icon"><i class="bi bi-plus-circle"></i></div>
       <div class="stat-value">{{ stats.new_colleges_month }}</div>
       <div class="stat-label">New This Month</div>
@@ -161,6 +171,7 @@
               <span class="small fw-semibold">{{ plan_meta.label }}</span>
               <span class="fw-bold">{{ count }}</span>
             </div>
+            <div class="text-muted mb-1" style="font-size:10px">{{ plan_meta.price_label }}</div>
             {% if stats.colleges > 0 %}
             <div class="progress" style="height:5px">
               <div class="progress-bar bg-{{ plan_meta.color }}"
@@ -222,6 +233,12 @@
         <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-outline-primary text-start">
           <i class="bi bi-plus-circle me-2"></i>Add New College
         </a>
+        <a href="{{ url_for('super_admin.universities') }}" class="btn btn-outline-secondary text-start">
+          <i class="bi bi-bank2 me-2"></i>Manage Universities
+        </a>
+        <button type="button" class="btn btn-outline-secondary text-start" data-bs-toggle="modal" data-bs-target="#planPricingModal">
+          <i class="bi bi-currency-exchange me-2"></i>Edit Plan Pricing
+        </button>
         <a href="{{ url_for('super_admin.broadcast') }}" class="btn btn-outline-secondary text-start">
           <i class="bi bi-megaphone me-2"></i>Send Broadcast
         </a>
@@ -238,6 +255,73 @@
     </div>
   </div>
 
+</div>
+
+{% if university_rows %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-bold mb-0"><i class="bi bi-bank2 text-primary me-2"></i>University Network</h6>
+    <a href="{{ url_for('super_admin.universities') }}" class="btn btn-sm btn-outline-secondary">View All</a>
+  </div>
+  <div class="card-body px-4 pb-4">
+    <div class="row g-3">
+      {% for row in university_rows %}
+      <div class="col-lg-4 col-md-6">
+        <a href="{{ url_for('super_admin.university_detail', university_id=row.university.id) }}" class="text-decoration-none text-dark">
+          <div class="border rounded-4 p-3 h-100 bg-light-subtle">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+              <div>
+                <div class="fw-semibold">{{ row.university.name }}</div>
+                <div class="small text-muted">{{ row.university.code }}</div>
+              </div>
+              <span class="badge {% if row.university.is_active %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                {{ 'Active' if row.university.is_active else 'Inactive' }}
+              </span>
+            </div>
+            <div class="small text-muted d-flex flex-column gap-1">
+              <span>{{ row.colleges }} colleges</span>
+              <span>{{ row.departments }} departments</span>
+              <span>{{ row.students }} students</span>
+              <span>{{ row.teachers }} teachers</span>
+            </div>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="modal fade" id="planPricingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-currency-exchange text-primary me-2"></i>Edit Plan Pricing</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('super_admin.update_plan_pricing') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+          <div class="small text-muted mb-3">
+            These price labels are shown across super-admin and college-admin plan screens.
+          </div>
+          <div class="row g-3">
+            {% for plan_key, plan_meta in college_plans.items() %}
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ plan_meta.label }}</label>
+              <input type="text" name="price_{{ plan_key }}" class="form-control" value="{{ plan_meta.price_label }}" required>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Pricing</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 {# ── College Status Table ── #}
@@ -271,9 +355,13 @@
               <div class="text-muted small">{{ row.college.code }}</div>
             </td>
             <td>
-              <span class="badge bg-{{ row.college.plan_meta.color }}-subtle text-{{ row.college.plan_meta.color }} fw-semibold">
-                <i class="bi {{ row.college.plan_meta.icon }} me-1"></i>{{ row.college.plan_meta.label }}
+              <span class="badge bg-{{ row.plan_state.display_plan_meta.color }}-subtle text-{{ row.plan_state.display_plan_meta.color }} fw-semibold">
+                <i class="bi {{ row.plan_state.display_plan_meta.icon }} me-1"></i>{{ row.plan_state.display_plan_meta.label }}
               </span>
+              <div class="text-muted" style="font-size:10px">{{ row.plan_state.display_plan_meta.price_label }}</div>
+              {% if not row.plan_state.matches_billing_plan %}
+              <div class="text-muted" style="font-size:10px">Billing: {{ row.plan_state.billing_plan_meta.label }}</div>
+              {% endif %}
             </td>
             <td>
               <span class="badge {% if row.college.is_active %}bg-success{% else %}bg-secondary{% endif %}">

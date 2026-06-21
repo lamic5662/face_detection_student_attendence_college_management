@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} Reader{% endblock %}
+{% block page_title %}<i class="bi bi-book me-2"></i>E-Book Reader{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+  <div>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <span class="badge bg-secondary-subtle text-secondary">{{ book.book_type|title }}</span>
+      <span class="badge bg-success-subtle text-success-emphasis">{{ book.ebook_access_label }}</span>
+      {% if not can_download_ebook %}<span class="badge bg-warning-subtle text-warning-emphasis">Download Locked</span>{% endif %}
+      {% if preview_limit %}<span class="badge bg-light text-dark border">Preview Limit {{ preview_limit }} page(s)</span>{% endif %}
+    </div>
+    <h2 class="h4 mb-1">{{ book.title }}</h2>
+    <div class="text-muted">{{ book.author }}{% if book.publisher %} · {{ book.publisher }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('library.book_detail', book_id=book.id) }}" class="btn btn-outline-secondary">Back To Book</a>
+    {% if can_download_ebook %}
+    <a href="{{ url_for('library.download_ebook', book_id=book.id) }}" class="btn btn-primary">
+      <i class="bi bi-download me-1"></i>Download
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <h3 class="h5 mb-1">Reader</h3>
+          <div class="text-muted small">
+            {% if ebook_extension == 'pdf' %}
+            Use the page controls below to continue from your saved position and update progress.
+            {% else %}
+            Open the e-book in the system viewer and save your progress manually after reading.
+            {% endif %}
+          </div>
+        </div>
+        <a href="{{ url_for('library.preview_ebook', book_id=book.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank" rel="noopener">
+          Open Raw Preview
+        </a>
+      </div>
+      <div class="card-body">
+        {% if ebook_extension == 'pdf' %}
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="readerPrevPage">Previous</button>
+          <div class="input-group input-group-sm" style="max-width:180px">
+            <span class="input-group-text">Page</span>
+            <input type="number" class="form-control" id="readerPageInput" min="1" {% if max_page %}max="{{ max_page }}"{% endif %} value="{{ current_page }}">
+            <span class="input-group-text">{% if max_page %}/ {{ max_page }}{% elif total_pages %}/ {{ total_pages }}{% endif %}</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="readerNextPage">Next</button>
+        </div>
+        <div class="ratio" style="--bs-aspect-ratio: 70%;">
+          <iframe id="ebookReaderFrame" src="{{ url_for('library.preview_ebook', book_id=book.id) }}#page={{ current_page }}" class="rounded border" title="E-Book Reader"></iframe>
+        </div>
+        {% else %}
+        <div class="rounded border bg-light p-4 text-center">
+          <i class="bi bi-journal-richtext fs-1 text-muted d-block mb-3"></i>
+          <div class="fw-semibold mb-2">EPUB reader preview</div>
+          <div class="text-muted small mb-3">
+            Browser EPUB support depends on the device. You can still open the file inside the system and save your position from the progress panel.
+          </div>
+          <iframe id="ebookReaderFrame" src="{{ url_for('library.preview_ebook', book_id=book.id) }}" class="rounded border w-100" style="min-height:70vh" title="E-Book Reader"></iframe>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Reading Progress</h3>
+        <div class="text-muted small">Saved per user so you can continue later.</div>
+      </div>
+      <div class="card-body">
+        <form id="readingProgressForm" method="post" action="{{ url_for('library.save_reading_progress', book_id=book.id) }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-12">
+            <label class="form-label">Last Page</label>
+            <input type="number" class="form-control" name="last_page" id="progressPageInput" min="1" {% if max_page %}max="{{ max_page }}"{% endif %} value="{{ progress.last_page if progress and progress.last_page else current_page }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Page Progress</label>
+            <input type="range" class="form-range" id="progressPercentRange" min="0" max="100" step="1" value="{{ current_progress|int }}">
+            <div class="d-flex justify-content-between small text-muted">
+              <span>0%</span>
+              <strong id="progressPercentLabel">{{ current_progress|int }}%</strong>
+              <span>100%</span>
+            </div>
+            <input type="hidden" name="progress_percent" id="progressPercentInput" value="{{ current_progress|int }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Last Read Position Note</label>
+            <input type="text" class="form-control" name="last_position" id="progressPositionInput" maxlength="255" value="{{ progress.last_position if progress and progress.last_position else '' }}" placeholder="Example: Started chapter 3 examples">
+          </div>
+          <div class="col-12">
+            <div class="small text-muted mb-2">
+              {% if progress %}
+              Last saved {{ progress.last_read_at.strftime('%d %b %Y %H:%M') }}
+              {% else %}
+              No saved reader progress yet.
+              {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Save Progress</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Read History</h3>
+        <div class="text-muted small">Recent preview and download activity for your account.</div>
+      </div>
+      <div class="card-body">
+        {% if reading_history %}
+        <div class="list-group list-group-flush">
+          {% for log in reading_history %}
+          <div class="list-group-item px-0">
+            <div class="fw-semibold">{{ log.action|title }}</div>
+            <div class="small text-muted">{{ log.accessed_at.strftime('%d %b %Y %H:%M') }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted">No reader history yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  const progressForm = document.getElementById('readingProgressForm');
+  const readerPageInput = document.getElementById('readerPageInput');
+  const progressPageInput = document.getElementById('progressPageInput');
+  const progressPercentRange = document.getElementById('progressPercentRange');
+  const progressPercentInput = document.getElementById('progressPercentInput');
+  const progressPercentLabel = document.getElementById('progressPercentLabel');
+  const readerFrame = document.getElementById('ebookReaderFrame');
+  const maxPage = {{ max_page or 0 }};
+  const previewUrl = {{ url_for('library.preview_ebook', book_id=book.id)|tojson }};
+  const csrfToken = document.querySelector('#readingProgressForm input[name="csrf_token"]')?.value || '';
+
+  function clampPage(value) {
+    let page = parseInt(value || '1', 10);
+    if (Number.isNaN(page) || page < 1) page = 1;
+    if (maxPage && page > maxPage) page = maxPage;
+    return page;
+  }
+
+  function syncReaderPage(page) {
+    const safePage = clampPage(page);
+    if (readerPageInput) readerPageInput.value = safePage;
+    if (progressPageInput) progressPageInput.value = safePage;
+    if (readerFrame && {{ 'true' if ebook_extension == 'pdf' else 'false' }}) {
+      readerFrame.src = `${previewUrl}#page=${safePage}`;
+    }
+  }
+
+  function syncProgressPercent(value) {
+    const safeValue = Math.max(0, Math.min(100, parseInt(value || '0', 10) || 0));
+    if (progressPercentRange) progressPercentRange.value = safeValue;
+    if (progressPercentInput) progressPercentInput.value = safeValue;
+    if (progressPercentLabel) progressPercentLabel.textContent = `${safeValue}%`;
+  }
+
+  async function saveProgressSilently() {
+    if (!progressForm || !csrfToken) return;
+    const formData = new FormData(progressForm);
+    try {
+      await fetch(progressForm.action, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Accept': 'application/json' },
+        body: formData,
+        credentials: 'same-origin',
+      });
+    } catch (_) {
+      // Ignore transient reader autosave failures.
+    }
+  }
+
+  document.getElementById('readerPrevPage')?.addEventListener('click', () => {
+    syncReaderPage((parseInt(readerPageInput?.value || '1', 10) || 1) - 1);
+  });
+  document.getElementById('readerNextPage')?.addEventListener('click', () => {
+    syncReaderPage((parseInt(readerPageInput?.value || '1', 10) || 1) + 1);
+  });
+  readerPageInput?.addEventListener('change', () => {
+    syncReaderPage(readerPageInput.value);
+    saveProgressSilently();
+  });
+  progressPageInput?.addEventListener('change', () => saveProgressSilently());
+  progressPercentRange?.addEventListener('input', () => {
+    syncProgressPercent(progressPercentRange.value);
+  });
+  progressPercentRange?.addEventListener('change', () => saveProgressSilently());
+  document.getElementById('progressPositionInput')?.addEventListener('change', () => saveProgressSilently());
+  window.addEventListener('beforeunload', () => {
+    if (navigator.sendBeacon && progressForm) {
+      const formData = new FormData(progressForm);
+      navigator.sendBeacon(progressForm.action, formData);
+    }
+  });
+
+  syncReaderPage(readerPageInput?.value || {{ current_page }});
+  syncProgressPercent(progressPercentRange?.value || {{ current_progress|int }});
+</script>
+{% endblock %}

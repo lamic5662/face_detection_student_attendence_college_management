@@ -12,6 +12,7 @@ from models.notice import Notice
 from models.exam import Exam, Mark
 from models.fee import FeeStructure, FeePayment
 from models.location import StudentLocation
+from models.library import LibraryBook, LibraryLoan, LibraryReservation
 from models.parent import TeacherStatus
 from models.content import TeacherContent, content_extension, is_allowed_content_upload
 from models.assignment import AssignmentSubmission
@@ -27,6 +28,7 @@ from werkzeug.utils import secure_filename
 from utils.content_storage import resolve_content_path
 from utils.assignment_storage import build_submission_relpath, resolve_submission_path
 from utils.dashboard import build_dashboard_preferences
+from utils.feature_access import user_has_feature
 from utils.time import utc_now_naive
 
 student_bp = Blueprint('student', __name__)
@@ -182,6 +184,44 @@ def dashboard():
         })
 
     location = StudentLocation.query.filter_by(college_id=student.college_id, student_id=student.id).first()
+    library_summary = None
+    if user_has_feature(current_user, 'library'):
+        active_library_loans = (
+            LibraryLoan.query
+            .filter(
+                LibraryLoan.college_id == student.college_id,
+                LibraryLoan.student_id == student.id,
+                LibraryLoan.status.in_(['active', 'overdue']),
+            )
+            .count()
+        )
+        pending_library_reservations = (
+            LibraryReservation.query
+            .filter(
+                LibraryReservation.college_id == student.college_id,
+                LibraryReservation.student_id == student.id,
+                LibraryReservation.status.in_(['pending', 'ready_for_pickup']),
+            )
+            .count()
+        )
+        semester_library_books = (
+            LibraryBook.query
+            .filter(
+                LibraryBook.college_id == student.college_id,
+                LibraryBook.is_active.is_(True),
+                db.or_(
+                    LibraryBook.department_id.is_(None),
+                    LibraryBook.department_id == student.department_id,
+                ),
+                LibraryBook.semester == student.semester,
+            )
+            .count()
+        )
+        library_summary = {
+            'active_loans': active_library_loans,
+            'pending_reservations': pending_library_reservations,
+            'available_titles': semester_library_books,
+        }
 
     return render_template('student/dashboard.html',
                            dashboard_prefs=dashboard_prefs,
@@ -195,6 +235,7 @@ def dashboard():
                            notices=notices,
                            slot_statuses=slot_statuses,
                            location=location,
+                           library_summary=library_summary,
                            today=today)
 
 

@@ -31,6 +31,10 @@ def teacher_required(f):
     return role_required('teacher')(f)
 
 
+def librarian_required(f):
+    return role_required('librarian')(f)
+
+
 def student_required(f):
     return role_required('student')(f)
 

@@ -1,10 +1,16 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, jsonify
 from flask_login import login_required, current_user
-from extensions import db
+from extensions import db, limiter
 from models.notice import Notice
 from models.notice_read import NoticeRead
+from models.user_notification import UserNotification
 from datetime import datetime, timedelta
 from utils.tenancy import current_college_id
+from utils.notification_center import (
+    dismiss_read_notifications,
+    mark_all_notifications_read,
+    notification_center_payload,
+)
 from utils.time import utc_now_naive
 
 notice_bp = Blueprint('notice', __name__)
@@ -58,33 +64,6 @@ def _read_notice_ids(notice_ids: list[int]) -> set[int]:
             NoticeRead.user_id == current_user.id,
             NoticeRead.notice_id.in_(notice_ids),
         ).all()
-    }
-
-
-def _notification_payload(limit: int = 6) -> dict:
-    scoped_query = _notification_scope_query()
-    notices = scoped_query.limit(limit).all()
-    notice_ids = [notice.id for notice in notices]
-    read_notice_ids = _read_notice_ids(notice_ids)
-    unread_count = scoped_query.filter(
-        ~Notice.read_receipts.any(NoticeRead.user_id == current_user.id)
-    ).count()
-    return {
-        'count': unread_count,
-        'items': [
-            {
-                'id': notice.id,
-                'title': notice.title,
-                'content': notice.content[:140],
-                'category': notice.category,
-                'target_role': notice.target_role,
-                'is_pinned': notice.is_pinned,
-                'created_label': notice.created_at.strftime('%d %b'),
-                'detail_url': url_for('notice.detail', nid=notice.id),
-                'is_read': notice.id in read_notice_ids,
-            }
-            for notice in notices
-        ],
     }
 
 
@@ -191,18 +170,33 @@ def detail(nid):
 
 @notice_bp.route('/notices/feed')
 @login_required
+@limiter.exempt
 def feed():
-    return jsonify(_notification_payload())
+    from utils.feature_access import user_has_feature
+
+    return jsonify(
+        notification_center_payload(
+            current_user,
+            include_public_notices=user_has_feature(current_user, 'notices'),
+        )
+    )
 
 
 @notice_bp.route('/notices/mark-all-read', methods=['POST'])
 @login_required
 def mark_all_read():
-    notice_ids = [notice.id for notice in _notification_scope_query().all()]
-    marked_count = _mark_notice_ids_read(notice_ids)
+    from utils.feature_access import user_has_feature
+
+    marked_count = mark_all_notifications_read(
+        current_user,
+        include_public_notices=user_has_feature(current_user, 'notices'),
+    )
 
     if request.accept_mimetypes.best == 'application/json' or request.is_json:
-        payload = _notification_payload()
+        payload = notification_center_payload(
+            current_user,
+            include_public_notices=user_has_feature(current_user, 'notices'),
+        )
         payload['marked_count'] = marked_count
         return jsonify(payload)
 
@@ -216,10 +210,18 @@ def mark_all_read():
 @notice_bp.route('/notices/delete-read', methods=['POST'])
 @login_required
 def delete_read():
-    deleted_count = _dismiss_read_notifications()
+    from utils.feature_access import user_has_feature
+
+    deleted_count = dismiss_read_notifications(
+        current_user,
+        include_public_notices=user_has_feature(current_user, 'notices'),
+    )
 
     if request.accept_mimetypes.best == 'application/json' or request.is_json:
-        payload = _notification_payload()
+        payload = notification_center_payload(
+            current_user,
+            include_public_notices=user_has_feature(current_user, 'notices'),
+        )
         payload['deleted_count'] = deleted_count
         return jsonify(payload)
 
@@ -228,6 +230,20 @@ def delete_read():
     else:
         flash('No read notifications to remove.', 'info')
     return redirect(url_for('notice.list_notices'))
+
+
+@notice_bp.route('/notifications/<int:notification_id>/open')
+@login_required
+def open_user_notification(notification_id: int):
+    notification = db.session.get(UserNotification, notification_id)
+    if notification is None or notification.user_id != current_user.id or notification.college_id != current_user.college_id:
+        abort(404)
+    notification.mark_read()
+    db.session.commit()
+    target = notification.action_url or url_for('notice.list_notices')
+    if not target.startswith('/'):
+        target = url_for('notice.list_notices')
+    return redirect(target)
 
 
 @notice_bp.route('/notices/create', methods=['GET', 'POST'])

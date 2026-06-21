@@ -5,7 +5,84 @@
 {% block content %}
 {% set visible_widgets = dashboard_prefs.visible_widget_keys if dashboard_prefs else [] %}
 {% set ordered_optional = dashboard_prefs.selected_optional_keys if dashboard_prefs else [] %}
+{% set show_dashboard_customize_trigger = false %}
 {% include "partials/dashboard_customize.html" %}
+
+<div class="card border-0 shadow-sm mb-4 admin-ops-hero">
+  <div class="card-body px-4 py-4 d-flex flex-wrap align-items-start justify-content-between gap-3">
+    <div class="flex-grow-1">
+      <span class="dashboard-hero-kicker mb-2">Teaching Workspace</span>
+      <h4 class="mb-2 fw-bold text-dark">Manage classes, live attendance, and daily teaching activity.</h4>
+      <div class="text-muted mb-3">Keep your status updated, start active sessions quickly, and stay on top of notices and exams from one place.</div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge bg-secondary-subtle text-secondary px-3 py-2">
+          <i class="bi bi-building-fill me-1"></i>{{ teacher.department.name }}
+        </span>
+        {% if teacher.department.resolved_university %}
+        <span class="badge bg-info-subtle text-info px-3 py-2">
+          <i class="bi bi-bank2 me-1"></i>{{ teacher.department.resolved_university.code }}
+        </span>
+        {% endif %}
+        <span class="badge bg-primary-subtle text-primary px-3 py-2">
+          <i class="bi bi-journal-bookmark-fill me-1"></i>{{ stats.total_subjects }} subjects
+        </span>
+        <span class="badge bg-success-subtle text-success px-3 py-2">
+          <i class="bi bi-camera-video-fill me-1"></i>{{ stats.total_sessions }} sessions
+        </span>
+        <span class="badge bg-warning-subtle text-warning px-3 py-2">
+          <i class="bi bi-calendar-check-fill me-1"></i>{{ stats.today_sessions }} today
+        </span>
+      </div>
+    </div>
+    {% if dashboard_prefs and dashboard_prefs.has_optional_items %}
+    <div class="dashboard-hero-actions d-flex flex-column flex-sm-row gap-2">
+      <button type="button" class="btn btn-outline-secondary admin-dashboard-customize-btn"
+              data-bs-toggle="modal" data-bs-target="#dashboardCustomizeModal">
+        <i class="bi bi-sliders2 me-2"></i>Customize Dashboard
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if library_summary %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 px-4 py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h6 class="fw-semibold mb-0">
+        <i class="bi bi-journal-richtext me-2 text-primary"></i>Library & E-Library
+      </h6>
+      <div class="text-muted small mt-1">Browse college titles, open e-books, and track your teacher loans and reservations.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('library.catalog') }}" class="btn btn-sm btn-outline-primary">Browse Library</a>
+      <a href="{{ url_for('library.my_loans') }}" class="btn btn-sm btn-primary">My Loans</a>
+    </div>
+  </div>
+  <div class="card-body px-4 py-3">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="rounded-4 bg-light p-3 h-100">
+          <div class="text-muted small">Relevant Titles</div>
+          <div class="fs-4 fw-bold">{{ library_summary.available_titles }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="rounded-4 bg-light p-3 h-100">
+          <div class="text-muted small">Active Loans</div>
+          <div class="fs-4 fw-bold">{{ library_summary.active_loans }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="rounded-4 bg-light p-3 h-100">
+          <div class="text-muted small">Pending Reservations</div>
+          <div class="fs-4 fw-bold text-warning-emphasis">{{ library_summary.pending_reservations }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% if 'teacher_status' in visible_widgets %}
 <!-- Teacher Status Widget -->

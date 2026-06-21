@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}<i class="bi bi-person-vcard me-2"></i>{{ title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center gap-3 mb-4 no-print">
+  <div>
+    <h2 class="h4 mb-1">{{ borrower.user.name if borrower_type == 'student' else borrower.user.name }}</h2>
+    <div class="text-muted">Printable library borrower card for the scan desk.</div>
+  </div>
+  <button onclick="window.print()" class="btn btn-primary">
+    <i class="bi bi-printer me-1"></i>Print Card
+  </button>
+</div>
+
+<div class="d-flex justify-content-center">
+  <div class="library-card shadow-sm">
+    <div class="library-card-header">
+      <div class="small text-uppercase opacity-75">Smart Attendance</div>
+      <div class="h5 mb-0">Library Borrower Card</div>
+    </div>
+    <div class="library-card-body">
+      <div class="library-card-main">
+        <div>
+          <div class="small text-muted text-uppercase mb-1">{{ borrower_type }}</div>
+          <div class="fs-4 fw-bold">{{ borrower.user.name }}</div>
+          <div class="text-muted mb-3">
+            {% if borrower_type == 'student' %}
+            {{ borrower.department.name }}{% if borrower.department and borrower.department.resolved_university %} · {{ borrower.department.resolved_university.code }}{% endif %} · Semester {{ borrower.semester }}
+            {% else %}
+            {{ borrower.department.name }}{% if borrower.designation %} · {{ borrower.designation }}{% endif %}
+            {% endif %}
+          </div>
+          <div class="mb-2">
+            <div class="small text-muted">Primary Scan Value</div>
+            <div class="fw-semibold fs-5"><code>{{ scan_value }}</code></div>
+          </div>
+          {% if borrower_type == 'student' %}
+          <div class="small text-muted">Roll Number: {{ borrower.roll_number }}</div>
+          {% else %}
+          <div class="small text-muted">Employee ID: {{ borrower.employee_id }}</div>
+          {% endif %}
+        </div>
+        <div class="text-center">
+          {% if qr_img %}
+          <img src="{{ qr_img }}" alt="Borrower QR" class="library-qr mb-2">
+          {% endif %}
+          <div class="small text-muted">Scan QR or type the code</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+.library-card {
+  width: min(100%, 720px);
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(13, 110, 253, 0.12);
+  background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
+}
+.library-card-header {
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, #0d6efd 0%, #083b8a 100%);
+  color: #fff;
+}
+.library-card-body {
+  padding: 1.5rem;
+}
+.library-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 1.5rem;
+  align-items: center;
+}
+.library-qr {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  border: 1px solid rgba(13, 110, 253, 0.16);
+  border-radius: 18px;
+  padding: 0.5rem;
+  background: #fff;
+}
+@media (max-width: 767px) {
+  .library-card-main {
+    grid-template-columns: 1fr;
+  }
+}
+@media print {
+  .no-print,
+  .navbar,
+  .sidebar,
+  .page-header,
+  footer {
+    display: none !important;
+  }
+  .main-content,
+  .content-wrapper,
+  .container,
+  .container-fluid {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .library-card {
+    box-shadow: none !important;
+    border-color: #cfd8e3;
+  }
+}
+</style>
+{% endblock %}

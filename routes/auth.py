@@ -19,11 +19,13 @@ _PASSWORD_RE = re.compile(
 def _dashboard_url(role: str) -> str:
     if role == 'sub_admin':
         return url_for('admin.dashboard')
+    if role == 'librarian':
+        return url_for('library.admin_dashboard')
     return url_for(f'{role}.dashboard')
 
 
 def _post_login_destination(user: User):
-    if user.must_change_password and user.role in {'student', 'teacher', 'parent'}:
+    if user.must_change_password and user.role in {'student', 'teacher', 'parent', 'librarian'}:
         return redirect(url_for('auth.password_setup_prompt'))
     next_page = request.args.get('next')
     if next_page and _is_safe_url(next_page):
@@ -68,11 +70,11 @@ def login():
         password = request.form.get('password', '')
         remember = request.form.get('remember') == 'on'
 
-        if not college_locked and not college_code:
+        if not college_locked:
             super_admin = _find_global_super_admin(email)
             if super_admin and super_admin.check_password(password):
                 login_user(super_admin, remember=remember)
-                store_login_college(super_admin.college)
+                store_login_college(None)
                 from utils.time import utc_now_naive
                 super_admin.last_login_at = utc_now_naive()
                 db.session.commit()
@@ -149,9 +151,9 @@ def forgot_password():
             )
 
         user = None
-        if not college_locked and not college_code:
+        if not college_locked:
             user = _find_global_super_admin(email)
-            if user is None:
+            if user is None and not college_code:
                 flash('Enter your college code to reset a college account password.', 'danger')
                 return render_template(
                     'auth/forgot_password.html',
@@ -159,7 +161,7 @@ def forgot_password():
                     college_locked=college_locked,
                     submitted_college_code=submitted_college_code,
                 )
-        else:
+        if user is None:
             target_college = login_college if college_locked else resolve_login_college(college_code)
             if target_college is None:
                 if college_locked:
@@ -226,7 +228,7 @@ def logout():
 def password_setup_prompt():
     if not current_user.must_change_password:
         return redirect(_dashboard_url(current_user.role))
-    if current_user.role not in {'student', 'teacher', 'parent', 'sub_admin'}:
+    if current_user.role not in {'student', 'teacher', 'parent', 'sub_admin', 'librarian'}:
         return redirect(_dashboard_url(current_user.role))
     if request.method == 'POST':
         new_pw = request.form.get('new_password', '')
@@ -265,7 +267,7 @@ def password_setup_prompt():
 @login_required
 @limiter.limit('5 per hour', methods=['POST'])
 def send_password_setup_email_to_current_user():
-    if not current_user.must_change_password or current_user.role not in {'student', 'teacher', 'parent', 'sub_admin'}:
+    if not current_user.must_change_password or current_user.role not in {'student', 'teacher', 'parent', 'sub_admin', 'librarian'}:
         return redirect(_dashboard_url(current_user.role))
 
     try:

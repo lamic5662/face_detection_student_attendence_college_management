@@ -5,35 +5,39 @@ from utils.time import utc_now_naive
 
 COLLEGE_PLANS = {
     'free': {
-        'label': 'Free',
+        'label': 'Free Trial',
         'color': 'secondary',
         'icon': 'bi-gift',
-        'description': 'Trial / evaluation access. No production features enabled by default.',
-        'includes': [],
+        'description': 'Full module access for a limited evaluation period.',
+        'price_label': 'Free for limited trial',
+        'includes': ['*'],
     },
     'starter': {
         'label': 'Starter',
         'color': 'primary',
         'icon': 'bi-rocket-takeoff',
         'description': 'Core essentials — Attendance, Notices, Academic Calendar, Timetable.',
+        'price_label': 'Rs. 2,999 / month',
         'includes': ['attendance', 'notices', 'calendar', 'timetable'],
     },
     'standard': {
         'label': 'Standard',
         'color': 'info',
         'icon': 'bi-award',
-        'description': 'Full academic suite — adds Exams, Learning Content, Classrooms, Leaves, ID Cards, Batch Tracker, Report Emails.',
+        'description': 'Full academic suite — adds Exams, Learning Content, Library, Classrooms, Leaves, ID Cards, Batch Tracker, and Report Emails.',
+        'price_label': 'Rs. 5,999 / month',
         'includes': ['attendance', 'notices', 'calendar', 'timetable', 'classrooms',
-                     'learning_content', 'exams', 'leaves', 'batch_tracker',
+                     'learning_content', 'library', 'exams', 'leaves', 'batch_tracker',
                      'report_emails', 'digital_id_cards'],
     },
     'professional': {
         'label': 'Professional',
         'color': 'success',
         'icon': 'bi-gem',
-        'description': 'Standard + Fees, Fee Reminders, Parent Portal, Analytics, AI Assistant.',
+        'description': 'Standard + Fees, Fee Reminders, Parent Portal, Analytics, and AI Assistant.',
+        'price_label': 'Rs. 8,999 / month',
         'includes': ['attendance', 'notices', 'calendar', 'timetable', 'classrooms',
-                     'learning_content', 'exams', 'leaves', 'batch_tracker',
+                     'learning_content', 'library', 'exams', 'leaves', 'batch_tracker',
                      'report_emails', 'digital_id_cards', 'fees', 'fee_reminders',
                      'parent_portal', 'analytics', 'ai_assistant'],
     },
@@ -42,15 +46,39 @@ COLLEGE_PLANS = {
         'color': 'warning',
         'icon': 'bi-stars',
         'description': 'All modules unlocked — includes Face Biometrics, Live Location, File Manager.',
+        'price_label': 'Custom pricing',
         'includes': [],  # all features
     },
 }
+
+
+def normalize_college_plan_key(plan_key: str | None) -> str:
+    normalized = (plan_key or 'free').strip().lower()
+    if normalized == 'pro':
+        return 'professional'
+    if normalized in COLLEGE_PLANS:
+        return normalized
+    return 'free'
+
+
+def resolved_college_plans() -> dict:
+    plans = {key: dict(meta) for key, meta in COLLEGE_PLANS.items()}
+    if not has_app_context():
+        return plans
+
+    from models.plan_pricing import PlanPricing
+
+    for row in PlanPricing.query.all():
+        if row.plan_key in plans:
+            plans[row.plan_key]['price_label'] = row.price_label
+    return plans
 
 
 class College(db.Model):
     __tablename__ = 'colleges'
 
     id = db.Column(db.Integer, primary_key=True)
+    university_id = db.Column(db.Integer, db.ForeignKey('universities.id'), nullable=True, index=True)
     name = db.Column(db.String(200), nullable=False)
     code = db.Column(db.String(50), unique=True, nullable=False)
     subdomain = db.Column(db.String(100), unique=True, nullable=True)
@@ -64,7 +92,8 @@ class College(db.Model):
 
     @property
     def plan_meta(self) -> dict:
-        return COLLEGE_PLANS.get(self.plan or 'free', COLLEGE_PLANS['free'])
+        plans = resolved_college_plans()
+        return plans.get(normalize_college_plan_key(self.plan), plans['free'])
 
     @property
     def plan_expired(self) -> bool:
@@ -78,6 +107,19 @@ class College(db.Model):
     students = db.relationship('Student', backref='college', lazy=True)
     teachers = db.relationship('Teacher', backref='college', lazy=True)
     subjects = db.relationship('Subject', backref='college', lazy=True)
+
+    @property
+    def affiliated_universities(self):
+        seen_ids = set()
+        universities = []
+        for department in self.departments:
+            university = department.university
+            if university and university.id not in seen_ids:
+                universities.append(university)
+                seen_ids.add(university.id)
+        if self.university and self.university.id not in seen_ids:
+            universities.append(self.university)
+        return universities
 
     @classmethod
     def default_code(cls) -> str:

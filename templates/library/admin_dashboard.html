@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+{% block title %}Library Management{% endblock %}
+{% block page_title %}<i class="bi bi-journal-richtext me-2"></i>Library Management{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="h4 mb-1">Library & E-Library</h2>
+  <div class="text-muted">
+    {% if can_operate %}
+    Manage titles, physical copies, circulation, and digital access from one workspace.
+    {% else %}
+    Review librarian activity, library growth, and circulation status without opening the operational tools.
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Titles</div><div class="fs-4 fw-bold">{{ stats.total_titles }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Physical Copies</div><div class="fs-4 fw-bold">{{ stats.physical_copies }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Available</div><div class="fs-4 fw-bold text-success">{{ stats.available_copies }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Active Loans</div><div class="fs-4 fw-bold">{{ stats.active_loans }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Overdue</div><div class="fs-4 fw-bold text-danger">{{ stats.overdue_loans }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Digital Titles</div><div class="fs-4 fw-bold">{{ stats.digital_titles }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Reservations</div><div class="fs-4 fw-bold text-warning-emphasis">{{ stats.pending_reservations }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Pending Fines</div><div class="fs-4 fw-bold text-danger">{{ stats.pending_fines }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Outstanding Fines</div><div class="fs-5 fw-bold text-danger">Rs. {{ '%.2f'|format(stats.outstanding_fine_total) }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Location Nodes</div><div class="fs-4 fw-bold">{{ stats.location_nodes }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Damaged</div><div class="fs-4 fw-bold text-warning-emphasis">{{ stats.damaged_copies }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Lost</div><div class="fs-4 fw-bold text-danger">{{ stats.lost_copies }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Written Off</div><div class="fs-4 fw-bold">{{ stats.written_off_copies }}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">{{ 'Issue Book' if can_operate else 'Circulation Rules & Regulations' }}</h3>
+        <div class="text-muted small">
+          {% if can_operate %}
+          Use an available physical copy and assign it to a student or teacher.
+          {% else %}
+          Admin controls the borrowing rules, due periods, renewals, and overdue fines used by the whole library workflow.
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        {% if can_operate %}
+        <div class="rounded-4 border bg-light-subtle p-3 mb-3">
+          <div class="fw-semibold mb-2">Current Borrowing Rules</div>
+          <div class="small text-muted mb-2">These values are controlled by admin and applied automatically during issue, renew, and return.</div>
+          <div class="row g-2 small">
+            <div class="col-md-6">
+              <div class="fw-semibold">Students</div>
+              <div>{{ borrower_rules.student.max_active_loans }} active book(s), {{ borrower_rules.student.due_days }} due day(s), {{ borrower_rules.student.max_renewals }} renewal(s), {{ borrower_rules.student.renew_days }} day renew, Rs. {{ '%.2f'|format(borrower_rules.student.fine_per_day) }}/day fine</div>
+            </div>
+            <div class="col-md-6">
+              <div class="fw-semibold">Teachers</div>
+              <div>{{ borrower_rules.teacher.max_active_loans }} active book(s), {{ borrower_rules.teacher.due_days }} due day(s), {{ borrower_rules.teacher.max_renewals }} renewal(s), {{ borrower_rules.teacher.renew_days }} day renew, Rs. {{ '%.2f'|format(borrower_rules.teacher.fine_per_day) }}/day fine</div>
+            </div>
+            {% if library_rule.grace_days or library_rule.regulations %}
+            <div class="col-12">
+              {% if library_rule.grace_days %}
+              <div>Grace period: {{ library_rule.grace_days }} day(s)</div>
+              {% endif %}
+              {% if library_rule.regulations %}
+              <div class="text-muted mt-1">{{ library_rule.regulations }}</div>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="rounded-4 border p-4">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <div class="fw-semibold mb-1">Operational circulation moved to its own desk</div>
+              <div class="text-muted small">Use the dedicated desk for QR issue, QR return, manual issue, renewals, reservation queue handling, and fine settlement.</div>
+            </div>
+            <a href="{{ circulation_url }}" class="btn btn-primary">
+              <i class="bi bi-upc-scan me-1"></i>Open Circulation Desk
+            </a>
+          </div>
+        </div>
+        {% else %}
+        <form method="post" action="{{ url_for('library.update_rules') }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-6">
+            <label class="form-label">Student Max Active Books</label>
+            <input type="number" class="form-control" name="student_max_active_loans" min="1" max="20" value="{{ library_rule.student_max_active_loans }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Teacher Max Active Books</label>
+            <input type="number" class="form-control" name="teacher_max_active_loans" min="1" max="30" value="{{ library_rule.teacher_max_active_loans }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Student Due Days</label>
+            <input type="number" class="form-control" name="student_due_days" min="1" max="90" value="{{ library_rule.student_due_days }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Teacher Due Days</label>
+            <input type="number" class="form-control" name="teacher_due_days" min="1" max="180" value="{{ library_rule.teacher_due_days }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Student Max Renewals</label>
+            <input type="number" class="form-control" name="student_max_renewals" min="0" max="10" value="{{ library_rule.student_max_renewals }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Teacher Max Renewals</label>
+            <input type="number" class="form-control" name="teacher_max_renewals" min="0" max="10" value="{{ library_rule.teacher_max_renewals }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Student Renew Days</label>
+            <input type="number" class="form-control" name="student_renew_days" min="1" max="60" value="{{ library_rule.student_renew_days }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Teacher Renew Days</label>
+            <input type="number" class="form-control" name="teacher_renew_days" min="1" max="90" value="{{ library_rule.teacher_renew_days }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Student Fine Per Day</label>
+            <input type="number" class="form-control" name="student_fine_per_day" min="0" step="0.01" value="{{ '%.2f'|format(library_rule.student_fine_per_day) }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Teacher Fine Per Day</label>
+            <input type="number" class="form-control" name="teacher_fine_per_day" min="0" step="0.01" value="{{ '%.2f'|format(library_rule.teacher_fine_per_day) }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Grace Days</label>
+            <input type="number" class="form-control" name="grace_days" min="0" max="30" value="{{ library_rule.grace_days }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Reservation Hold Days</label>
+            <input type="number" class="form-control" name="reservation_hold_days" min="1" max="14" value="{{ library_rule.reservation_hold_days }}" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Regulations</label>
+            <textarea class="form-control" name="regulations" rows="4" placeholder="Example: Books must be returned in good condition. Reissue is blocked until overdue fines are cleared.">{{ library_rule.regulations or '' }}</textarea>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-shield-check me-1"></i>Save Library Rules
+            </button>
+          </div>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+        <div>
+          <h3 class="h5 mb-1">{{ 'Active Circulation' if can_operate else 'Recent Circulation Activity' }}</h3>
+          <div class="text-muted small">
+            {% if can_operate %}
+            Return or renew books from the current active queue.
+            {% else %}
+            Admin can review recent issue and return activity without handling the circulation desk.
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if can_operate %}
+          <div class="rounded-4 border p-4 h-100 d-flex flex-column justify-content-between">
+            <div>
+              <div class="fw-semibold mb-1">Daily circulation work now lives in the desk</div>
+              <div class="text-muted small">Open the desk to renew loans, process returns, issue books, scan QR codes, review reservations, and settle fines.</div>
+            </div>
+            <div class="mt-3">
+              <a href="{{ circulation_url }}" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-right-circle me-1"></i>Go To Circulation Desk
+              </a>
+            </div>
+          </div>
+        {% else %}
+          {% if recent_loans %}
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Book</th>
+                  <th>Borrower</th>
+                  <th>Handled By</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for loan in recent_loans %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ loan.book.title }}</div>
+                    <div class="text-muted small">{{ loan.copy.accession_number }}</div>
+                  </td>
+                  <td>
+                    <div>{{ loan.borrower_label }}</div>
+                    <div class="text-muted small text-uppercase">{{ loan.borrower_role }}</div>
+                  </td>
+                  <td>
+                    <div>{{ loan.issued_by.name if loan.issued_by else 'System' }}</div>
+                    <div class="text-muted small">
+                      {% if loan.returned_to %}
+                      returned to {{ loan.returned_to.name }}
+                      {% else %}
+                      issued {{ loan.issued_at.strftime('%d %b %Y') }}
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge {% if loan.status == 'overdue' %}bg-danger{% elif loan.status == 'returned' %}bg-success{% else %}bg-primary{% endif %}">
+                      {{ loan.status|title }}
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center text-muted py-5">
+            <i class="bi bi-journal-check fs-1 d-block mb-3 opacity-25"></i>
+            No circulation activity yet.
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">{{ 'Pending Reservations' if can_operate else 'Reservation Queue Overview' }}</h3>
+        <div class="text-muted small">
+          {% if can_operate %}
+          Borrower requests waiting for an available physical copy.
+          {% else %}
+          Admin can review the live reservation workload without managing the queue directly.
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        {% if pending_reservations %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Book</th>
+                <th>Borrower</th>
+                <th>Requested</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for reservation in pending_reservations %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ reservation.book.title }}</div>
+                  <div class="text-muted small">{{ reservation.book.author }}</div>
+                </td>
+                <td>
+                  <div>{{ reservation.borrower_label }}</div>
+                  <div class="text-muted small text-uppercase">{{ reservation.borrower_role }}</div>
+                </td>
+                <td>{{ reservation.created_at.strftime('%d %b %Y') }}</td>
+                <td>
+                  <span class="badge {% if reservation.status == 'ready_for_pickup' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    {{ reservation.status|replace('_', ' ')|title }}
+                  </span>
+                  {% if reservation.pickup_expires_at %}
+                  <div class="small text-success mt-2">Hold until {{ reservation.pickup_expires_at.strftime('%d %b %Y') }}</div>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-clock-history fs-1 d-block mb-3 opacity-25"></i>
+          No pending reservations right now.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">{{ 'Fine Ledger' if can_operate else 'Outstanding Fine Overview' }}</h3>
+        <div class="text-muted small">
+          {% if can_operate %}
+          Track overdue fines, accept partial payments, and waive balances when needed.
+          {% else %}
+          Admin can monitor unpaid and partially settled fines without handling collection directly.
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        {% if pending_fines %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Borrower</th>
+                <th>Book</th>
+                <th>Assessed</th>
+                <th>Paid</th>
+                <th>Waived</th>
+                <th>Outstanding</th>
+                <th>Status</th>
+                {% if can_operate %}
+                <th class="text-end">Settle</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for fine in pending_fines %}
+              <tr>
+                <td>
+                  <div>{{ fine.borrower_label }}</div>
+                  <div class="text-muted small text-uppercase">{{ fine.borrower_role }}</div>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ fine.book.title }}</div>
+                  <div class="text-muted small">{{ fine.loan.copy.accession_number if fine.loan and fine.loan.copy else fine.reason|title }}</div>
+                </td>
+                <td>Rs. {{ '%.2f'|format(fine.amount_assessed) }}</td>
+                <td>Rs. {{ '%.2f'|format(fine.amount_paid) }}</td>
+                <td>Rs. {{ '%.2f'|format(fine.amount_waived) }}</td>
+                <td class="fw-semibold text-danger">Rs. {{ '%.2f'|format(fine.outstanding_amount) }}</td>
+                <td>
+                  <span class="badge {% if fine.status == 'partial' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                    {{ fine.status|title }}
+                  </span>
+                </td>
+                {% if can_operate %}
+                <td class="text-end" style="min-width: 320px;">
+                  <form method="post" action="{{ url_for('library.settle_fine', fine_id=fine.id) }}" class="row g-2 justify-content-end">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="col-sm-4">
+                      <input type="number" class="form-control form-control-sm" name="payment_amount" min="0" step="0.01" placeholder="Pay">
+                    </div>
+                    <div class="col-sm-4">
+                      <input type="number" class="form-control form-control-sm" name="waive_amount" min="0" step="0.01" placeholder="Waive">
+                    </div>
+                    <div class="col-sm-4">
+                      <button type="submit" class="btn btn-sm btn-outline-primary w-100">Update</button>
+                    </div>
+                    <div class="col-12">
+                      <input type="text" class="form-control form-control-sm" name="notes" maxlength="255" placeholder="Optional settlement note">
+                    </div>
+                  </form>
+                </td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-cash-coin fs-1 d-block mb-3 opacity-25"></i>
+          No outstanding fine records right now.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+<div class="row g-4 mt-0">
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+          <div>
+            <h3 class="h5 mb-1">{{ 'Book Inventory' if can_operate else 'Recent Catalog Activity' }}</h3>
+            <div class="text-muted small">
+              {% if can_operate %}
+              Titles across physical shelves and e-library storage.
+              {% else %}
+              See what the librarian has recently added and updated in the library catalog.
+              {% endif %}
+            </div>
+          </div>
+          <form method="get"
+                class="d-flex gap-2"
+                data-live-search-form
+                data-live-search-target="#libraryInventorySearchResults"
+                data-live-search-items="[data-live-search-item]"
+                data-live-search-empty="#libraryInventorySearchEmpty">
+            <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search title, author, ISBN" data-live-search-input>
+            <button type="submit" class="btn btn-outline-secondary">Search</button>
+          </form>
+        </div>
+      </div>
+      <div class="card-body">
+        {% if books %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Copies</th>
+                <th>Category</th>
+                <th>Location</th>
+                <th class="text-end">{{ 'Manage' if can_operate else 'View' }}</th>
+              </tr>
+            </thead>
+            <tbody id="libraryInventorySearchResults">
+              {% for book in books %}
+              <tr data-live-search-item>
+                <td>
+                  <div class="fw-semibold">{{ book.title }}</div>
+                  <div class="text-muted small">{{ book.author }}</div>
+                </td>
+                <td><span class="badge bg-secondary-subtle text-secondary">{{ book.book_type|title }}</span></td>
+                <td>{{ book.available_copies }} / {{ book.total_copies }}</td>
+                <td>{{ book.category.name if book.category else 'Uncategorized' }}</td>
+                <td>{{ book.location_label }}</td>
+                <td class="text-end">
+                  <div class="d-flex gap-2 justify-content-end">
+                    <a href="{{ url_for('library.book_detail', book_id=book.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+                    {% if can_operate %}
+                    <a href="{{ url_for('library.edit_book', book_id=book.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <form
+                      method="post"
+                      action="{{ url_for('library.delete_book', book_id=book.id) }}"
+                      data-confirm="Delete this book and its copies?"
+                      data-confirm-title="Delete book?"
+                      data-confirm-type="danger"
+                      data-confirm-ok="Delete"
+                    >
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next_view" value="library.admin_dashboard">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="text-center text-muted py-4 d-none" id="libraryInventorySearchEmpty">
+          No books matched this search.
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-journal-richtext fs-1 d-block mb-3 opacity-25"></i>
+          No books have been added yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">{{ 'Hierarchy Snapshot' if can_operate else 'Recent Structure Changes' }}</h3>
+        <div class="text-muted small">
+          {% if can_operate %}
+          Quick view of the current storage structure.
+          {% else %}
+          Track the most recent rack and location updates made inside the library structure.
+          {% endif %}
+        </div>
+      </div>
+      <div class="card-body">
+        {% if can_operate and location_roots %}
+        <div class="list-group list-group-flush">
+          {% for location in location_roots[:8] %}
+          <div class="list-group-item px-0">
+            <div class="fw-semibold">{{ location.full_label }}</div>
+            <div class="small text-muted">
+              {{ location.type_label }} · {{ location.academic_scope_label }} · {{ location.child_count }} child node(s) · {{ location.copies|length }} copy/copies
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% elif can_operate %}
+        <div class="text-center text-muted py-4">No hierarchy nodes yet.</div>
+        {% elif recent_location_updates %}
+        <div class="list-group list-group-flush">
+          {% for location in recent_location_updates %}
+          <div class="list-group-item px-0">
+            <div class="fw-semibold">{{ location.full_label }}</div>
+            <div class="small text-muted">
+              {{ location.type_label }} · {{ location.updated_at.strftime('%d %b %Y %H:%M') }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">No structure updates yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-4">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Recent E-Book Access</h3>
+        <div class="text-muted small">Latest digital download activity.</div>
+      </div>
+      <div class="card-body">
+        {% if recent_access_logs %}
+        <div class="list-group list-group-flush">
+          {% for log in recent_access_logs %}
+          <div class="list-group-item px-0">
+            <div class="fw-semibold">{{ log.book.title }}</div>
+            <div class="small text-muted">
+              {{ log.student.user.name if log.student else log.teacher.user.name if log.teacher else 'Admin' }}
+              · {{ log.action|title }} · {{ log.accessed_at.strftime('%d %b %Y %H:%M') }}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">No digital access records yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% include "library/_live_search_script.html" %}
+<script>
+</script>
+{% endblock %}

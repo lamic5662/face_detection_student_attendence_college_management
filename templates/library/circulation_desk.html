@@ -1,0 +1,828 @@
+{% extends "base.html" %}
+{% block title %}Circulation Desk{% endblock %}
+{% block page_title %}<i class="bi bi-upc-scan me-2"></i>Circulation Desk{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="h4 mb-1">Circulation Desk</h2>
+  <div class="text-muted">Issue, return, renew, reserve-aware queue handling, and fine collection from one librarian workspace.</div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-5">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Issue & Return</h3>
+        <div class="text-muted small">Use scan-first circulation for speed, or fall back to manual issue when needed.</div>
+      </div>
+      <div class="card-body">
+        <div class="rounded-4 border bg-light-subtle p-3 mb-3">
+          <div class="fw-semibold mb-2">Current Borrowing Rules</div>
+          <div class="small text-muted mb-2">Admin policies are enforced automatically during issue, renew, and return.</div>
+          <div class="row g-2 small">
+            <div class="col-md-6">
+              <div class="fw-semibold">Students</div>
+              <div>{{ borrower_rules.student.max_active_loans }} active book(s), {{ borrower_rules.student.due_days }} due day(s), {{ borrower_rules.student.max_renewals }} renewal(s), {{ borrower_rules.student.renew_days }} day renew, Rs. {{ '%.2f'|format(borrower_rules.student.fine_per_day) }}/day fine</div>
+            </div>
+            <div class="col-md-6">
+              <div class="fw-semibold">Teachers</div>
+              <div>{{ borrower_rules.teacher.max_active_loans }} active book(s), {{ borrower_rules.teacher.due_days }} due day(s), {{ borrower_rules.teacher.max_renewals }} renewal(s), {{ borrower_rules.teacher.renew_days }} day renew, Rs. {{ '%.2f'|format(borrower_rules.teacher.fine_per_day) }}/day fine</div>
+            </div>
+            {% if library_rule.grace_days or library_rule.regulations %}
+            <div class="col-12">
+              {% if library_rule.grace_days %}
+              <div>Grace period: {{ library_rule.grace_days }} day(s)</div>
+              {% endif %}
+              {% if library_rule.regulations %}
+              <div class="text-muted mt-1">{{ library_rule.regulations }}</div>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="rounded-4 border p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+            <div>
+              <div class="fw-semibold">Quick Scan Desk</div>
+              <div class="small text-muted">Issue by scanning a student card number or roll number, or a teacher employee ID, then scan the physical copy barcode.</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <a href="{{ url_for('library.borrower_cards') }}" class="btn btn-sm btn-outline-secondary">Borrower Cards</a>
+              <span class="badge bg-primary-subtle text-primary">Fast Issue</span>
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('library.scan_issue_book') }}" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next_view" value="library.circulation_desk">
+            <div class="col-md-6">
+              <label class="form-label">Borrower Scan</label>
+              <div class="input-group">
+                <input type="text" class="form-control" id="scanIssueBorrowerInput" name="borrower_scan" placeholder="Student card QR, card number, roll number, or teacher employee ID" required>
+                <button type="button" class="btn btn-outline-secondary qr-scan-trigger" data-scan-target="scanIssueBorrowerInput">
+                  <i class="bi bi-qr-code-scan"></i>
+                </button>
+              </div>
+              <div class="form-text">Approved student ID card numbers and full QR payloads are supported automatically.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Copy Scan</label>
+              <div class="input-group">
+                <input type="text" class="form-control" id="scanIssueCopyInput" name="copy_scan" placeholder="Copy QR, barcode, or accession number" required>
+                <button type="button" class="btn btn-outline-secondary qr-scan-trigger" data-scan-target="scanIssueCopyInput">
+                  <i class="bi bi-qr-code-scan"></i>
+                </button>
+              </div>
+              <div class="form-text">Physical copies can be scanned by QR, barcode, or typed by accession number.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Due In (days)</label>
+              <input type="number" class="form-control" name="due_days" min="1" max="{{ borrower_rules.student.due_days }}" placeholder="Auto from borrower policy">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Notes</label>
+              <input type="text" class="form-control" name="notes" maxlength="255" placeholder="Optional circulation note">
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="bi bi-upc-scan me-1"></i>Scan Issue Book
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="rounded-4 border p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+            <div>
+              <div class="fw-semibold">Quick Return Desk</div>
+              <div class="small text-muted">Return an active physical loan by scanning the copy barcode. Suggested overdue fines still apply automatically.</div>
+            </div>
+            <span class="badge bg-success-subtle text-success">Fast Return</span>
+          </div>
+          <form method="post" action="{{ url_for('library.scan_return_book') }}" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next_view" value="library.circulation_desk">
+            <div class="col-md-8">
+              <label class="form-label">Copy Scan</label>
+              <div class="input-group">
+                <input type="text" class="form-control" id="scanReturnCopyInput" name="copy_scan" placeholder="Copy QR, barcode, or accession number" required>
+                <button type="button" class="btn btn-outline-secondary qr-scan-trigger" data-scan-target="scanReturnCopyInput">
+                  <i class="bi bi-qr-code-scan"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Fine Amount</label>
+              <input type="number" class="form-control" name="fine_amount" min="0" step="0.01" placeholder="Auto if blank">
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-outline-success w-100">
+                <i class="bi bi-arrow-return-left me-1"></i>Scan Return Book
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="rounded-4 border p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+            <div>
+              <div class="fw-semibold">Inventory Workflow</div>
+              <div class="small text-muted">Mark physical copies as damaged, maintenance, lost, repaired, written off, or replacement received.</div>
+            </div>
+            <span class="badge bg-warning-subtle text-warning-emphasis">Stock Control</span>
+          </div>
+          <form method="post" action="{{ url_for('library.update_copy_workflow_from_scan') }}" class="row g-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next_view" value="library.circulation_desk">
+            <div class="col-md-6">
+              <label class="form-label">Copy Scan</label>
+              <div class="input-group">
+                <input type="text" class="form-control" id="workflowCopyScanInput" name="copy_scan" placeholder="Scan copy QR, barcode, or accession">
+                <button type="button" class="btn btn-outline-secondary qr-scan-trigger" data-scan-target="workflowCopyScanInput">
+                  <i class="bi bi-qr-code-scan"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Or Select Copy</label>
+              <select class="form-select" name="copy_id" id="workflowCopySelect">
+                <option value="">Choose copy manually</option>
+                {% for copy in inventory_copies %}
+                <option value="{{ copy.id }}" data-actions="{% for action_value, action_label in copy_action_options.get(copy.id, []) %}{{ action_value }}::{{ action_label }}{% if not loop.last %}||{% endif %}{% endfor %}">
+                  {{ copy.book.title }} · {{ copy.accession_number }} · {{ copy.status|replace('_', ' ')|title }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Workflow Action</label>
+              <select class="form-select" name="workflow_action" id="workflowActionSelect" required>
+                <option value="">Select an action</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Restored / Replacement Condition</label>
+              <select class="form-select d-none" name="restored_condition" id="workflowConditionSelect">
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="new">New</option>
+              </select>
+              <div class="form-text" id="workflowConditionHint">Required only for repaired or replacement actions.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Note</label>
+              <input type="text" class="form-control" name="workflow_note" maxlength="255" placeholder="Optional note for damage, loss, repair, or replacement">
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-outline-dark w-100">
+                <i class="bi bi-tools me-1"></i>Apply Inventory Workflow
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="fw-semibold mb-2">Manual Issue</div>
+        <form method="post" action="{{ url_for('library.issue_book') }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="next_view" value="library.circulation_desk">
+          <div class="col-md-4">
+            <label class="form-label">Department</label>
+            <select class="form-select issue-department-select">
+              <option value="">All departments</option>
+              {% for department in departments %}
+              <option value="{{ department.id }}">{{ department.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Semester</label>
+            <select class="form-select issue-semester-select">
+              <option value="">All semesters</option>
+              {% for value in range(1, 9) %}
+              <option value="{{ value }}">Semester {{ value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Subject</label>
+            <select class="form-select issue-subject-select" id="issueSubjectSelect">
+              <option value="">All subjects</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" data-department-id="{{ subject.department_id or '' }}" data-semester="{{ subject.semester or '' }}">{{ subject.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Borrower Type</label>
+            <select class="form-select issue-borrower-type-select">
+              <option value="student" selected>Student</option>
+              <option value="teacher">Teacher</option>
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label">Borrower Name</label>
+            <select class="form-select issue-borrower-select" name="borrower_ref" required>
+              <option value="">Select borrower</option>
+              {% for student in borrower_options.students %}
+              <option value="student:{{ student.id }}" data-borrower-type="student" data-department-id="{{ student.department_id or '' }}" data-semester="{{ student.semester or '' }}">Student · {{ student.roll_number }} · {{ student.user.name }}</option>
+              {% endfor %}
+              {% for teacher in borrower_options.teachers %}
+              <option value="teacher:{{ teacher.id }}" data-borrower-type="teacher" data-department-id="{{ teacher.department_id or '' }}" data-subject-ids="{% for subject in teacher.subjects %}{{ subject.id }}{% if not loop.last %},{% endif %}{% endfor %}">Teacher · {{ teacher.employee_id }} · {{ teacher.user.name }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text" id="borrowerFilterNote">Students are filtered by department and semester. Teachers are filtered by department and, when selected, by subject.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Available Copy</label>
+            <select class="form-select issue-copy-select" name="copy_id" required>
+              <option value="">Select a copy</option>
+              {% for copy in available_copies %}
+              <option value="{{ copy.id }}" data-department-id="{{ copy.book.department_id or '' }}" data-semester="{{ copy.book.semester or '' }}" data-subject-id="{{ copy.book.subject_id or '' }}">{{ copy.book.title }} · {{ copy.accession_number }} · {{ copy.location_label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text" id="copyFilterNote">Select department, semester, and subject to narrow the physical copies. E-books are read directly in the system and are not issued.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Due In (days)</label>
+            <input type="number" class="form-control" name="due_days" min="1" max="{{ borrower_rules.student.due_days }}" value="{{ borrower_rules.student.due_days }}" data-student-due="{{ borrower_rules.student.due_days }}" data-teacher-due="{{ borrower_rules.teacher.due_days }}" required>
+            <div class="form-text" id="issueRuleNote">Student default: {{ borrower_rules.student.due_days }} day(s). Teacher default: {{ borrower_rules.teacher.due_days }} day(s).</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Notes</label>
+            <input type="text" class="form-control" name="notes" maxlength="255" placeholder="Optional circulation note">
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-outline-primary w-100">
+              <i class="bi bi-journal-plus me-1"></i>Issue Book Manually
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Active Circulation</h3>
+        <div class="text-muted small">Return or renew books from the current active queue.</div>
+      </div>
+      <div class="card-body">
+        {% if active_loans %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Book</th>
+                <th>Borrower</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for loan in active_loans %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ loan.book.title }}</div>
+                  <div class="text-muted small">{{ loan.copy.accession_number }}</div>
+                </td>
+                <td>
+                  <div>{{ loan.borrower_label }}</div>
+                  <div class="text-muted small text-uppercase">{{ loan.borrower_role }}</div>
+                </td>
+                <td>{{ loan.due_at.strftime('%d %b %Y') }}</td>
+                <td>
+                  <span class="badge {% if loan.status == 'overdue' %}bg-danger{% else %}bg-primary{% endif %}">{{ loan.status|title }}</span>
+                  {% if loan.outstanding_fine_amount %}
+                  <div class="small text-danger mt-2">Outstanding fine: Rs. {{ '%.2f'|format(loan.outstanding_fine_amount) }}</div>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="d-flex flex-column flex-lg-row gap-2 justify-content-end">
+                    <form method="post" action="{{ url_for('library.renew_loan', loan_id=loan.id) }}" class="d-flex gap-2 justify-content-end">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next_view" value="library.circulation_desk">
+                      <div class="small text-muted align-self-center" style="min-width:130px">{{ borrower_rules[loan.borrower_role].renew_days }} day renew · {{ loan.renewed_count }}/{{ borrower_rules[loan.borrower_role].max_renewals }} used</div>
+                      <button type="submit" class="btn btn-sm btn-outline-primary">Renew</button>
+                    </form>
+                    <form method="post" action="{{ url_for('library.return_loan', loan_id=loan.id) }}" class="d-flex gap-2 justify-content-end">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <input type="hidden" name="next_view" value="library.circulation_desk">
+                      <input type="number" class="form-control form-control-sm" name="fine_amount" min="0" step="0.01" value="{{ '%.2f'|format(suggested_fines[loan.id]) }}" style="width:92px">
+                      <button type="submit" class="btn btn-sm btn-success">Return</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-journal-check fs-1 d-block mb-3 opacity-25"></i>
+          No active loans right now.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Pending Reservations</h3>
+        <div class="text-muted small">Borrower requests waiting for an available physical copy.</div>
+      </div>
+      <div class="card-body">
+        {% if pending_reservations %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Book</th>
+                <th>Borrower</th>
+                <th>Requested</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for reservation in pending_reservations %}
+              <tr>
+                <td>
+                  <div class="fw-semibold">{{ reservation.book.title }}</div>
+                  <div class="text-muted small">{{ reservation.book.author }}</div>
+                </td>
+                <td>
+                  <div>{{ reservation.borrower_label }}</div>
+                  <div class="text-muted small text-uppercase">{{ reservation.borrower_role }}</div>
+                </td>
+                <td>{{ reservation.created_at.strftime('%d %b %Y') }}</td>
+                <td>
+                  <span class="badge {% if reservation.status == 'ready_for_pickup' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                    {{ reservation.status|replace('_', ' ')|title }}
+                  </span>
+                  {% if reservation.pickup_expires_at %}
+                  <div class="small text-success mt-2">Hold until {{ reservation.pickup_expires_at.strftime('%d %b %Y') }}</div>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-clock-history fs-1 d-block mb-3 opacity-25"></i>
+          No pending reservations right now.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Fine Ledger & Inventory History</h3>
+        <div class="text-muted small">Track overdue fines, accept partial payments, and review recent copy incidents.</div>
+      </div>
+      <div class="card-body">
+        {% if pending_fines %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Borrower</th>
+                <th>Book</th>
+                <th>Outstanding</th>
+                <th class="text-end">Settle</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for fine in pending_fines %}
+              <tr>
+                <td>
+                  <div>{{ fine.borrower_label }}</div>
+                  <div class="text-muted small text-uppercase">{{ fine.borrower_role }}</div>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ fine.book.title }}</div>
+                  <div class="text-muted small">{{ fine.loan.copy.accession_number if fine.loan and fine.loan.copy else fine.reason|title }}</div>
+                </td>
+                <td class="fw-semibold text-danger">Rs. {{ '%.2f'|format(fine.outstanding_amount) }}</td>
+                <td class="text-end" style="min-width: 300px;">
+                  <form method="post" action="{{ url_for('library.settle_fine', fine_id=fine.id) }}" class="row g-2 justify-content-end">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="next_view" value="library.circulation_desk">
+                    <div class="col-sm-4">
+                      <input type="number" class="form-control form-control-sm" name="payment_amount" min="0" step="0.01" placeholder="Pay">
+                    </div>
+                    <div class="col-sm-4">
+                      <input type="number" class="form-control form-control-sm" name="waive_amount" min="0" step="0.01" placeholder="Waive">
+                    </div>
+                    <div class="col-sm-4">
+                      <button type="submit" class="btn btn-sm btn-outline-primary w-100">Update</button>
+                    </div>
+                    <div class="col-12">
+                      <input type="text" class="form-control form-control-sm" name="notes" maxlength="255" placeholder="Optional settlement note">
+                    </div>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-cash-coin fs-1 d-block mb-3 opacity-25"></i>
+          No outstanding fine records right now.
+        </div>
+        {% endif %}
+
+        <hr class="my-4">
+
+        <h4 class="h6 mb-3">Recent Inventory Events</h4>
+        {% if recent_inventory_events %}
+        <div class="list-group list-group-flush">
+          {% for event in recent_inventory_events %}
+          <div class="list-group-item px-0">
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <div class="fw-semibold">{{ event.copy.accession_number }} · {{ event.action_label }}</div>
+                <div class="small text-muted">{{ event.copy.book.title }}</div>
+                <div class="small text-muted">
+                  {{ event.previous_status or 'new' }}{% if event.new_status %} -> {{ event.new_status }}{% endif %}
+                  {% if event.previous_condition or event.new_condition %}
+                  · {{ event.previous_condition or 'n/a' }}{% if event.new_condition %} -> {{ event.new_condition }}{% endif %}
+                  {% endif %}
+                </div>
+                {% if event.notes %}
+                <div class="small text-muted mt-1">{{ event.notes }}</div>
+                {% endif %}
+              </div>
+              <div class="small text-muted text-end">
+                {{ event.created_by.name if event.created_by else 'System' }}<br>
+                {{ event.created_at.strftime('%d %b %Y %H:%M') }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted">No inventory workflow events recorded yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="qrScannerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <div>
+          <h5 class="modal-title mb-1">QR Scanner</h5>
+          <div class="text-muted small">Point the camera at a borrower card or copy label. The scan result will fill the selected field automatically.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-0">
+        <div id="qrScannerViewport" class="rounded border overflow-hidden bg-dark-subtle" style="min-height: 320px;"></div>
+        <div class="d-flex justify-content-between align-items-center gap-3 mt-3">
+          <div class="small text-muted" id="qrScannerStatus">Camera scanner is idle.</div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="qrScannerStopButton">Stop Scanner</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  function filterIssueSubjects() {
+    const departmentSelect = document.querySelector('.issue-department-select');
+    const semesterSelect = document.querySelector('.issue-semester-select');
+    const subjectSelect = document.querySelector('.issue-subject-select');
+    if (!departmentSelect || !semesterSelect || !subjectSelect) return;
+
+    const selectedDepartment = departmentSelect.value || '';
+    const selectedSemester = semesterSelect.value || '';
+    const selectedSubject = subjectSelect.dataset.selected || subjectSelect.value || '';
+
+    if (!subjectSelect._originalOptions) {
+      subjectSelect._originalOptions = Array.from(subjectSelect.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        departmentId: option.dataset.departmentId || '',
+        semester: option.dataset.semester || '',
+      }));
+    }
+
+    subjectSelect.innerHTML = '';
+    subjectSelect._originalOptions.forEach((optionData) => {
+      if (optionData.value && selectedDepartment && optionData.departmentId !== selectedDepartment) return;
+      if (optionData.value && selectedSemester && optionData.semester !== selectedSemester) return;
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      option.dataset.departmentId = optionData.departmentId;
+      option.dataset.semester = optionData.semester;
+      if (optionData.value === selectedSubject) option.selected = true;
+      subjectSelect.appendChild(option);
+    });
+
+    if (!Array.from(subjectSelect.options).some((option) => option.value === selectedSubject)) {
+      subjectSelect.dataset.selected = '';
+      subjectSelect.value = '';
+    }
+  }
+
+  function filterIssueBorrowersAndCopies() {
+    const departmentSelect = document.querySelector('.issue-department-select');
+    const semesterSelect = document.querySelector('.issue-semester-select');
+    const subjectSelect = document.querySelector('.issue-subject-select');
+    const borrowerTypeSelect = document.querySelector('.issue-borrower-type-select');
+    const borrowerSelect = document.querySelector('.issue-borrower-select');
+    const copySelect = document.querySelector('.issue-copy-select');
+    const borrowerFilterNote = document.getElementById('borrowerFilterNote');
+    const copyFilterNote = document.getElementById('copyFilterNote');
+    if (!departmentSelect || !semesterSelect || !subjectSelect || !borrowerTypeSelect || !borrowerSelect || !copySelect) return;
+
+    const selectedDepartment = departmentSelect.value || '';
+    const selectedSemester = semesterSelect.value || '';
+    const selectedSubject = subjectSelect.value || '';
+    const selectedBorrowerType = borrowerTypeSelect.value || 'student';
+    const currentBorrower = borrowerSelect.dataset.selected || borrowerSelect.value || '';
+    const currentCopy = copySelect.dataset.selected || copySelect.value || '';
+
+    if (!borrowerSelect._originalOptions) {
+      borrowerSelect._originalOptions = Array.from(borrowerSelect.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        borrowerType: option.dataset.borrowerType || '',
+        departmentId: option.dataset.departmentId || '',
+        semester: option.dataset.semester || '',
+        subjectIds: option.dataset.subjectIds || '',
+      }));
+    }
+    if (!copySelect._originalOptions) {
+      copySelect._originalOptions = Array.from(copySelect.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        departmentId: option.dataset.departmentId || '',
+        semester: option.dataset.semester || '',
+        subjectId: option.dataset.subjectId || '',
+      }));
+    }
+
+    borrowerSelect.innerHTML = '';
+    borrowerSelect._originalOptions.forEach((optionData) => {
+      if (!optionData.value) {
+        const placeholder = document.createElement('option');
+        placeholder.value = optionData.value;
+        placeholder.textContent = optionData.text;
+        borrowerSelect.appendChild(placeholder);
+        return;
+      }
+      if (optionData.borrowerType !== selectedBorrowerType) return;
+      if (selectedDepartment && optionData.departmentId && optionData.departmentId !== selectedDepartment) return;
+      if (selectedBorrowerType === 'student' && selectedSemester && optionData.semester !== selectedSemester) return;
+      if (selectedBorrowerType === 'teacher' && selectedSubject) {
+        const subjectIds = optionData.subjectIds ? optionData.subjectIds.split(',') : [];
+        if (!subjectIds.includes(selectedSubject)) return;
+      }
+
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      option.dataset.borrowerType = optionData.borrowerType;
+      option.dataset.departmentId = optionData.departmentId;
+      option.dataset.semester = optionData.semester;
+      option.dataset.subjectIds = optionData.subjectIds;
+      if (optionData.value === currentBorrower) option.selected = true;
+      borrowerSelect.appendChild(option);
+    });
+
+    copySelect.innerHTML = '';
+    copySelect._originalOptions.forEach((optionData) => {
+      if (!optionData.value) {
+        const placeholder = document.createElement('option');
+        placeholder.value = optionData.value;
+        placeholder.textContent = optionData.text;
+        copySelect.appendChild(placeholder);
+        return;
+      }
+      if (selectedDepartment && optionData.departmentId && optionData.departmentId !== selectedDepartment) return;
+      if (selectedSemester && optionData.semester && optionData.semester !== selectedSemester) return;
+      if (selectedSubject && optionData.subjectId && optionData.subjectId !== selectedSubject) return;
+
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      option.dataset.departmentId = optionData.departmentId;
+      option.dataset.semester = optionData.semester;
+      option.dataset.subjectId = optionData.subjectId;
+      if (optionData.value === currentCopy) option.selected = true;
+      copySelect.appendChild(option);
+    });
+
+    if (!Array.from(borrowerSelect.options).some((option) => option.value === currentBorrower)) {
+      borrowerSelect.dataset.selected = '';
+      borrowerSelect.value = '';
+    }
+    if (!Array.from(copySelect.options).some((option) => option.value === currentCopy)) {
+      copySelect.dataset.selected = '';
+      copySelect.value = '';
+    }
+
+    if (borrowerFilterNote) {
+      borrowerFilterNote.textContent = selectedBorrowerType === 'teacher'
+        ? 'Teachers are filtered by department and, when selected, by subject.'
+        : 'Students are filtered by department and semester.';
+    }
+    if (copyFilterNote) {
+      copyFilterNote.textContent = selectedSubject
+        ? 'Copies are narrowed to the selected department, semester, and subject.'
+        : 'Copies are narrowed to the selected academic scope.';
+    }
+  }
+
+  const borrowerSelect = document.querySelector('select[name="borrower_ref"]');
+  const dueDaysInput = document.querySelector('input[name="due_days"]');
+  const issueRuleNote = document.getElementById('issueRuleNote');
+
+  function syncIssueDueDays() {
+    if (!borrowerSelect || !dueDaysInput || !issueRuleNote) return;
+    const borrowerRef = borrowerSelect.value || '';
+    const borrowerType = borrowerRef.startsWith('teacher:') ? 'teacher' : 'student';
+    const dueDays = borrowerType === 'teacher'
+      ? parseInt(dueDaysInput.dataset.teacherDue || dueDaysInput.value, 10)
+      : parseInt(dueDaysInput.dataset.studentDue || dueDaysInput.value, 10);
+
+    dueDaysInput.max = String(dueDays);
+    if (!dueDaysInput.value || parseInt(dueDaysInput.value, 10) > dueDays) {
+      dueDaysInput.value = String(dueDays);
+    }
+    issueRuleNote.textContent = borrowerType === 'teacher'
+      ? `Teacher rule: ${dueDays} due day(s).`
+      : `Student rule: ${dueDays} due day(s).`;
+  }
+
+  if (borrowerSelect) {
+    borrowerSelect.addEventListener('change', syncIssueDueDays);
+    syncIssueDueDays();
+  }
+
+  const issueDepartmentSelect = document.querySelector('.issue-department-select');
+  const issueSemesterSelect = document.querySelector('.issue-semester-select');
+  const issueSubjectSelect = document.querySelector('.issue-subject-select');
+  const issueBorrowerTypeSelect = document.querySelector('.issue-borrower-type-select');
+  const issueBorrowerSelect = document.querySelector('.issue-borrower-select');
+  const issueCopySelect = document.querySelector('.issue-copy-select');
+
+  if (issueSubjectSelect) {
+    issueSubjectSelect.addEventListener('change', () => {
+      issueSubjectSelect.dataset.selected = issueSubjectSelect.value;
+      filterIssueBorrowersAndCopies();
+    });
+  }
+  if (issueBorrowerSelect) {
+    issueBorrowerSelect.addEventListener('change', () => {
+      issueBorrowerSelect.dataset.selected = issueBorrowerSelect.value;
+      syncIssueDueDays();
+    });
+  }
+  if (issueCopySelect) {
+    issueCopySelect.addEventListener('change', () => {
+      issueCopySelect.dataset.selected = issueCopySelect.value;
+    });
+  }
+  [issueDepartmentSelect, issueSemesterSelect].forEach((selectEl) => {
+    if (!selectEl) return;
+    selectEl.addEventListener('change', () => {
+      if (issueSubjectSelect) issueSubjectSelect.dataset.selected = '';
+      filterIssueSubjects();
+      filterIssueBorrowersAndCopies();
+    });
+  });
+  if (issueBorrowerTypeSelect) {
+    issueBorrowerTypeSelect.addEventListener('change', () => {
+      if (issueBorrowerSelect) issueBorrowerSelect.dataset.selected = '';
+      filterIssueBorrowersAndCopies();
+      syncIssueDueDays();
+    });
+  }
+  filterIssueSubjects();
+  filterIssueBorrowersAndCopies();
+
+  const workflowCopySelect = document.getElementById('workflowCopySelect');
+  const workflowActionSelect = document.getElementById('workflowActionSelect');
+  const workflowConditionSelect = document.getElementById('workflowConditionSelect');
+  const workflowConditionHint = document.getElementById('workflowConditionHint');
+
+  function syncWorkflowActions() {
+    if (!workflowCopySelect || !workflowActionSelect || !workflowConditionSelect) return;
+    const selected = workflowCopySelect.options[workflowCopySelect.selectedIndex];
+    const encodedActions = selected?.dataset.actions || '';
+    const currentValue = workflowActionSelect.value || '';
+    workflowActionSelect.innerHTML = '<option value="">Select an action</option>';
+    if (encodedActions) {
+      encodedActions.split('||').forEach((entry) => {
+        const [value, label] = entry.split('::');
+        if (!value || !label) return;
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        if (value === currentValue) option.selected = true;
+        workflowActionSelect.appendChild(option);
+      });
+    }
+    syncWorkflowConditionField();
+  }
+
+  function syncWorkflowConditionField() {
+    if (!workflowActionSelect || !workflowConditionSelect || !workflowConditionHint) return;
+    const needsCondition = ['mark_repaired', 'replacement_received'].includes(workflowActionSelect.value);
+    workflowConditionSelect.classList.toggle('d-none', !needsCondition);
+    workflowConditionSelect.required = needsCondition;
+    workflowConditionHint.textContent = needsCondition
+      ? 'Choose the restored or replacement copy condition.'
+      : 'Required only for repaired or replacement actions.';
+  }
+
+  workflowCopySelect?.addEventListener('change', syncWorkflowActions);
+  workflowActionSelect?.addEventListener('change', syncWorkflowConditionField);
+  syncWorkflowActions();
+
+  const qrModalElement = document.getElementById('qrScannerModal');
+  const qrViewportId = 'qrScannerViewport';
+  const qrStatus = document.getElementById('qrScannerStatus');
+  const qrStopButton = document.getElementById('qrScannerStopButton');
+  const qrTriggers = document.querySelectorAll('.qr-scan-trigger');
+  const qrModal = qrModalElement ? new bootstrap.Modal(qrModalElement) : null;
+  let qrScanner = null;
+  let qrTargetInputId = null;
+  let qrStarting = false;
+
+  async function stopQrScanner() {
+    if (!qrScanner) return;
+    try { await qrScanner.stop(); } catch (error) {}
+    try { await qrScanner.clear(); } catch (error) {}
+    qrScanner = null;
+    qrStarting = false;
+    if (qrStatus) qrStatus.textContent = 'Camera scanner is idle.';
+  }
+
+  async function startQrScanner(targetInputId) {
+    if (!qrModal || !window.Html5Qrcode) {
+      if (qrStatus) qrStatus.textContent = 'QR scanner library is unavailable in this browser.';
+      return;
+    }
+    qrTargetInputId = targetInputId;
+    qrModal.show();
+    if (qrStarting) return;
+    await stopQrScanner();
+    qrStarting = true;
+    qrScanner = new Html5Qrcode(qrViewportId);
+    if (qrStatus) qrStatus.textContent = 'Starting camera scanner...';
+    try {
+      await qrScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        async (decodedText) => {
+          const input = document.getElementById(qrTargetInputId);
+          if (input) {
+            input.value = decodedText;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (qrStatus) qrStatus.textContent = 'QR captured successfully.';
+          await stopQrScanner();
+          qrModal.hide();
+        },
+        () => {}
+      );
+      if (qrStatus) qrStatus.textContent = 'Point the camera at a QR card or copy label.';
+    } catch (error) {
+      if (qrStatus) qrStatus.textContent = 'Unable to access the camera scanner. You can still paste QR text manually.';
+      await stopQrScanner();
+    } finally {
+      qrStarting = false;
+    }
+  }
+
+  qrTriggers.forEach((button) => {
+    button.addEventListener('click', () => startQrScanner(button.dataset.scanTarget));
+  });
+  qrStopButton?.addEventListener('click', async () => { await stopQrScanner(); });
+  qrModalElement?.addEventListener('hidden.bs.modal', async () => { await stopQrScanner(); });
+</script>
+{% endblock %}

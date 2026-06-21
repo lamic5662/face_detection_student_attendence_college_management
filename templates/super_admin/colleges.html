@@ -25,6 +25,16 @@
             <input type="text" name="subdomain" class="form-control" placeholder="e.g. everest">
             <div class="form-text">Optional. Use this if each college gets its own subdomain portal later.</div>
           </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Default University</label>
+            <select name="university_id" class="form-select">
+              <option value="">Independent / no default</option>
+              {% for university in universities %}
+              <option value="{{ university.id }}">{{ university.name }} ({{ university.code }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Optional fallback. Real university mapping now happens at the department/program level.</div>
+          </div>
           <button type="submit" class="btn btn-primary w-100">
             <i class="bi bi-check2-circle me-1"></i>Create College
           </button>
@@ -76,11 +86,57 @@
               </div>
             </div>
           </div>
+          <div class="col-md-6">
+            <div class="platform-duty-card">
+              <div class="platform-duty-icon"><i class="bi bi-bank2"></i></div>
+              <div>
+                <div class="fw-semibold">University Mapping</div>
+                <div class="text-muted small">Group affiliated colleges under TU, KU, PU, and compare departments, students, and subjects across them.</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+{% if university_rows %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
+    <h6 class="fw-semibold mb-0"><i class="bi bi-bank2 text-primary me-2"></i>University Overview</h6>
+    <a href="{{ url_for('super_admin.universities') }}" class="btn btn-sm btn-outline-secondary">Manage Universities</a>
+  </div>
+  <div class="card-body px-4 pb-4">
+    <div class="row g-3">
+      {% for row in university_rows %}
+      <div class="col-lg-4 col-md-6">
+        <a href="{{ url_for('super_admin.university_detail', university_id=row.university.id) }}"
+           class="text-decoration-none text-dark">
+          <div class="border rounded-4 p-3 h-100 bg-light-subtle">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+              <div>
+                <div class="fw-semibold">{{ row.university.name }}</div>
+                <div class="small text-muted">{{ row.university.code }}</div>
+              </div>
+              <span class="badge {% if row.university.is_active %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+                {{ 'Active' if row.university.is_active else 'Inactive' }}
+              </span>
+            </div>
+            <div class="small text-muted d-flex flex-column gap-1">
+              <span>{{ row.colleges }} colleges</span>
+              <span>{{ row.departments }} departments</span>
+              <span>{{ row.students }} students</span>
+              <span>{{ row.teachers }} teachers</span>
+            </div>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {# ── Expiry Alerts ── #}
 {% if expired %}
@@ -123,6 +179,7 @@
         <thead class="table-light">
           <tr>
             <th class="px-4">College</th>
+            <th>Universities</th>
             <th>Plan</th>
             <th>Health</th>
             <th>Status</th>
@@ -143,9 +200,30 @@
               <div class="text-muted small">{{ row.college.code }}{% if row.college.subdomain %} · {{ row.college.subdomain }}{% endif %}</div>
             </td>
             <td>
-              <span class="badge bg-{{ row.college.plan_meta.color }}-subtle text-{{ row.college.plan_meta.color }} fw-semibold">
-                <i class="bi {{ row.college.plan_meta.icon }} me-1"></i>{{ row.college.plan_meta.label }}
+              {% if row.college.affiliated_universities %}
+              <div class="d-flex flex-wrap gap-1 mb-1">
+                {% for university in row.college.affiliated_universities %}
+                <span class="badge bg-info-subtle text-info">{{ university.code }}</span>
+                {% endfor %}
+              </div>
+              <div class="small text-muted">
+                {{ row.college.affiliated_universities | map(attribute='name') | join(', ') }}
+              </div>
+              {% elif row.college.university %}
+              <div class="fw-semibold">{{ row.college.university.code }}</div>
+              <div class="small text-muted">Default: {{ row.college.university.name }}</div>
+              {% else %}
+              <span class="text-muted small">Independent</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-{{ row.plan_state.display_plan_meta.color }}-subtle text-{{ row.plan_state.display_plan_meta.color }} fw-semibold">
+                <i class="bi {{ row.plan_state.display_plan_meta.icon }} me-1"></i>{{ row.plan_state.display_plan_meta.label }}
               </span>
+              <div class="text-muted" style="font-size:10px">{{ row.plan_state.display_plan_meta.price_label }}</div>
+              {% if not row.plan_state.matches_billing_plan %}
+              <div class="text-muted" style="font-size:10px">Billing: {{ row.plan_state.billing_plan_meta.label }}</div>
+              {% endif %}
               {% if row.days_left is not none %}
                 {% if row.days_left < 0 %}
                 <div class="badge bg-danger" style="font-size:10px">Expired</div>
@@ -238,6 +316,18 @@
                       <label class="form-label fw-semibold small">Subdomain</label>
                       <input type="text" name="subdomain" class="form-control" value="{{ row.college.subdomain or '' }}">
                     </div>
+                    <div class="mb-0">
+                      <label class="form-label fw-semibold small">Default University</label>
+                      <select name="university_id" class="form-select">
+                        <option value="">Independent / no default</option>
+                        {% for university in universities %}
+                        <option value="{{ university.id }}" {% if row.college.university_id == university.id %}selected{% endif %}>
+                          {{ university.name }} ({{ university.code }})
+                        </option>
+                        {% endfor %}
+                      </select>
+                      <div class="form-text">Use this only as the college default. Departments/programs can override it individually.</div>
+                    </div>
                   </div>
                   <div class="modal-footer border-0">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
@@ -301,6 +391,7 @@
 
                 <form method="post" action="{{ url_for('super_admin.update_college_features', college_id=row.college.id) }}">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="preset" value="">
                   <div class="modal-body">
 
                     {# ── Tier Presets ── #}
@@ -314,15 +405,20 @@
                         {% for preset_key, preset in feature_presets.items() %}
                         {% set col = preset.get('color', tier_colors.get(preset_key, 'secondary')) %}
                         {% set ico = preset.get('icon',  tier_icons.get(preset_key,  'bi-grid')) %}
+                        {% set plan_meta = college_plans.get(preset_key) %}
                         <div class="col-6 col-md-3">
                           <button type="button"
                                   class="tier-preset-btn tier-{{ col }} w-100 text-start"
+                                  data-preset="{{ preset_key }}"
                                   data-features='{{ preset.features | tojson }}'
                                   onclick="applyTierPreset(this)">
                             <div class="d-flex align-items-center gap-2 mb-1">
                               <i class="bi {{ ico }} fs-5"></i>
                               <span class="fw-bold">{{ preset.label }}</span>
                             </div>
+                            {% if plan_meta %}
+                            <div class="small fw-semibold mb-1 text-{{ col }}">{{ plan_meta.price_label }}</div>
+                            {% endif %}
                             <div class="tier-preset-count">{{ preset.features|length }} modules</div>
                             <div class="tier-preset-desc">{{ preset.description }}</div>
                           </button>
@@ -392,7 +488,7 @@
           </div>
           {% else %}
           <tr>
-            <td colspan="10" class="text-center text-muted py-5">No colleges found.</td>
+            <td colspan="11" class="text-center text-muted py-5">No colleges found.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -481,6 +577,10 @@ function applyTierPreset(btn) {
 
   const modal = btn.closest('.modal');
   if (!modal) return;
+  const presetInput = modal.querySelector('input[name="preset"]');
+  if (presetInput) {
+    presetInput.value = btn.dataset.preset || '';
+  }
 
   modal.querySelectorAll('input[name="enabled_features"]').forEach(cb => {
     cb.checked = featureSet.has(cb.value);
@@ -502,5 +602,22 @@ function applyTierPreset(btn) {
   modal.querySelectorAll('.tier-preset-btn').forEach(b => b.classList.remove('tier-active'));
   btn.classList.add('tier-active');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tier-preset-btn').forEach(btn => {
+    btn.dataset.preset = btn.dataset.preset || '';
+  });
+  document.querySelectorAll('.modal input[name="enabled_features"]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const modal = cb.closest('.modal');
+      if (!modal) return;
+      const presetInput = modal.querySelector('input[name="preset"]');
+      if (presetInput) {
+        presetInput.value = '';
+      }
+      modal.querySelectorAll('.tier-preset-btn').forEach(btn => btn.classList.remove('tier-active'));
+    });
+  });
+});
 </script>
 {% endblock %}

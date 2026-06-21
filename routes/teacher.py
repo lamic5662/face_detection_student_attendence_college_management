@@ -10,6 +10,7 @@ from models.notice import Notice
 from models.exam import Exam
 from models.content import TeacherContent, content_extension, is_allowed_content_upload
 from models.assignment import AssignmentSubmission
+from models.library import LibraryBook, LibraryLoan, LibraryReservation
 from models.parent import TeacherStatus
 from utils.decorators import teacher_required
 from services.face_service import decode_base64_image, recognize_faces
@@ -23,6 +24,7 @@ import os
 from utils.content_storage import build_content_relpath, resolve_content_path
 from utils.assignment_storage import build_submission_relpath, resolve_submission_path
 from utils.dashboard import build_dashboard_preferences
+from utils.feature_access import user_has_feature
 from utils.time import utc_now_naive
 
 teacher_bp = Blueprint('teacher', __name__)
@@ -112,6 +114,50 @@ def dashboard():
     ).order_by(Notice.is_pinned.desc(), Notice.created_at.desc()).limit(4).all()
 
     teacher_status = TeacherStatus.query.filter_by(college_id=teacher.college_id, teacher_id=teacher.id).first()
+    library_summary = None
+    if user_has_feature(current_user, 'library'):
+        active_library_loans = (
+            LibraryLoan.query
+            .filter(
+                LibraryLoan.college_id == teacher.college_id,
+                LibraryLoan.teacher_id == teacher.id,
+                LibraryLoan.status.in_(['active', 'overdue']),
+            )
+            .count()
+        )
+        pending_library_reservations = (
+            LibraryReservation.query
+            .filter_by(
+                college_id=teacher.college_id,
+                teacher_id=teacher.id,
+                status='pending',
+            )
+            .count()
+        )
+        teacher_subject_ids = [subject.id for subject in subjects]
+        library_title_query = (
+            LibraryBook.query
+            .filter(
+                LibraryBook.college_id == teacher.college_id,
+                LibraryBook.is_active.is_(True),
+                db.or_(
+                    LibraryBook.department_id.is_(None),
+                    LibraryBook.department_id == teacher.department_id,
+                ),
+            )
+        )
+        if teacher_subject_ids:
+            library_title_query = library_title_query.filter(
+                db.or_(
+                    LibraryBook.subject_id.is_(None),
+                    LibraryBook.subject_id.in_(teacher_subject_ids),
+                )
+            )
+        library_summary = {
+            'active_loans': active_library_loans,
+            'pending_reservations': pending_library_reservations,
+            'available_titles': library_title_query.count(),
+        }
 
     return render_template('teacher/dashboard.html',
                            dashboard_prefs=dashboard_prefs,
@@ -120,7 +166,8 @@ def dashboard():
                            recent_sessions=recent_sessions, stats=stats,
                            upcoming_exams=upcoming_exams,
                            notices=notices, today=today,
-                           teacher_status=teacher_status)
+                           teacher_status=teacher_status,
+                           library_summary=library_summary)
 
 
 # ─── Sessions ────────────────────────────────────────────────────────────────

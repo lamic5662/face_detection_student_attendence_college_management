@@ -1,0 +1,579 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Library Book' if book else 'Add Library Book' }}{% endblock %}
+{% block page_title %}<i class="bi bi-journal-plus me-2"></i>{{ 'Edit Library Book' if book else 'Add Library Book' }}{% endblock %}
+
+{% block content %}
+{% set selected_type = request.form.get('book_type', book.book_type if book else 'physical') %}
+{% set category_mode = request.form.get('category_mode', 'existing') %}
+{% set selected_access_level = request.form.get('ebook_access_level', book.ebook_access_level if book else 'full_read') %}
+{% set download_allowed_checked = request.form.get('ebook_download_allowed', '1' if not book or book.ebook_download_allowed else '0') == '1' %}
+
+<div class="mb-4">
+  <h2 class="h4 mb-1">{{ 'Edit Book Placement' if book else 'Add Book To Rack' }}</h2>
+  <div class="text-muted">Use the basic fields first. Optional metadata is grouped below.</div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-4">
+    <form method="post" enctype="multipart/form-data" class="row g-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="col-12">
+        <div class="rounded-4 border bg-light-subtle px-3 py-3 small text-muted">
+          Basic flow: title, author, and academic scope first. Physical and hybrid books then get rack placement. Open the optional sections only when you need more detail.
+        </div>
+      </div>
+
+      <div class="col-md-8">
+        <label class="form-label">Title</label>
+        <input type="text" class="form-control" name="title" value="{{ request.form.get('title', book.title if book else '') }}" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Book Type</label>
+        <select class="form-select book-type-select" name="book_type" required>
+          {% for option in book_types %}
+          <option value="{{ option }}" {% if selected_type == option %}selected{% endif %}>{{ option|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Author</label>
+        <input type="text" class="form-control" name="author" value="{{ request.form.get('author', book.author if book else '') }}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Department</label>
+        <select class="form-select department-select" name="department_id" data-subject-target="bookSubjectSelect">
+          {% set selected_department = request.form.get('department_id', book.department_id if book else '')|string %}
+          <option value="">All departments</option>
+          {% for department in departments %}
+          <option value="{{ department.id }}" {% if selected_department == department.id|string %}selected{% endif %}>{{ department.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Semester</label>
+        <input type="number" class="form-control" name="semester" min="1" max="12" value="{{ request.form.get('semester', book.semester if book and book.semester else '') }}">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Subject</label>
+        <select class="form-select subject-select" name="subject_id" id="bookSubjectSelect" data-selected="{{ request.form.get('subject_id', book.subject_id if book else '')|string }}">
+          {% set selected_subject = request.form.get('subject_id', book.subject_id if book else '')|string %}
+          <option value="">No specific subject</option>
+          {% for subject in subjects %}
+          <option value="{{ subject.id }}" data-department-id="{{ subject.department_id or '' }}" {% if selected_subject == subject.id|string %}selected{% endif %}>{{ subject.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12" data-placement-section>
+        <div class="rounded-4 border p-3">
+          <div class="fw-semibold mb-3">Rack Assignment</div>
+          <div class="row g-3">
+            <div class="col-12">
+              <input type="text" class="form-control" id="rackSearchInput" placeholder="Search rack name or code">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Rack</label>
+              <select class="form-select rack-select" name="default_location_rack_id" data-row-target="defaultRackRow" data-column-target="defaultRackColumn">
+                {% set selected_rack = request.form.get('default_location_rack_id', default_rack.id if default_rack else '')|string %}
+                <option value="">No rack assigned</option>
+                {% for rack in rack_choices %}
+                <option value="{{ rack.id }}" data-row-count="{{ rack.row_count or 0 }}" data-column-count="{{ rack.column_count or 0 }}" {% if selected_rack == rack.id|string %}selected{% endif %}>{{ rack.full_label }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text" id="rackSuggestionNote">Select department, semester, and subject to auto-suggest rack placement.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Rack Row</label>
+              <select class="form-select rack-grid-select" name="default_location_row" id="defaultRackRow" data-selected="{{ request.form.get('default_location_row', default_row) }}">
+                <option value="">Select row</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Rack Column</label>
+              <select class="form-select rack-grid-select" name="default_location_column" id="defaultRackColumn" data-selected="{{ request.form.get('default_location_column', default_column) }}">
+                <option value="">Select column</option>
+              </select>
+            </div>
+            {% if not book %}
+            <div class="col-md-4" data-physical-section>
+              <label class="form-label">Initial Physical Copies</label>
+              <input type="number" class="form-control" name="initial_copy_count" min="0" value="{{ request.form.get('initial_copy_count', '1') }}">
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <details class="border rounded-4 p-3">
+          <summary class="fw-semibold">Optional Details</summary>
+          <div class="row g-3 mt-1">
+            <div class="col-md-4">
+              <label class="form-label">ISBN</label>
+              <input type="text" class="form-control" name="isbn" value="{{ request.form.get('isbn', book.isbn if book else '') }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Publisher</label>
+              <input type="text" class="form-control" name="publisher" value="{{ request.form.get('publisher', book.publisher if book else '') }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Edition</label>
+              <input type="text" class="form-control" name="edition" value="{{ request.form.get('edition', book.edition if book else '') }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Language</label>
+              <input type="text" class="form-control" name="language" value="{{ request.form.get('language', book.language if book else '') }}" placeholder="English">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Category Source</label>
+              <select class="form-select" name="category_mode">
+                <option value="existing" {% if category_mode == 'existing' %}selected{% endif %}>Use existing category</option>
+                <option value="new" {% if category_mode == 'new' %}selected{% endif %}>Create new category</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Existing Category</label>
+              <select class="form-select" name="category_id">
+                {% set selected_category = request.form.get('category_id', book.category_id if book else '')|string %}
+                <option value="">Uncategorized</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}" {% if selected_category == category.id|string %}selected{% endif %}>{{ category.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">New Category Name</label>
+              <input type="text" class="form-control" name="new_category_name" value="{{ request.form.get('new_category_name', '') }}" placeholder="Reference Books">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Tags</label>
+              <input type="text" class="form-control" name="tags" value="{{ request.form.get('tags', book.tags if book else '') }}" placeholder="dbms, networking, first year">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Description</label>
+              <textarea class="form-control" name="description" rows="4">{{ request.form.get('description', book.description if book else '') }}</textarea>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="col-12" data-digital-section>
+        <details class="border rounded-4 p-3" {% if selected_type in ['digital', 'hybrid'] %}open{% endif %}>
+          <summary class="fw-semibold">E-Book Reader Settings</summary>
+          <div class="row g-3 mt-1">
+            <div class="col-md-8">
+              <label class="form-label">Upload File</label>
+              <input type="file" class="form-control" name="ebook_file" accept=".pdf,.epub">
+              {% if book and book.ebook_filename %}
+              <div class="form-text">Current file: {{ book.ebook_filename }}</div>
+              {% else %}
+              <div class="form-text">Use PDF or EPUB for digital and hybrid books.</div>
+              {% endif %}
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="remove_ebook" value="1" id="removeEbook">
+                <label class="form-check-label" for="removeEbook">Remove current e-book</label>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Access Mode</label>
+              <select class="form-select ebook-access-level-select" name="ebook_access_level">
+                {% for option in ebook_access_levels %}
+                <option value="{{ option }}" {% if selected_access_level == option %}selected{% endif %}>
+                  {{ 'Preview Only' if option == 'preview_only' else 'Full Read' }}
+                </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Preview only keeps reading inside the system. Full read unlocks full progress tracking.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Preview Page Limit</label>
+              <input
+                type="number"
+                class="form-control ebook-preview-limit-input"
+                name="ebook_preview_page_limit"
+                min="1"
+                max="500"
+                value="{{ request.form.get('ebook_preview_page_limit', book.ebook_preview_page_limit if book and book.ebook_preview_page_limit else '10') }}"
+              >
+              <div class="form-text">Used for PDF preview-only titles. EPUB files stay reader-only without download.</div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check form-switch">
+                <input class="form-check-input ebook-download-toggle" type="checkbox" role="switch" id="ebookDownloadAllowed" name="ebook_download_allowed" value="1" {% if download_allowed_checked %}checked{% endif %}>
+                <label class="form-check-label" for="ebookDownloadAllowed">Allow download</label>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="col-12 d-flex flex-column flex-md-row justify-content-between gap-3 pt-2">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" role="switch" id="bookActiveSwitch" name="is_active" value="1" {% if request.form.get('is_active', '1' if not book or book.is_active else '0') == '1' %}checked{% endif %}>
+          <label class="form-check-label" for="bookActiveSwitch">Visible in catalog</label>
+        </div>
+        <div class="d-flex gap-2">
+          {% if book %}
+          <form
+            method="post"
+            action="{{ url_for('library.delete_book', book_id=book.id) }}"
+            data-confirm="Delete this book and its copies?"
+            data-confirm-title="Delete book?"
+            data-confirm-type="danger"
+            data-confirm-ok="Delete"
+          >
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next_view" value="library.admin_dashboard">
+            <button type="submit" class="btn btn-outline-danger">Delete</button>
+          </form>
+          <a href="{{ url_for('library.book_detail', book_id=book.id) }}" class="btn btn-outline-secondary">Cancel</a>
+          {% else %}
+          <a href="{{ url_for('library.admin_dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+          {% endif %}
+          <button type="submit" class="btn btn-primary">{{ 'Save Changes' if book else 'Create Book' }}</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  const rackCellAssignments = [
+    {% for rack in rack_choices %}
+      {% for cell in rack.children if cell.location_type == 'cell' and cell.is_active %}
+      {
+        rackId: {{ rack.id|string|tojson }},
+        rackLabel: {{ rack.full_label|tojson }},
+        row: {{ (cell.row_label or '')|tojson }},
+        column: {{ (cell.column_label or '')|tojson }},
+        departmentId: {{ (cell.department_id|string if cell.department_id else '')|tojson }},
+        semester: {{ (cell.semester|string if cell.semester else '')|tojson }},
+        subjectId: {{ (cell.subject_id|string if cell.subject_id else '')|tojson }}
+      },
+      {% endfor %}
+    {% endfor %}
+  ];
+
+  function filterSubjectsByDepartment(departmentSelect) {
+    const subjectTarget = document.getElementById(departmentSelect.dataset.subjectTarget);
+    if (!subjectTarget) return;
+
+    const selectedDepartment = departmentSelect.value || '';
+    const selectedSubject = subjectTarget.dataset.selected || '';
+    if (!subjectTarget._originalOptions) {
+      subjectTarget._originalOptions = Array.from(subjectTarget.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        departmentId: option.dataset.departmentId || '',
+      }));
+    }
+
+    subjectTarget.innerHTML = '';
+    subjectTarget._originalOptions.forEach((optionData) => {
+      if (optionData.value && selectedDepartment && optionData.departmentId !== selectedDepartment) {
+        return;
+      }
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      option.dataset.departmentId = optionData.departmentId;
+      if (optionData.value === selectedSubject) option.selected = true;
+      subjectTarget.appendChild(option);
+    });
+
+    if (!subjectTarget.value) {
+      subjectTarget.dataset.selected = '';
+    }
+  }
+
+  function fillRackGrid(selectEl) {
+    const rowTarget = document.getElementById(selectEl.dataset.rowTarget);
+    const columnTarget = document.getElementById(selectEl.dataset.columnTarget);
+    if (!rowTarget || !columnTarget) return;
+
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const rowCount = parseInt(selectedOption?.dataset.rowCount || '0', 10);
+    const columnCount = parseInt(selectedOption?.dataset.columnCount || '0', 10);
+    const selectedRow = rowTarget.dataset.selected || '';
+    const selectedColumn = columnTarget.dataset.selected || '';
+
+    rowTarget.innerHTML = '<option value="">Select row</option>';
+    columnTarget.innerHTML = '<option value="">Select column</option>';
+
+    for (let index = 1; index <= rowCount; index += 1) {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `Row ${index}`;
+      if (option.value === selectedRow) option.selected = true;
+      rowTarget.appendChild(option);
+    }
+
+    for (let index = 1; index <= columnCount; index += 1) {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `Column ${index}`;
+      if (option.value === selectedColumn) option.selected = true;
+      columnTarget.appendChild(option);
+    }
+  }
+
+  function filterRacksByScope() {
+    const departmentSelect = document.querySelector('.department-select[name="department_id"]');
+    const semesterInput = document.querySelector('input[name="semester"]');
+    const subjectSelect = document.getElementById('bookSubjectSelect');
+    const rackSelect = document.querySelector('select[name="default_location_rack_id"]');
+    if (!departmentSelect || !semesterInput || !rackSelect) return;
+
+    const departmentId = departmentSelect.value || '';
+    const semester = semesterInput.value || '';
+    const subjectId = subjectSelect ? (subjectSelect.value || '') : '';
+    const rackSearch = (document.getElementById('rackSearchInput')?.value || '').trim().toLowerCase();
+    const hasScopeFilter = Boolean(departmentId || semester || subjectId);
+    const selectedRack = rackSelect.dataset.selected || rackSelect.value || '';
+
+    if (!rackSelect._originalOptions) {
+      rackSelect._originalOptions = Array.from(rackSelect.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        rowCount: option.dataset.rowCount || '0',
+        columnCount: option.dataset.columnCount || '0',
+      }));
+    }
+
+    const allowedRackIds = new Set(
+      rackCellAssignments
+        .filter((cell) => {
+          if (departmentId && cell.departmentId !== departmentId) return false;
+          if (semester && cell.semester !== semester) return false;
+          if (subjectId && cell.subjectId && cell.subjectId !== subjectId) return false;
+          return true;
+        })
+        .map((cell) => cell.rackId)
+    );
+
+    rackSelect.innerHTML = '';
+    rackSelect._originalOptions.forEach((optionData) => {
+      if (optionData.value && hasScopeFilter && !allowedRackIds.has(optionData.value)) {
+        return;
+      }
+      if (rackSearch && optionData.value && !optionData.text.toLowerCase().includes(rackSearch)) {
+        return;
+      }
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      option.dataset.rowCount = optionData.rowCount;
+      option.dataset.columnCount = optionData.columnCount;
+      if (optionData.value === selectedRack) option.selected = true;
+      rackSelect.appendChild(option);
+    });
+
+    if (selectedRack && !Array.from(rackSelect.options).some((option) => option.value === selectedRack)) {
+      rackSelect.dataset.selected = '';
+      rackSelect.value = '';
+      const rowTarget = document.getElementById(rackSelect.dataset.rowTarget);
+      const columnTarget = document.getElementById(rackSelect.dataset.columnTarget);
+      if (rowTarget) {
+        rowTarget.dataset.selected = '';
+        rowTarget.value = '';
+      }
+      if (columnTarget) {
+        columnTarget.dataset.selected = '';
+        columnTarget.value = '';
+      }
+    }
+
+    fillRackGrid(rackSelect);
+  }
+
+  function applySuggestedRackPlacement() {
+    const departmentSelect = document.querySelector('.department-select[name="department_id"]');
+    const semesterInput = document.querySelector('input[name="semester"]');
+    const subjectSelect = document.getElementById('bookSubjectSelect');
+    const suggestionNote = document.getElementById('rackSuggestionNote');
+    const defaultRackSelect = document.querySelector('select[name="default_location_rack_id"]');
+
+    if (!departmentSelect || !semesterInput || !subjectSelect || !defaultRackSelect) return;
+
+    const departmentId = departmentSelect.value || '';
+    const semester = semesterInput.value || '';
+    const subjectId = subjectSelect.value || '';
+
+    if (!departmentId && !semester && !subjectId) {
+      if (suggestionNote) {
+        suggestionNote.textContent = 'Select department, semester, and subject to auto-suggest rack placement.';
+      }
+      return;
+    }
+
+    const matchingCell = rackCellAssignments.find((cell) => {
+      if (departmentId && cell.departmentId !== departmentId) return false;
+      if (semester && cell.semester !== semester) return false;
+      if (subjectId && cell.subjectId !== subjectId) return false;
+      return true;
+    });
+
+    if (!matchingCell) {
+      if (suggestionNote) {
+        suggestionNote.textContent = 'No assigned rack cell matched the selected department, semester, and subject.';
+      }
+      return;
+    }
+
+    defaultRackSelect.value = matchingCell.rackId;
+    fillRackGrid(defaultRackSelect);
+    const defaultRowTarget = document.getElementById(defaultRackSelect.dataset.rowTarget);
+    const defaultColumnTarget = document.getElementById(defaultRackSelect.dataset.columnTarget);
+    if (defaultRowTarget) {
+      defaultRowTarget.dataset.selected = matchingCell.row;
+      fillRackGrid(defaultRackSelect);
+      defaultRowTarget.value = matchingCell.row;
+    }
+    if (defaultColumnTarget) {
+      defaultColumnTarget.dataset.selected = matchingCell.column;
+      fillRackGrid(defaultRackSelect);
+      defaultColumnTarget.value = matchingCell.column;
+    }
+
+    if (suggestionNote) {
+      suggestionNote.textContent = `Suggested: ${matchingCell.rackLabel} · Row ${matchingCell.row} · Column ${matchingCell.column}`;
+    }
+  }
+
+  function syncBookTypeSections() {
+    const bookTypeSelect = document.querySelector('.book-type-select');
+    if (!bookTypeSelect) return;
+
+    const bookType = bookTypeSelect.value || 'physical';
+    const digitalSection = document.querySelector('[data-digital-section]');
+    const physicalSection = document.querySelector('[data-physical-section]');
+    const placementSection = document.querySelector('[data-placement-section]');
+    const rackSelect = document.querySelector('select[name="default_location_rack_id"]');
+    const rowSelect = document.getElementById('defaultRackRow');
+    const columnSelect = document.getElementById('defaultRackColumn');
+    const rackSearchInput = document.getElementById('rackSearchInput');
+
+    if (digitalSection) {
+      digitalSection.style.display = ['digital', 'hybrid'].includes(bookType) ? '' : 'none';
+    }
+    if (placementSection) {
+      placementSection.style.display = ['physical', 'hybrid'].includes(bookType) ? '' : 'none';
+    }
+    if (physicalSection) {
+      physicalSection.style.display = ['physical', 'hybrid'].includes(bookType) ? '' : 'none';
+    }
+    if (bookType === 'digital') {
+      if (rackSelect) {
+        rackSelect.value = '';
+        rackSelect.dataset.selected = '';
+      }
+      if (rowSelect) {
+        rowSelect.innerHTML = '<option value="">Select row</option>';
+        rowSelect.dataset.selected = '';
+        rowSelect.value = '';
+      }
+      if (columnSelect) {
+        columnSelect.innerHTML = '<option value="">Select column</option>';
+        columnSelect.dataset.selected = '';
+        columnSelect.value = '';
+      }
+      if (rackSearchInput) {
+        rackSearchInput.value = '';
+      }
+    }
+  }
+
+  function syncEbookAccessControls() {
+    const accessSelect = document.querySelector('.ebook-access-level-select');
+    const previewLimitInput = document.querySelector('.ebook-preview-limit-input');
+    const downloadToggle = document.querySelector('.ebook-download-toggle');
+    if (!accessSelect || !previewLimitInput || !downloadToggle) return;
+
+    const previewOnly = accessSelect.value === 'preview_only';
+    previewLimitInput.disabled = !previewOnly;
+    downloadToggle.disabled = previewOnly;
+    if (previewOnly) {
+      downloadToggle.checked = false;
+    }
+  }
+
+  document.querySelectorAll('.department-select').forEach((selectEl) => {
+    filterSubjectsByDepartment(selectEl);
+    filterRacksByScope();
+    const subjectTarget = document.getElementById(selectEl.dataset.subjectTarget);
+    if (subjectTarget) {
+      subjectTarget.addEventListener('change', () => {
+        subjectTarget.dataset.selected = subjectTarget.value;
+      });
+    }
+    selectEl.addEventListener('change', () => {
+      if (subjectTarget) {
+        subjectTarget.dataset.selected = '';
+      }
+      filterSubjectsByDepartment(selectEl);
+      filterRacksByScope();
+      applySuggestedRackPlacement();
+    });
+  });
+
+  document.querySelectorAll('.rack-select').forEach((selectEl) => {
+    fillRackGrid(selectEl);
+    selectEl.addEventListener('change', () => {
+      const rowTarget = document.getElementById(selectEl.dataset.rowTarget);
+      const columnTarget = document.getElementById(selectEl.dataset.columnTarget);
+      if (rowTarget) rowTarget.dataset.selected = '';
+      if (columnTarget) columnTarget.dataset.selected = '';
+      fillRackGrid(selectEl);
+    });
+  });
+
+  const bookTypeSelect = document.querySelector('.book-type-select');
+  if (bookTypeSelect) {
+    syncBookTypeSections();
+    bookTypeSelect.addEventListener('change', syncBookTypeSections);
+  }
+
+  const ebookAccessLevelSelect = document.querySelector('.ebook-access-level-select');
+  if (ebookAccessLevelSelect) {
+    syncEbookAccessControls();
+    ebookAccessLevelSelect.addEventListener('change', syncEbookAccessControls);
+  }
+
+  const semesterInput = document.querySelector('input[name="semester"]');
+  if (semesterInput) {
+    semesterInput.addEventListener('change', () => {
+      filterRacksByScope();
+      applySuggestedRackPlacement();
+    });
+    semesterInput.addEventListener('input', () => {
+      filterRacksByScope();
+      applySuggestedRackPlacement();
+    });
+  }
+
+  const subjectSelect = document.getElementById('bookSubjectSelect');
+  if (subjectSelect) {
+    subjectSelect.addEventListener('change', () => {
+      subjectSelect.dataset.selected = subjectSelect.value;
+      filterRacksByScope();
+      applySuggestedRackPlacement();
+    });
+  }
+
+  const rackSearchInputEl = document.getElementById('rackSearchInput');
+  if (rackSearchInputEl) {
+    rackSearchInputEl.addEventListener('input', filterRacksByScope);
+  }
+
+  filterRacksByScope();
+  applySuggestedRackPlacement();
+  syncEbookAccessControls();
+</script>
+{% endblock %}

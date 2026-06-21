@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}My Library Loans{% endblock %}
+{% block page_title %}<i class="bi bi-journal-check me-2"></i>My Library Loans{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="h4 mb-1">Borrowed Books & Reservations</h2>
+  <div class="text-muted">Track due dates, pending reservations, overdue items, and your recent loan history.</div>
+</div>
+
+{% if borrower_policy %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <div class="fw-semibold mb-1">{{ borrower_policy.label }} Borrowing Rules</div>
+    <div class="small text-muted">
+      Max {{ borrower_policy.max_active_loans }} active book(s), {{ borrower_policy.due_days }} due day(s), {{ borrower_policy.max_renewals }} renewal(s), {{ borrower_policy.renew_days }} day renewal window, and Rs. {{ '%.2f'|format(borrower_policy.fine_per_day) }} per overdue day.
+      {% if library_rule.grace_days %} Grace period: {{ library_rule.grace_days }} day(s).{% endif %}
+      Reservation pickup hold: {{ library_rule.reservation_hold_days }} day(s).
+    </div>
+    {% if library_rule.regulations %}
+    <div class="small text-muted mt-2">{{ library_rule.regulations }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get"
+          class="row g-3"
+          data-live-search-form
+          data-live-search-target="#myLoansSearchResults"
+          data-live-search-items="[data-live-search-item]"
+          data-live-search-empty="#myLoansSearchEmpty">
+      <div class="col-md-10">
+        <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search book title, author, or accession number" data-live-search-input>
+      </div>
+      <div class="col-md-2 d-grid">
+        <button type="submit" class="btn btn-outline-secondary">Search</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-0 pt-4 pb-0">
+    <h3 class="h5 mb-1">Fine Ledger</h3>
+    <div class="text-muted small">Your unpaid, partial, and settled overdue fine records.</div>
+  </div>
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="rounded-4 border bg-light-subtle p-3 h-100">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <div class="fw-semibold">Outstanding Balance</div>
+              <div class="text-muted small">This balance is visible to the librarian during issue and return.</div>
+            </div>
+            <div class="fs-4 fw-bold text-danger">Rs. {{ '%.2f'|format(outstanding_fine_total) }}</div>
+          </div>
+          {% if outstanding_fines %}
+          <div class="list-group list-group-flush">
+            {% for fine in outstanding_fines %}
+            <div class="list-group-item px-0" data-live-search-item>
+              <div class="d-flex justify-content-between gap-3">
+                <div>
+                  <div class="fw-semibold">{{ fine.book.title }}</div>
+                  <div class="small text-muted">{{ fine.reason|title }} · Assessed {{ fine.created_at.strftime('%d %b %Y') }}</div>
+                </div>
+                <div class="text-end">
+                  <span class="badge {% if fine.status == 'partial' %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ fine.status|title }}</span>
+                  <div class="small text-danger mt-2">Rs. {{ '%.2f'|format(fine.outstanding_amount) }} due</div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted">No outstanding fines right now.</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="rounded-4 border bg-light-subtle p-3 h-100">
+          <div class="fw-semibold mb-3">Settled Fine History</div>
+          {% if fine_history %}
+          <div class="list-group list-group-flush">
+            {% for fine in fine_history %}
+            <div class="list-group-item px-0" data-live-search-item>
+              <div class="d-flex justify-content-between gap-3">
+                <div>
+                  <div class="fw-semibold">{{ fine.book.title }}</div>
+                  <div class="small text-muted">
+                    {{ fine.reason|title }}
+                    {% if fine.settled_at %} · Settled {{ fine.settled_at.strftime('%d %b %Y') }}{% endif %}
+                  </div>
+                </div>
+                <div class="text-end">
+                  <span class="badge bg-success">{{ fine.status|title }}</span>
+                  <div class="small text-muted mt-2">
+                    Rs. {{ '%.2f'|format(fine.amount_assessed) }}
+                    {% if fine.amount_paid %} · Paid {{ '%.2f'|format(fine.amount_paid) }}{% endif %}
+                    {% if fine.amount_waived %} · Waived {{ '%.2f'|format(fine.amount_waived) }}{% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="text-muted">No settled fine records yet.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4" id="myLoansSearchResults">
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Active Loans</h3>
+        <div class="text-muted small">Books that are currently with you.</div>
+      </div>
+      <div class="card-body">
+        {% if active_loans %}
+        <div class="list-group list-group-flush">
+          {% for loan in active_loans %}
+          <div class="list-group-item px-0" data-live-search-item>
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <div class="fw-semibold">{{ loan.book.title }}</div>
+                <div class="text-muted small">{{ loan.copy.accession_number }} · Issued {{ loan.issued_at.strftime('%d %b %Y') }}</div>
+              </div>
+              <div class="text-end">
+                <span class="badge {% if loan.status == 'overdue' %}bg-danger{% else %}bg-primary{% endif %}">{{ loan.status|title }}</span>
+                <div class="small text-muted mt-2">Due {{ loan.due_at.strftime('%d %b %Y') }}</div>
+                {% if loan.status == 'overdue' and borrower_policy %}
+                <div class="small text-danger mt-1">Fine continues at Rs. {{ '%.2f'|format(borrower_policy.fine_per_day) }}/day</div>
+                {% endif %}
+                {% if loan.outstanding_fine_amount %}
+                <div class="small text-danger mt-1">Outstanding fine Rs. {{ '%.2f'|format(loan.outstanding_fine_amount) }}</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted">You do not have any active library loans.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Active Reservations</h3>
+        <div class="text-muted small">Physical books waiting for availability.</div>
+      </div>
+      <div class="card-body">
+        {% if active_reservations %}
+        <div class="list-group list-group-flush">
+          {% for reservation in active_reservations %}
+          <div class="list-group-item px-0" data-live-search-item>
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <div class="fw-semibold">{{ reservation.book.title }}</div>
+                <div class="text-muted small">
+                  {{ reservation.book.author }} · Requested {{ reservation.created_at.strftime('%d %b %Y') }}
+                  {% if reservation.ready_at %} · Ready {{ reservation.ready_at.strftime('%d %b %Y') }}{% endif %}
+                </div>
+              </div>
+              <div class="text-end">
+                <span class="badge {% if reservation.status == 'ready_for_pickup' %}bg-success{% else %}bg-warning text-dark{% endif %}">{{ reservation.status|replace('_', ' ')|title }}</span>
+                {% if reservation.pickup_expires_at %}
+                <div class="small text-success mt-2">Pick up by {{ reservation.pickup_expires_at.strftime('%d %b %Y') }}</div>
+                {% endif %}
+                <form method="post" action="{{ url_for('library.cancel_reservation', reservation_id=reservation.id) }}" class="mt-2">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                </form>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted">No active reservations right now.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">History</h3>
+        <div class="text-muted small">Returned loans and completed reservation activity.</div>
+      </div>
+      <div class="card-body">
+        {% if history_loans or reservation_history %}
+        <div class="list-group list-group-flush">
+          {% for loan in history_loans %}
+          <div class="list-group-item px-0" data-live-search-item>
+            <div class="fw-semibold">{{ loan.book.title }}</div>
+            <div class="small text-muted">
+              {{ loan.copy.accession_number }} · Issued {{ loan.issued_at.strftime('%d %b %Y') }}
+              {% if loan.returned_at %} · Returned {{ loan.returned_at.strftime('%d %b %Y') }}{% endif %}
+              {% if loan.fine_amount %} · Fine Rs. {{ '%.2f'|format(loan.fine_amount) }}{% endif %}
+              {% if loan.fine_records %}
+                {% set fine = loan.fine_records[0] %}
+                {% if fine.amount_paid %} · Paid Rs. {{ '%.2f'|format(fine.amount_paid) }}{% endif %}
+                {% if fine.amount_waived %} · Waived Rs. {{ '%.2f'|format(fine.amount_waived) }}{% endif %}
+                {% if fine.outstanding_amount %} · Outstanding Rs. {{ '%.2f'|format(fine.outstanding_amount) }}{% endif %}
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          {% for reservation in reservation_history %}
+          <div class="list-group-item px-0" data-live-search-item>
+            <div class="fw-semibold">{{ reservation.book.title }}</div>
+            <div class="small text-muted">
+              Reservation {{ reservation.status|replace('_', ' ')|title }}
+              {% if reservation.ready_at %} · Ready {{ reservation.ready_at.strftime('%d %b %Y') }}{% endif %}
+              {% if reservation.fulfilled_at %} · Fulfilled {{ reservation.fulfilled_at.strftime('%d %b %Y') }}{% endif %}
+              {% if reservation.cancelled_at %} · Cancelled {{ reservation.cancelled_at.strftime('%d %b %Y') }}{% endif %}
+              {% if reservation.expired_at %} · Expired {{ reservation.expired_at.strftime('%d %b %Y') }}{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted">No completed library activity yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+<div class="card border-0 shadow-sm d-none" id="myLoansSearchEmpty">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
+    No loans matched this search.
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% include "library/_live_search_script.html" %}
+{% endblock %}

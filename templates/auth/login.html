@@ -2,182 +2,418 @@
 {% block title %}Sign In — {{ login_college.name if login_college else college_name }}{% endblock %}
 
 {% block auth_content %}
-<div class="auth-root">
-
-  {# ══════════════════════════════════════════════
-  LEFT PANEL — branding + feature showcase
-  ══════════════════════════════════════════════ #}
-  <div class="auth-left">
-
-    {# Floating decorative circles #}
-    <div class="deco-circle deco-1"></div>
-    <div class="deco-circle deco-2"></div>
-    <div class="deco-circle deco-3"></div>
-
-    <div class="auth-left-inner">
-
-      {# Logo + system name #}
-      <div class="brand-block">
-        <div class="brand-icon">
-          <i class="bi bi-mortarboard-fill"></i>
-        </div>
-        <div class="brand-text">
-          <div class="brand-title">SmartAttend</div>
-          <div class="brand-sub">Multi-College Academic Platform</div>
-        </div>
-      </div>
-
-      {# College name #}
-      <div class="college-banner">
-        <i class="bi bi-building-fill me-2 opacity-75"></i>
-        {{ login_college.name if login_college else 'Multi-College SaaS Portal' }}
-      </div>
-
-      {# Headline #}
-      <div class="left-headline">
-        Manage college operations from one secure platform.
-      </div>
-      <div class="left-subtext">
-        Built for super admins, college admins, teachers, students, and parents with
-        one connected system for academics, operations, and communication.
-      </div>
-
-      {# Feature list #}
-      <div class="feature-list">
-        {% for icon, label in [
-        ('bi-shield-fill-check', 'Super Admin Controls'),
-        ('bi-camera-video-fill', 'Attendance & Biometrics'),
-        ('bi-journals', 'Exams, Fees & Reports'),
-        ('bi-collection-fill', 'Assignments & Content'),
-        ] %}
-        <div class="feature-item">
-          <div class="feature-dot"><i class="bi {{ icon }}"></i></div>
-          <div class="feature-copy">
-            <div class="feature-title">{{ label }}</div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-
-      <div class="auth-side-note">
-        Secure access, college-level isolation, and role-based workflows in one production-ready system.
-      </div>
-
-      {# Role badges #}
-      <div class="role-badges">
-        <span class="role-badge role-super-admin">
-          <i class="bi bi-stars me-1"></i>Super Admin
+<div class="landing-auth-page">
+  <div class="landing-auth-shell">
+    <header class="landing-auth-header">
+      <a href="#landing-home" class="landing-auth-brand">
+        <span class="landing-auth-brand-mark"><i class="bi bi-mortarboard-fill"></i></span>
+        <span class="landing-auth-brand-copy">
+          <strong>SmartAttend</strong>
+          <span>College Management System</span>
         </span>
-        <span class="role-badge role-admin">
-          <i class="bi bi-shield-fill me-1"></i>Admin
-        </span>
-        <span class="role-badge role-teacher">
-          <i class="bi bi-person-badge me-1"></i>Teacher
-        </span>
-        <span class="role-badge role-student">
-          <i class="bi bi-person me-1"></i>Student
-        </span>
-        <span class="role-badge role-parent">
-          <i class="bi bi-house-heart me-1"></i>Parent
-        </span>
+      </a>
+
+      <nav class="landing-auth-nav">
+        <a href="#landing-home" class="active">Overview</a>
+        <a href="#landing-features">Features</a>
+        <a href="#landing-roles">Roles</a>
+        <a href="#landing-about">Platform</a>
+        <a href="#landing-portal">Access</a>
+      </nav>
+
+      <div class="landing-auth-header-actions">
+        <a href="#landing-portal" class="landing-auth-btn landing-auth-btn-outline">Login</a>
       </div>
+    </header>
 
-    </div>
-  </div>
-
-  {# ══════════════════════════════════════════════
-  RIGHT PANEL — login form
-  ══════════════════════════════════════════════ #}
-  <div class="auth-right">
-    <div class="auth-form-wrap">
-
-      {# Header #}
-      <div class="form-header">
-        <h2 class="form-title">Welcome back!</h2>
-        <p class="form-sub">Sign in to continue to SmartAttend.</p>
-      </div>
-
-      {# Flash messages #}
-      {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show mb-4 py-2 px-3 small" role="alert" data-flash>
-        <i
-          class="bi bi-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-triangle{% else %}info-circle{% endif %}-fill me-2"></i>
-        {{ message }}
-        <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
-      </div>
-      {% endfor %}
-      {% endwith %}
-
-      {# Form #}
-      <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        {% if not college_locked %}
-        <div class="field-group mb-4">
-          <label class="field-label">College Code</label>
-          <div class="field-wrap">
-            <span class="field-icon"><i class="bi bi-buildings-fill"></i></span>
-            <input type="text" name="college_code" class="field-input" placeholder="e.g. ABC"
-              value="{{ submitted_college_code or '' }}" autocomplete="organization">
-          </div>
-          <div class="form-text mt-2">College users should enter their college code. Super admins can leave this blank.</div>
-        </div>
-        {% else %}
-        <input type="hidden" name="college_code" value="{{ login_college.code if login_college else '' }}">
-        {% endif %}
-
-        <div class="field-group mb-4">
-          <label class="field-label">Email Address</label>
-          <div class="field-wrap">
-            <span class="field-icon"><i class="bi bi-envelope-fill"></i></span>
-            <input type="email" name="email" class="field-input" placeholder="you@college.edu" required autofocus
-              autocomplete="email">
-          </div>
+    <section class="landing-auth-hero" id="landing-home">
+      <div class="landing-auth-copy">
+        <div class="landing-auth-kicker">
+          <span class="landing-auth-kicker-dot"></span>
+          {{ login_college.name if login_college else 'Multi-College Digital Operations' }}
         </div>
 
-        <div class="field-group mb-3">
-          <label class="field-label">Password</label>
-          <div class="field-wrap">
-            <span class="field-icon"><i class="bi bi-lock-fill"></i></span>
-            <input type="password" name="password" id="pwInput" class="field-input" placeholder="Enter your password"
-              required autocomplete="current-password">
-            <button type="button" class="field-eye" id="togglePw" tabindex="-1" title="Toggle visibility">
-              <i class="bi bi-eye-fill" id="eyeIcon"></i>
-            </button>
-          </div>
-        </div>
+        <h1 class="landing-auth-title">
+          Smart College Management System for Modern Institutions
+        </h1>
 
-        <div class="d-flex align-items-center justify-content-between mb-5">
-          <label class="remember-label">
-            <input type="checkbox" name="remember" class="remember-check">
-            <span>Remember me</span>
-          </label>
-          <a href="{{ url_for('auth.forgot_password') }}" class="small text-decoration-none fw-semibold">
-            Forgot password?
+        <p class="landing-auth-lead">
+          SmartAttend gives colleges one structured workspace for attendance, academic records,
+          notices, user access, and daily operational coordination across every role.
+        </p>
+
+        <div class="landing-auth-cta">
+          <a href="#landing-portal" class="landing-auth-btn landing-auth-btn-primary landing-auth-btn-lg">
+            Login to Portal <i class="bi bi-person-circle"></i>
+          </a>
+          <a href="#landing-features" class="landing-auth-btn landing-auth-btn-outline landing-auth-btn-lg">
+            Explore Features <i class="bi bi-arrow-right"></i>
           </a>
         </div>
 
-        <button type="submit" class="signin-btn">
-          <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
-        </button>
-      </form>
-
-      {# Footer #}
-      <div class="form-footer">
-        <div class="security-line">
-          <span class="sec-badge"><i class="bi bi-lock-fill"></i> SSL Secured</span>
-          <span class="sec-badge"><i class="bi bi-shield-check-fill"></i> CSRF Protected</span>
-          <span class="sec-badge"><i class="bi bi-eye-slash-fill"></i> Rate Limited</span>
+        <div class="landing-auth-trust">
+          <div class="landing-auth-trust-item">
+            <i class="bi bi-shield-check"></i>
+            <span>Secure & Reliable</span>
+          </div>
+          <div class="landing-auth-trust-item">
+            <i class="bi bi-stars"></i>
+            <span>Easy to Use</span>
+          </div>
+          <div class="landing-auth-trust-item">
+            <i class="bi bi-cloud-check"></i>
+            <span>Cloud Enabled</span>
+          </div>
         </div>
-        <div class="auth-copyright">
-          Copyright &copy; 2026 SmartAttend. All rights reserved.
+
+        <div class="landing-auth-summary-strip">
+          <div class="landing-auth-summary-item">
+            <div class="landing-auth-summary-icon"><i class="bi bi-diagram-3"></i></div>
+            <strong>5 Roles</strong>
+            <span>Admin, teacher, student, parent, super admin</span>
+          </div>
+          <div class="landing-auth-summary-item">
+            <div class="landing-auth-summary-icon"><i class="bi bi-buildings"></i></div>
+            <strong>Tenant Ready</strong>
+            <span>Per-college feature access and data isolation</span>
+          </div>
+          <div class="landing-auth-summary-item">
+            <div class="landing-auth-summary-icon"><i class="bi bi-shield-lock"></i></div>
+            <strong>Unified Operations</strong>
+            <span>Attendance, academics, notices, reports, and access control</span>
+          </div>
         </div>
       </div>
 
-    </div>
-  </div>
+      <div class="landing-auth-visual">
+        <div class="landing-app-stage">
+          <div class="landing-app-window">
+            <div class="landing-app-topbar">
+              <div class="landing-app-logo">
+                <i class="bi bi-mortarboard-fill"></i>
+                <span>SmartAttend</span>
+              </div>
+              <div class="landing-app-topbar-actions">
+                <span><i class="bi bi-list"></i></span>
+              </div>
+              <div class="landing-app-search">
+                <i class="bi bi-search"></i>
+                <span>Search anything...</span>
+              </div>
+              <div class="landing-app-alerts">
+                <span class="landing-app-alert-badge"><i class="bi bi-bell"></i></span>
+                <span class="landing-app-alert-badge"><i class="bi bi-envelope"></i></span>
+              </div>
+              <div class="landing-app-user">
+                <span class="landing-app-user-avatar"><i class="bi bi-person-circle"></i></span>
+                <div>
+                  <strong>Admin</strong>
+                  <small>Super Admin</small>
+                </div>
+              </div>
+            </div>
 
+            <div class="landing-app-body">
+              <aside class="landing-app-sidebar">
+                <div class="landing-app-nav-item active"><i class="bi bi-house-door-fill"></i><span>Dashboard</span></div>
+                <div class="landing-app-nav-item"><i class="bi bi-people-fill"></i><span>Students</span></div>
+                <div class="landing-app-nav-item"><i class="bi bi-person-workspace"></i><span>Teachers</span></div>
+                <div class="landing-app-nav-item"><i class="bi bi-calendar-check"></i><span>Attendance</span></div>
+                <div class="landing-app-nav-item"><i class="bi bi-journal-bookmark"></i><span>Classes</span></div>
+                <div class="landing-app-nav-item"><i class="bi bi-clipboard-data"></i><span>Reports</span></div>
+                <div class="landing-app-nav-item"><i class="bi bi-gear"></i><span>Settings</span></div>
+              </aside>
+
+              <div class="landing-app-main">
+                <div class="landing-app-heading">Dashboard</div>
+
+                <div class="landing-app-stats">
+                  <div class="landing-app-stat">
+                    <span>Students</span>
+                    <strong>1,248</strong>
+                    <small>Total Students</small>
+                  </div>
+                  <div class="landing-app-stat">
+                    <span>Teachers</span>
+                    <strong>86</strong>
+                    <small>Total Teachers</small>
+                  </div>
+                  <div class="landing-app-stat">
+                    <span>Attendance</span>
+                    <strong>92%</strong>
+                    <small>Overall Today</small>
+                  </div>
+                  <div class="landing-app-stat">
+                    <span>Classes</span>
+                    <strong>48</strong>
+                    <small>Total Classes</small>
+                  </div>
+                </div>
+
+                <div class="landing-app-panels">
+                  <div class="landing-app-panel landing-app-chart-panel">
+                    <div class="landing-app-panel-head">
+                      <div class="landing-app-panel-title">Attendance Overview</div>
+                      <a href="#">View Trends</a>
+                    </div>
+                    <div class="landing-app-chart">
+                      <span class="landing-chart-line line-a"></span>
+                      <span class="landing-chart-line line-b"></span>
+                      <span class="landing-chart-line line-c"></span>
+                    </div>
+                    <div class="landing-app-chart-legend">
+                      <span><i class="legend-dot legend-green"></i>Present</span>
+                      <span><i class="legend-dot legend-blue"></i>Assigned</span>
+                      <span><i class="legend-dot legend-red"></i>Leave</span>
+                    </div>
+                  </div>
+                  <div class="landing-app-panel">
+                    <div class="landing-app-panel-head">
+                      <div class="landing-app-panel-title">Notice Board</div>
+                      <a href="#">View All</a>
+                    </div>
+                    <div class="landing-app-notice">
+                      <strong>Annual Sports Day</strong>
+                      <small>12 May 2026</small>
+                    </div>
+                    <div class="landing-app-notice">
+                      <strong>Parent Teacher Meeting</strong>
+                      <small>10 May 2026</small>
+                    </div>
+                    <div class="landing-app-notice">
+                      <strong>Library Book Return</strong>
+                      <small>08 May 2026</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-info-section" id="landing-roles">
+      <div class="landing-section-head">
+        <div class="landing-section-kicker">Role Coverage</div>
+        <h3>Built for Every Role</h3>
+        <p>One platform with role-aware workflows for academic and operational users.</p>
+      </div>
+
+      <div class="landing-role-grid">
+        <article class="landing-role-card">
+          <div class="landing-role-icon role-admin"><i class="bi bi-person-gear"></i></div>
+          <div>
+            <h4>For Administrators</h4>
+            <p>Manage students, teachers, classes, attendance, notices, fees, and reports from one dashboard.</p>
+          </div>
+        </article>
+        <article class="landing-role-card">
+          <div class="landing-role-icon role-teacher"><i class="bi bi-person-video3"></i></div>
+          <div>
+            <h4>For Teachers</h4>
+            <p>Handle attendance, class updates, academic documents, marks, and day-to-day student monitoring.</p>
+          </div>
+        </article>
+        <article class="landing-role-card">
+          <div class="landing-role-icon role-student"><i class="bi bi-people"></i></div>
+          <div>
+            <h4>For Students</h4>
+            <p>View attendance, notices, results, schedules, and essential academic resources in one place.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-info-section" id="landing-features">
+      <div class="landing-section-head">
+        <div class="landing-section-kicker">Core Modules</div>
+        <h3>Powerful Features</h3>
+        <p>Operational tools built for colleges that need structure, visibility, and controlled access.</p>
+      </div>
+
+      <div class="landing-feature-grid">
+        {% for icon, title in [
+          ('bi-people', 'Student Management'),
+          ('bi-person-workspace', 'Teacher Management'),
+          ('bi-calendar-check', 'Attendance Tracking'),
+          ('bi-diagram-3', 'Class & Section'),
+          ('bi-megaphone', 'Notice Management'),
+          ('bi-graph-up-arrow', 'Reports & Analytics'),
+          ('bi-credit-card-2-front', 'Fee Records'),
+          ('bi-person-lock', 'Role Based Access'),
+          ('bi-cloud-check', 'Secure Cloud Access'),
+          ('bi-buildings', 'Multi College Support')
+        ] %}
+        <div class="landing-feature-item">
+          <span class="landing-feature-icon"><i class="bi {{ icon }}"></i></span>
+          <span>{{ title }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="landing-info-section" id="landing-about">
+      <div class="landing-section-head">
+        <div class="landing-section-kicker">Platform Model</div>
+        <h3>Institution Ready by Design</h3>
+        <p>Structured for real colleges that need controlled access, operational clarity, and a system that works across departments.</p>
+      </div>
+
+      <div class="landing-role-grid landing-value-grid">
+        <article class="landing-role-card landing-value-card">
+          <div class="landing-role-icon role-admin"><i class="bi bi-buildings"></i></div>
+          <div>
+            <h4>Multi-College Operations</h4>
+            <p>Support separate colleges, dedicated admins, isolated records, and platform-level oversight from one system.</p>
+          </div>
+        </article>
+        <article class="landing-role-card landing-value-card">
+          <div class="landing-role-icon role-teacher"><i class="bi bi-sliders2-vertical"></i></div>
+          <div>
+            <h4>Controlled Feature Access</h4>
+            <p>Super admin can enable, restrict, or completely hide modules per college without breaking role workflows.</p>
+          </div>
+        </article>
+        <article class="landing-role-card landing-value-card">
+          <div class="landing-role-icon role-student"><i class="bi bi-journal-check"></i></div>
+          <div>
+            <h4>Academic + Operational Coverage</h4>
+            <p>Bring attendance, notices, dashboards, user management, and records into a single institutional workspace.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-info-section" id="landing-workflow">
+      <div class="landing-section-head">
+        <div class="landing-section-kicker">Operating Flow</div>
+        <h3>How It Works</h3>
+        <p>Simple onboarding path for institutions and clear access flow for daily operations.</p>
+      </div>
+
+      <div class="landing-step-grid">
+        <article class="landing-step-card">
+          <div class="landing-step-index">1</div>
+          <h4>College Setup</h4>
+          <p>Configure the institution profile, users, settings, and enabled modules for the college.</p>
+        </article>
+        <article class="landing-step-card">
+          <div class="landing-step-index">2</div>
+          <h4>Account Access</h4>
+          <p>Create secure access for admins, teachers, students, and parents with role-based visibility.</p>
+        </article>
+        <article class="landing-step-card">
+          <div class="landing-step-index">3</div>
+          <h4>Daily Operations</h4>
+          <p>Use attendance, records, notices, reports, and academic management tools from one platform.</p>
+        </article>
+        <article class="landing-step-card">
+          <div class="landing-step-index">4</div>
+          <h4>Track & Improve</h4>
+          <p>Review updates, monitor activity, and keep institutional workflows organized throughout the term.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="landing-info-section landing-portal-section" id="landing-portal">
+      <div class="landing-section-head">
+        <div class="landing-section-kicker">Secure Entry</div>
+        <h3>Portal Access</h3>
+        <p>Use your institutional credentials to access the SmartAttend workspace assigned to your role.</p>
+      </div>
+
+      <div class="landing-portal-shell">
+        <div class="landing-portal-copy">
+          <div class="landing-portal-copy-card">
+            <div class="landing-login-card-badge">Institution Access</div>
+            <h4>One secure entry point for every authorized role</h4>
+            <p>Super admins can access the platform directly. College users sign in with their assigned email, password, and college code when required.</p>
+            <ul class="landing-portal-points">
+              <li><i class="bi bi-check2-circle"></i><span>Role-based dashboards after successful sign-in</span></li>
+              <li><i class="bi bi-check2-circle"></i><span>Temporary-password onboarding for teacher, student, and parent accounts</span></li>
+              <li><i class="bi bi-check2-circle"></i><span>Secure reset flow through verified email for forgotten passwords</span></li>
+            </ul>
+          </div>
+        </div>
+        <div class="landing-login-card">
+          <div class="landing-login-card-head">
+            <div class="landing-login-card-badge">Portal Access</div>
+            <h2>Welcome back!</h2>
+            <p>Sign in to continue to SmartAttend.</p>
+          </div>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show mb-3 py-2 px-3 small" role="alert" data-flash>
+            <i class="bi bi-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-triangle{% else %}info-circle{% endif %}-fill me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+          </div>
+          {% endfor %}
+          {% endwith %}
+
+          <form method="POST" action="{{ url_for('auth.login') }}" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            {% if not college_locked %}
+            <div class="field-group mb-3">
+              <label class="field-label">College Code</label>
+              <div class="field-wrap">
+                <span class="field-icon"><i class="bi bi-buildings-fill"></i></span>
+                <input type="text" name="college_code" class="field-input" placeholder="e.g. ABC"
+                  value="{{ submitted_college_code or '' }}" autocomplete="organization">
+              </div>
+              <div class="form-text mt-2">College users should enter their college code. Super admins can leave this blank.</div>
+            </div>
+            {% else %}
+            <input type="hidden" name="college_code" value="{{ login_college.code if login_college else '' }}">
+            {% endif %}
+
+            <div class="field-group mb-3">
+              <label class="field-label">Email Address</label>
+              <div class="field-wrap">
+                <span class="field-icon"><i class="bi bi-envelope-fill"></i></span>
+                <input type="email" name="email" class="field-input" placeholder="you@college.edu" required autofocus autocomplete="email">
+              </div>
+            </div>
+
+            <div class="field-group mb-3">
+              <label class="field-label">Password</label>
+              <div class="field-wrap">
+                <span class="field-icon"><i class="bi bi-lock-fill"></i></span>
+                <input type="password" name="password" id="pwInput" class="field-input" placeholder="Enter your password" required autocomplete="current-password">
+                <button type="button" class="field-eye" id="togglePw" tabindex="-1" title="Toggle visibility">
+                  <i class="bi bi-eye-fill" id="eyeIcon"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="landing-login-row">
+              <label class="remember-label">
+                <input type="checkbox" name="remember" class="remember-check">
+                <span>Remember me</span>
+              </label>
+              <a href="{{ url_for('auth.forgot_password') }}" class="small text-decoration-none fw-semibold">Forgot password?</a>
+            </div>
+
+            <button type="submit" class="signin-btn mt-3">
+              <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+            </button>
+          </form>
+
+          <div class="landing-login-meta">
+            <span><i class="bi bi-shield-check"></i> Protected access</span>
+            <span><i class="bi bi-lock-fill"></i> Secure session</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="landing-auth-footer">
+      <p>Copyright © 2026 SmartAttend. All rights reserved.</p>
+    </footer>
+  </div>
 </div>
 
 <script>

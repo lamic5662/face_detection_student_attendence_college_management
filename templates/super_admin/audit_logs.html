@@ -47,6 +47,24 @@
     <div class="d-flex align-items-center gap-2">
       <span class="badge bg-light text-dark border">{{ logs|length }} entries</span>
       <form method="post"
+            action="{{ url_for('super_admin.delete_selected_audit_logs') }}"
+            id="deleteSelectedAuditLogsForm"
+            data-confirm="Delete the selected audit log entries?"
+            data-confirm-title="Delete Selected Audit Logs"
+            data-confirm-type="danger"
+            data-confirm-ok="Delete Selected">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="college_id" value="{{ selected_college_id or '' }}">
+        <input type="hidden" name="action" value="{{ selected_action or '' }}">
+        <div id="selectedAuditLogInputs"></div>
+        <button type="submit"
+                class="btn btn-sm btn-outline-danger"
+                id="deleteSelectedAuditLogsButton"
+                disabled>
+          <i class="bi bi-trash3 me-1"></i>Delete Selected
+        </button>
+      </form>
+      <form method="post"
             action="{{ url_for('super_admin.delete_filtered_audit_logs') }}"
             data-confirm="Delete all audit log entries matching the current filters?"
             data-confirm-title="Delete Filtered Audit Logs"
@@ -66,6 +84,9 @@
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
+            <th class="ps-4" style="width: 48px;">
+              <input type="checkbox" class="form-check-input" id="selectAllAuditLogs" {% if not logs %}disabled{% endif %}>
+            </th>
             <th class="px-4">When</th>
             <th>Actor</th>
             <th>College</th>
@@ -79,6 +100,12 @@
           {% for log in logs %}
           {% set details = log.get_details() %}
           <tr>
+            <td class="ps-4">
+              <input type="checkbox"
+                     class="form-check-input audit-log-select"
+                     value="{{ log.id }}"
+                     aria-label="Select audit log {{ log.id }}">
+            </td>
             <td class="px-4 text-nowrap small text-muted">
               {{ log.created_at.strftime('%d %b %Y %H:%M') if log.created_at else '-' }}
             </td>
@@ -130,7 +157,7 @@
           </tr>
           {% else %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-5">No audit entries found for the selected filters.</td>
+            <td colspan="8" class="text-center text-muted py-5">No audit entries found for the selected filters.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -138,4 +165,48 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const selectAll = document.getElementById('selectAllAuditLogs');
+    const rowChecks = Array.from(document.querySelectorAll('.audit-log-select'));
+    const deleteButton = document.getElementById('deleteSelectedAuditLogsButton');
+    const selectedInputs = document.getElementById('selectedAuditLogInputs');
+
+    if (!deleteButton || !selectedInputs) return;
+
+    function syncSelectedState() {
+      const selected = rowChecks.filter((cb) => cb.checked);
+      selectedInputs.innerHTML = selected.map((cb) => (
+        `<input type="hidden" name="selected_log_ids" value="${cb.value}">`
+      )).join('');
+
+      deleteButton.disabled = selected.length === 0;
+      deleteButton.innerHTML = `<i class="bi bi-trash3 me-1"></i>Delete Selected${selected.length ? ` (${selected.length})` : ''}`;
+
+      if (selectAll) {
+        const checkedCount = selected.length;
+        selectAll.checked = checkedCount > 0 && checkedCount === rowChecks.length;
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < rowChecks.length;
+      }
+    }
+
+    if (selectAll) {
+      selectAll.addEventListener('change', () => {
+        rowChecks.forEach((cb) => {
+          cb.checked = selectAll.checked;
+        });
+        syncSelectedState();
+      });
+    }
+
+    rowChecks.forEach((cb) => {
+      cb.addEventListener('change', syncSelectedState);
+    });
+
+    syncSelectedState();
+  })();
+</script>
 {% endblock %}

@@ -22,6 +22,16 @@
             <input type="text" name="code" class="form-control" placeholder="CS" required
                    style="text-transform:uppercase">
           </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">University / Board</label>
+            <select name="university_id" class="form-select">
+              <option value="">Use college default / independent</option>
+              {% for university in universities %}
+              <option value="{{ university.id }}">{{ university.name }} ({{ university.code }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Map this program to TU, KU, PU, or another university.</div>
+          </div>
           <button type="submit" class="btn btn-primary w-100">
             <i class="bi bi-building-fill-add me-2"></i>Add Department
           </button>
@@ -48,6 +58,7 @@
                 </th>
                 <th class="px-2">Code</th>
                 <th>Name</th>
+                <th>University</th>
                 <th>Students</th>
                 <th>Teachers</th>
                 <th>Actions</th>
@@ -65,6 +76,14 @@
                 </td>
                 <td class="px-2"><span class="badge bg-primary">{{ d.code }}</span></td>
                 <td class="fw-semibold">{{ d.name }}</td>
+                <td>
+                  {% if d.resolved_university %}
+                  <span class="badge bg-info-subtle text-info">{{ d.resolved_university.code }}</span>
+                  <div class="small text-muted">{{ d.resolved_university.name }}</div>
+                  {% else %}
+                  <span class="text-muted small">Independent</span>
+                  {% endif %}
+                </td>
                 <td>{{ d.students|length }}</td>
                 <td>{{ d.teachers|length }}</td>
                 <td>
@@ -104,6 +123,15 @@
                           <label class="form-label fw-semibold">Code</label>
                           <input type="text" name="code" class="form-control" value="{{ d.code }}" required style="text-transform:uppercase">
                         </div>
+                        <div class="mb-2">
+                          <label class="form-label fw-semibold">University / Board</label>
+                          <select name="university_id" class="form-select">
+                            <option value="">Independent / no override</option>
+                            {% for university in universities %}
+                            <option value="{{ university.id }}" {% if d.university_id == university.id %}selected{% endif %}>{{ university.name }} ({{ university.code }})</option>
+                            {% endfor %}
+                          </select>
+                        </div>
                       </div>
                       <div class="modal-footer border-0">
                         <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Cancel</button>
@@ -114,7 +142,7 @@
                 </div>
               </div>
               {% else %}
-              <tr><td colspan="6" class="text-center text-muted py-4">No departments yet.</td></tr>
+              <tr><td colspan="7" class="text-center text-muted py-4">No departments yet.</td></tr>
               {% endfor %}
             </tbody>
           </table>

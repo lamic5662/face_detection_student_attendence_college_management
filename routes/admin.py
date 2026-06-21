@@ -9,6 +9,7 @@ from models.student import Student
 from models.teacher import Teacher
 from models.subject import Subject
 from models.department import Department
+from models.university import University
 from models.attendance import AttendanceSession, AttendanceRecord
 from models.notice import Notice
 from models.exam import Exam
@@ -286,6 +287,95 @@ def users():
                            search=search)
 
 
+@admin_bp.route('/librarians')
+@login_required
+@strict_admin_required
+def librarians():
+    search = request.args.get('q', '').strip()
+    query = _scoped_user_query().filter_by(role='librarian', is_active=True)
+    if search:
+        query = query.filter(
+            db.or_(User.name.ilike(f'%{search}%'),
+                   User.email.ilike(f'%{search}%'))
+        )
+    librarian_users = query.order_by(User.created_at.desc()).all()
+    return render_template('admin/librarians.html', librarian_users=librarian_users, search=search)
+
+
+@admin_bp.route('/librarians/add', methods=['POST'])
+@login_required
+@strict_admin_required
+def add_librarian():
+    cid = _admin_college_id()
+    name = request.form.get('name', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    temp_password = request.form.get('temp_password', '').strip()
+
+    if not name or not email or not temp_password:
+        flash('Name, email, and temporary password are required.', 'danger')
+        return redirect(url_for('admin.librarians'))
+
+    if not _validate_temporary_password(temp_password):
+        flash('Temporary password must be at least 8 characters with uppercase, lowercase, digit, and special character.', 'danger')
+        return redirect(url_for('admin.librarians'))
+
+    if User.query.filter_by(college_id=cid, email=email).first():
+        flash('A user with that email already exists in this college.', 'danger')
+        return redirect(url_for('admin.librarians'))
+
+    user = User(
+        college_id=cid,
+        name=name,
+        email=email,
+        role='librarian',
+        is_active=True,
+    )
+    user.set_temporary_password(temp_password)
+    db.session.add(user)
+    db.session.commit()
+    flash(f'Librarian {name} created successfully.', 'success')
+    return redirect(url_for('admin.librarians'))
+
+
+@admin_bp.route('/librarians/<int:uid>/edit', methods=['POST'])
+@login_required
+@strict_admin_required
+def edit_librarian(uid):
+    user = User.query.filter_by(id=uid, college_id=_admin_college_id(), role='librarian').first_or_404()
+    name = request.form.get('name', '').strip()
+    email = request.form.get('email', '').strip().lower()
+
+    if not name or not email:
+        flash('Name and email are required.', 'danger')
+        return redirect(url_for('admin.librarians'))
+
+    duplicate = User.query.filter(
+        User.college_id == _admin_college_id(),
+        User.email == email,
+        User.id != user.id,
+    ).first()
+    if duplicate:
+        flash('Another user with that email already exists in this college.', 'danger')
+        return redirect(url_for('admin.librarians'))
+
+    user.name = name
+    user.email = email
+    db.session.commit()
+    flash(f'Librarian {name} updated.', 'success')
+    return redirect(url_for('admin.librarians'))
+
+
+@admin_bp.route('/librarians/<int:uid>/delete', methods=['POST'])
+@login_required
+@strict_admin_required
+def delete_librarian(uid):
+    user = User.query.filter_by(id=uid, college_id=_admin_college_id(), role='librarian').first_or_404()
+    db.session.delete(user)
+    db.session.commit()
+    flash(f'Librarian {user.name} removed.', 'info')
+    return redirect(url_for('admin.librarians'))
+
+
 @admin_bp.route('/users/toggle/<int:uid>', methods=['POST'])
 @login_required
 @admin_required
@@ -321,19 +411,28 @@ def reset_user_password(uid):
 @login_required
 @admin_required
 def departments():
+    universities = University.query.filter_by(is_active=True).order_by(University.name.asc()).all()
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         code = request.form.get('code', '').strip().upper()
+        university_id = request.form.get('university_id', type=int)
+        university = db.session.get(University, university_id) if university_id else None
         if not name or not code:
             flash('Name and code are required.', 'danger')
         elif _scoped_department_query().filter_by(code=code).first():
             flash('Department code already exists.', 'danger')
         else:
-            db.session.add(Department(college_id=_admin_college_id(), name=name, code=code))
+            db.session.add(Department(
+                college_id=_admin_college_id(),
+                university_id=university.id if university else current_user.college.university_id,
+                name=name,
+                code=code,
+            ))
             db.session.commit()
             flash(f'Department {code} added.', 'success')
     return render_template('admin/departments.html',
-                           departments=_scoped_department_query().all())
+                           departments=_scoped_department_query().all(),
+                           universities=universities)
 
 
 @admin_bp.route('/departments/edit/<int:did>', methods=['POST'])
@@ -343,6 +442,8 @@ def edit_department(did):
     dept = _scoped_model_or_404(Department, did)
     name = request.form.get('name', '').strip()
     code = request.form.get('code', '').strip().upper()
+    university_id = request.form.get('university_id', type=int)
+    university = db.session.get(University, university_id) if university_id else None
     if not name or not code:
         flash('Name and code are required.', 'danger')
         return redirect(url_for('admin.people_hub', tab='departments'))
@@ -351,6 +452,7 @@ def edit_department(did):
         return redirect(url_for('admin.people_hub', tab='departments'))
     dept.name = name
     dept.code = code
+    dept.university_id = university.id if university else None
     db.session.commit()
     flash(f'Department {code} updated.', 'success')
     return redirect(url_for('admin.people_hub', tab='departments'))
@@ -1564,7 +1666,7 @@ def approve_id_card(cid):
     card.rejection_note = None
     if not card.card_number:
         s = card.student
-        card.card_number = f"{current_user.college.code}-{s.department.code}-{s.roll_number}"
+        card.card_number = s.roll_number
     db.session.commit()
     flash(f'ID card approved for {card.student.user.name}.', 'success')
     return redirect(url_for('admin.id_cards', status='pending'))
@@ -2310,7 +2412,10 @@ def people_hub():
                    departments=departments, selected_dept=dept_id, search=search)
 
     elif tab == 'departments':
-        ctx['departments_list'] = _scoped_department_query().order_by(Department.name).all()
+        departments = _scoped_department_query().order_by(Department.name).all()
+        ctx['departments_list'] = departments
+        ctx['departments'] = departments
+        ctx['universities'] = University.query.filter_by(is_active=True).order_by(University.name.asc()).all()
 
     elif tab == 'parents':
         parents_list = _scoped_user_query().filter_by(role='parent', is_active=True).all()
@@ -2539,15 +2644,17 @@ def attendance_hub():
 @login_required
 @admin_required
 def my_plan():
-    from models.college import COLLEGE_PLANS
-    from utils.feature_access import FEATURE_CATALOG, FEATURE_PRESETS, college_feature_matrix
+    from models.college import normalize_college_plan_key, resolved_college_plans
+    from utils.feature_access import FEATURE_CATALOG, FEATURE_PRESETS, college_feature_matrix, resolve_college_plan_state
 
     college = current_user.college
-    plan_key = college.plan or 'free'
-    plan_meta = COLLEGE_PLANS.get(plan_key, COLLEGE_PLANS['free'])
+    all_plans = resolved_college_plans()
 
     # What features are actually enabled for this college
     feature_matrix = college_feature_matrix(college.id)
+    plan_state = resolve_college_plan_state(college.plan, feature_matrix)
+    plan_key = plan_state['display_plan_key'] or normalize_college_plan_key(college.plan)
+    plan_meta = plan_state['display_plan_meta']
     enabled_features = [k for k, v in feature_matrix.items() if v]
     disabled_features = [k for k, v in feature_matrix.items() if not v]
 
@@ -2566,7 +2673,11 @@ def my_plan():
         college=college,
         plan_key=plan_key,
         plan_meta=plan_meta,
-        all_plans=COLLEGE_PLANS,
+        billing_plan_meta=plan_state['billing_plan_meta'],
+        billing_plan_key=plan_state['billing_plan_key'],
+        is_custom_plan=plan_state['is_custom'],
+        plan_matches_billing=plan_state['matches_billing_plan'],
+        all_plans=all_plans,
         feature_catalog=FEATURE_CATALOG,
         feature_presets=FEATURE_PRESETS,
         enabled_features=enabled_features,

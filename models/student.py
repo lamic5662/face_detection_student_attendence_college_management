@@ -61,14 +61,21 @@ class Student(db.Model):
         return round((present / total) * 100, 2)
 
     @classmethod
-    def generate_roll_number(cls, college_id: int, department_id: int, year: int) -> str:
-        from models.college import College
+    def roll_number_prefix(cls, college_id: int, department_id: int, year: int) -> str:
         from models.department import Department
-        college = College.query.get(college_id)
-        dept = Department.query.get(department_id)
-        college_code = (college.code if college else 'COL').upper()
-        dept_code = (dept.code if dept else 'DEPT').upper()
-        prefix = f"{college_code}-{dept_code}-{year}-"
+
+        dept = db.session.get(Department, department_id)
+        university_code = (
+            (dept.resolved_university.code if dept and dept.resolved_university else 'GEN')
+            .strip()
+            .upper()
+        )
+        dept_code = (dept.code if dept else 'DEPT').strip().upper()
+        return f"{university_code}-{dept_code}-{year}"
+
+    @classmethod
+    def generate_roll_number(cls, college_id: int, department_id: int, year: int) -> str:
+        prefix = f"{cls.roll_number_prefix(college_id, department_id, year)}-"
         existing = cls.query.filter(
             cls.college_id == college_id,
             cls.roll_number.like(f"{prefix}%")

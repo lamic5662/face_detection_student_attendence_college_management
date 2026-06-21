@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Library Hierarchy{% endblock %}
+{% block page_title %}<i class="bi bi-diagram-3 me-2"></i>Library Hierarchy{% endblock %}
+
+{% macro render_tree_node(node, depth=0) -%}
+  <details
+    class="library-tree-node"
+    data-tree-search-node
+    data-tree-search-text="{{ ((node.name or '') ~ ' ' ~ (node.code or '') ~ ' ' ~ (node.full_label or '') ~ ' ' ~ (node.type_label or '') ~ ' ' ~ (node.coordinate_label or '') ~ ' ' ~ (node.academic_scope_label or '') ~ ' ' ~ (node.notes or ''))|trim }}"
+  >
+    <summary class="library-tree-summary">
+      <span class="library-tree-toggle"></span>
+      <span class="badge bg-secondary-subtle text-secondary">{{ node.type_label }}</span>
+      <span class="fw-semibold">{{ node.name }}</span>
+      {% if node.code %}<span class="badge text-bg-light border">{{ node.code }}</span>{% endif %}
+      {% if not node.is_active %}<span class="badge bg-warning-subtle text-warning-emphasis">Inactive</span>{% endif %}
+      {% if node.location_type == 'rack' and node.grid_label %}
+      <span class="badge bg-info-subtle text-info-emphasis">{{ node.grid_label }}</span>
+      {% endif %}
+      {% if node.coordinate_label %}
+      <span class="badge bg-light text-dark border">{{ node.coordinate_label }}</span>
+      {% endif %}
+      {% if node.children %}
+      <span class="badge bg-light text-dark border">{{ node.children|length }} child</span>
+      {% endif %}
+    </summary>
+
+    <div class="library-tree-card">
+      <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+        <div>
+          <div class="small text-muted">{{ node.full_label }}</div>
+          <div class="small text-muted mt-1">{{ node.academic_scope_label }}</div>
+          {% if node.notes %}
+          <div class="small mt-2">{{ node.notes }}</div>
+          {% endif %}
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-self-start">
+          {% if node.location_type == 'rack' %}
+          <a href="{{ url_for('library.manage_racks', edit_id=node.id) }}" class="btn btn-sm btn-outline-primary">Edit Rack</a>
+          {% elif node.location_type == 'cell' %}
+          <a href="{{ url_for('library.manage_rack_assignments', edit_id=node.id) }}" class="btn btn-sm btn-outline-primary">Assign Cell</a>
+          {% endif %}
+          {% if node.location_type in ['rack', 'cell'] %}
+          <a href="{{ url_for('library.create_book') }}" class="btn btn-sm btn-outline-secondary">Add Book</a>
+          {% endif %}
+          <form
+            method="post"
+            action="{{ url_for('library.delete_location', location_id=node.id) }}"
+            data-confirm="Delete this hierarchy node?"
+            data-confirm-title="Delete hierarchy node?"
+            data-confirm-type="danger"
+            data-confirm-ok="Delete"
+          >
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="next_view" value="library.manage_locations">
+            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+          </form>
+        </div>
+      </div>
+
+      {% if node.children %}
+      <div class="library-tree-branch">
+        {% for child in node.children|sort(attribute='name') %}
+          {{ render_tree_node(child, depth + 1) }}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </details>
+{%- endmacro %}
+
+{% block content %}
+<style>
+  .library-workflow-card {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.08), rgba(25, 135, 84, 0.08));
+    border: 1px solid rgba(13, 110, 253, 0.12);
+  }
+
+  .library-tree-shell {
+    background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  }
+
+  .library-tree-node {
+    position: relative;
+    margin: 0 0 1rem 0;
+  }
+
+  .library-tree-node:last-child {
+    margin-bottom: 0;
+  }
+
+  .library-tree-summary {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.9rem;
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  }
+
+  .library-tree-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .library-tree-toggle {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    border: 1px solid rgba(15, 23, 42, 0.18);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    background: #f8fafc;
+  }
+
+  .library-tree-toggle::before {
+    content: "+";
+    font-weight: 700;
+    line-height: 1;
+    color: #334155;
+  }
+
+  .library-tree-node[open] > .library-tree-summary .library-tree-toggle::before {
+    content: "−";
+  }
+
+  .library-tree-card {
+    margin-left: 1.35rem;
+    padding: 0.9rem 0 0 1.5rem;
+    border-left: 2px solid rgba(13, 110, 253, 0.14);
+  }
+
+  .library-tree-branch {
+    margin-top: 1rem;
+  }
+
+  .library-tree-metric {
+    min-width: 0;
+  }
+
+  @media (max-width: 767.98px) {
+    .library-tree-card {
+      margin-left: 0.6rem;
+      padding-left: 1rem;
+    }
+  }
+</style>
+
+<div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3 mb-4">
+  <div>
+    <h2 class="h4 mb-1">Hierarchy Tree</h2>
+    <div class="text-muted">Expand racks to inspect row and column cells, then jump directly into assignment or book placement.</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <button type="button" class="btn btn-outline-secondary" data-tree-action="expand">Expand All</button>
+    <button type="button" class="btn btn-outline-secondary" data-tree-action="collapse">Collapse All</button>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm library-workflow-card h-100">
+      <div class="card-body p-4">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="fw-semibold mb-1">1. Build Rack</div>
+            <div class="small text-muted">Create a rack with total rows and total columns.</div>
+          </div>
+          <div class="col-md-4">
+            <div class="fw-semibold mb-1">2. Assign Cells</div>
+            <div class="small text-muted">Give each row and column cell its department, semester, and subject.</div>
+          </div>
+          <div class="col-md-4">
+            <div class="fw-semibold mb-1">3. Place Books</div>
+            <div class="small text-muted">Add books into the exact rack cell that owns that academic area.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body p-4">
+        <div class="fw-semibold mb-2">How The Tree Reads</div>
+        <div class="small text-muted">A rack expands into child cells. Each cell shows its row, column, and academic assignment so the librarian can inspect the structure before editing.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3">
+      <div class="col-lg-4">
+        <input type="text" class="form-control" name="q" value="{{ filters.q }}" placeholder="Search node, rack, row, column, code" id="hierarchyLiveSearchInput">
+      </div>
+      <div class="col-md-4 col-lg-2">
+        <select class="form-select hierarchy-department-select" name="department_id" data-subject-target="hierarchySubjectSelect" data-semester-target="hierarchySemesterFilter">
+          <option value="">All departments</option>
+          {% for department in departments %}
+          <option value="{{ department.id }}" {% if filters.department_id == department.id %}selected{% endif %}>{{ department.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 col-lg-2">
+        <input type="number" class="form-control hierarchy-semester-input" id="hierarchySemesterFilter" name="semester" min="1" max="12" value="{{ filters.semester or '' }}" placeholder="Semester">
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <select class="form-select hierarchy-subject-select" id="hierarchySubjectSelect" name="subject_id" data-selected="{{ filters.subject_id or '' }}">
+          <option value="">All subjects</option>
+          {% for subject in subjects %}
+          <option value="{{ subject.id }}" data-department-id="{{ subject.department_id }}" data-semester="{{ subject.semester }}" {% if filters.subject_id == subject.id %}selected{% endif %}>{{ subject.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 col-lg-1 d-grid">
+        <button type="submit" class="btn btn-outline-secondary">Filter</button>
+      </div>
+      <div class="col-md-3 col-lg-1 d-grid">
+        <a href="{{ url_for('library.manage_locations') }}" class="btn btn-outline-secondary">Clear</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm library-tree-shell">
+  <div class="card-body p-4">
+    {% if location_roots %}
+      {% for node in location_roots %}
+        {{ render_tree_node(node) }}
+      {% endfor %}
+    {% else %}
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-diagram-3 fs-1 d-block mb-3 opacity-25"></i>
+      No library structure yet.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  function filterHierarchySubjects() {
+    const departmentSelect = document.querySelector('.hierarchy-department-select');
+    const semesterInput = document.querySelector('.hierarchy-semester-input');
+    const subjectSelect = document.querySelector('.hierarchy-subject-select');
+    if (!departmentSelect || !semesterInput || !subjectSelect) return;
+
+    const selectedDepartment = departmentSelect.value || '';
+    const selectedSemester = semesterInput.value || '';
+    const selectedSubject = subjectSelect.dataset.selected || subjectSelect.value || '';
+
+    if (!subjectSelect._originalOptions) {
+      subjectSelect._originalOptions = Array.from(subjectSelect.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        departmentId: option.dataset.departmentId || '',
+        semester: option.dataset.semester || '',
+      }));
+    }
+
+    subjectSelect.innerHTML = '';
+    subjectSelect._originalOptions.forEach((optionData) => {
+      if (optionData.value && selectedDepartment && optionData.departmentId !== selectedDepartment) {
+        return;
+      }
+      if (optionData.value && selectedSemester && optionData.semester !== selectedSemester) {
+        return;
+      }
+
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      option.dataset.departmentId = optionData.departmentId;
+      option.dataset.semester = optionData.semester;
+      if (optionData.value === selectedSubject) option.selected = true;
+      subjectSelect.appendChild(option);
+    });
+
+    if (!subjectSelect.value) {
+      subjectSelect.dataset.selected = '';
+    }
+  }
+
+  document.querySelectorAll('[data-tree-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const shouldOpen = button.dataset.treeAction === 'expand';
+      document.querySelectorAll('.library-tree-node').forEach((node) => {
+        node.open = shouldOpen;
+      });
+    });
+  });
+
+  const hierarchyDepartmentSelect = document.querySelector('.hierarchy-department-select');
+  const hierarchySemesterInput = document.querySelector('.hierarchy-semester-input');
+  const hierarchySubjectSelect = document.querySelector('.hierarchy-subject-select');
+
+  if (hierarchySubjectSelect) {
+    hierarchySubjectSelect.addEventListener('change', () => {
+      hierarchySubjectSelect.dataset.selected = hierarchySubjectSelect.value;
+    });
+  }
+
+  if (hierarchyDepartmentSelect) {
+    hierarchyDepartmentSelect.addEventListener('change', () => {
+      if (hierarchySubjectSelect) {
+        hierarchySubjectSelect.dataset.selected = '';
+      }
+      filterHierarchySubjects();
+    });
+  }
+
+  if (hierarchySemesterInput) {
+    hierarchySemesterInput.addEventListener('change', () => {
+      if (hierarchySubjectSelect) {
+        hierarchySubjectSelect.dataset.selected = '';
+      }
+      filterHierarchySubjects();
+    });
+    hierarchySemesterInput.addEventListener('input', () => {
+      if (hierarchySubjectSelect) {
+        hierarchySubjectSelect.dataset.selected = '';
+      }
+      filterHierarchySubjects();
+    });
+  }
+
+  filterHierarchySubjects();
+
+  function filterHierarchyTree() {
+    const searchInput = document.getElementById('hierarchyLiveSearchInput');
+    if (!searchInput) return;
+
+    const query = (searchInput.value || '').trim().toLowerCase();
+    const nodes = Array.from(document.querySelectorAll('[data-tree-search-node]'));
+
+    for (let index = nodes.length - 1; index >= 0; index -= 1) {
+      const node = nodes[index];
+      const ownText = (node.dataset.treeSearchText || '').toLowerCase();
+      const branch = node.querySelector(':scope > .library-tree-card > .library-tree-branch');
+      const childVisible = branch
+        ? Array.from(branch.children).some((child) => child.dataset.treeVisible === '1')
+        : false;
+      const visible = !query || ownText.includes(query) || childVisible;
+
+      node.style.display = visible ? '' : 'none';
+      node.dataset.treeVisible = visible ? '1' : '0';
+      if (query && childVisible) {
+        node.open = true;
+      }
+    }
+  }
+
+  const hierarchyLiveSearchInput = document.getElementById('hierarchyLiveSearchInput');
+  if (hierarchyLiveSearchInput) {
+    hierarchyLiveSearchInput.addEventListener('input', filterHierarchyTree);
+    hierarchyLiveSearchInput.addEventListener('search', filterHierarchyTree);
+  }
+
+  filterHierarchyTree();
+</script>
+{% endblock %}

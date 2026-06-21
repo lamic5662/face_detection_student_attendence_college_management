@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+{% block title %}Stock Audit{% endblock %}
+{% block page_title %}<i class="bi bi-clipboard2-check me-2"></i>Stock Audit{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="h4 mb-1">Inventory Audit & Stock Verification</h2>
+  <div class="text-muted">Start a stock-check session, scan shelf copies, and finalize the missing list for librarian review.</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Auditable Copies</div>
+      <div class="fs-4 fw-bold">{{ overview.auditable_copies }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Open Sessions</div>
+      <div class="fs-4 fw-bold text-warning-emphasis">{{ overview.open_sessions }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="text-muted small">Recent Completed</div>
+      <div class="fs-4 fw-bold">{{ overview.completed_sessions }}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Start New Audit</h3>
+        <div class="text-muted small">Choose a rack scope or leave it blank to verify all shelf-held physical stock.</div>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('library.create_stock_audit') }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-12">
+            <label class="form-label">Audit Title</label>
+            <input type="text" class="form-control" name="title" placeholder="Shelf Verification May 2026">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Rack Scope</label>
+            <select class="form-select" name="rack_id">
+              <option value="">Whole library stock</option>
+              {% for rack in rack_choices %}
+              <option value="{{ rack.id }}">{{ rack.full_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" name="notes" rows="3" placeholder="Optional audit note"></textarea>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-play-circle me-1"></i>Start Audit Session
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Recent Sessions</h3>
+        <div class="text-muted small">Open sessions stay editable. Completed sessions remain as history.</div>
+      </div>
+      <div class="card-body">
+        {% if open_sessions %}
+        <div class="mb-3">
+          <div class="fw-semibold small text-uppercase text-muted mb-2">Open</div>
+          <div class="list-group list-group-flush">
+            {% for session in open_sessions %}
+            <a href="{{ url_for('library.stock_audit', session_id=session.id) }}" class="list-group-item list-group-item-action px-0 {% if active_session and active_session.id == session.id %}active bg-primary-subtle text-primary-emphasis border-0 rounded px-3{% endif %}">
+              <div class="fw-semibold">{{ session.title }}</div>
+              <div class="small {% if active_session and active_session.id == session.id %}text-primary-emphasis{% else %}text-muted{% endif %}">
+                {{ session.scanned_count }}/{{ session.expected_count }} verified
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if completed_sessions %}
+        <div>
+          <div class="fw-semibold small text-uppercase text-muted mb-2">Completed</div>
+          <div class="list-group list-group-flush">
+            {% for session in completed_sessions %}
+            <a href="{{ url_for('library.stock_audit', session_id=session.id) }}" class="list-group-item list-group-item-action px-0 {% if active_session and active_session.id == session.id %}active bg-primary-subtle text-primary-emphasis border-0 rounded px-3{% endif %}">
+              <div class="fw-semibold">{{ session.title }}</div>
+              <div class="small {% if active_session and active_session.id == session.id %}text-primary-emphasis{% else %}text-muted{% endif %}">
+                Missing {{ session.missing_count }} · {{ session.completed_at.strftime('%d %b %Y') if session.completed_at else 'Completed' }}
+              </div>
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% else %}
+        <div class="text-muted">No completed stock audits yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <h3 class="h5 mb-1">{{ active_session.title if active_session else 'No Active Session Selected' }}</h3>
+          <div class="text-muted small">
+            {% if active_session %}
+            {{ active_session.rack.full_label if active_session.rack else 'Whole library scope' }} · {{ active_session.expected_count }} expected copy/copies
+            {% else %}
+            Start a session or open one from the left panel.
+            {% endif %}
+          </div>
+        </div>
+        {% if active_session %}
+        <div class="text-end">
+          <div class="small text-muted">Progress</div>
+          <div class="fw-semibold">{{ active_session.scanned_count }}/{{ active_session.expected_count }} verified</div>
+          <div class="small text-muted">{{ active_session.progress_percent }}%</div>
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if active_session %}
+          {% if active_session.status == 'open' %}
+          <div class="rounded-4 border p-3 mb-4">
+            <div class="fw-semibold mb-2">Scan Copy Into Audit</div>
+            <form method="post" action="{{ url_for('library.scan_stock_audit_copy', session_id=active_session.id) }}" class="row g-3">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="col-md-9">
+                <div class="input-group">
+                  <input type="text" class="form-control" id="auditCopyScanInput" name="copy_scan" placeholder="Scan copy QR, barcode, or accession number" required>
+                  <button type="button" class="btn btn-outline-secondary qr-scan-trigger" data-scan-target="auditCopyScanInput">
+                    <i class="bi bi-qr-code-scan"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="col-md-3 d-grid">
+                <button type="submit" class="btn btn-outline-primary">
+                  <i class="bi bi-check2-square me-1"></i>Verify Copy
+                </button>
+              </div>
+            </form>
+          </div>
+          {% endif %}
+
+          <div class="table-responsive">
+            <table class="table align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Copy</th>
+                  <th>Book</th>
+                  <th>Expected State</th>
+                  <th>Verified</th>
+                  <th>Discrepancy</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for entry in audit_entries %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ entry.copy.accession_number }}</div>
+                    <div class="small text-muted">{{ entry.copy.location_label }}</div>
+                  </td>
+                  <td>
+                    <div>{{ entry.copy.book.title }}</div>
+                    <div class="small text-muted">{{ entry.copy.book.author }}</div>
+                  </td>
+                  <td>
+                    <div>{{ entry.expected_status|replace('_', ' ')|title }}</div>
+                    <div class="small text-muted">{{ entry.expected_condition|title if entry.expected_condition else 'No condition saved' }}</div>
+                  </td>
+                  <td>
+                    <span class="badge {% if entry.is_present %}bg-success{% else %}bg-secondary{% endif %}">
+                      {{ 'Present' if entry.is_present else 'Not Verified' }}
+                    </span>
+                    {% if entry.scanned_at %}
+                    <div class="small text-muted mt-2">{{ entry.scanned_at.strftime('%d %b %Y %H:%M') }}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if entry.is_present %}
+                    <span class="badge bg-success-subtle text-success-emphasis">No Issue</span>
+                    {% else %}
+                    <span class="badge {% if entry.discrepancy_status == 'unresolved' %}bg-warning text-dark{% elif entry.discrepancy_status == 'follow_up_required' %}bg-info-subtle text-info-emphasis{% else %}bg-secondary{% endif %}">
+                      {{ entry.discrepancy_label }}
+                    </span>
+                    {% if entry.resolved_at %}
+                    <div class="small text-muted mt-2">{{ entry.resolved_at.strftime('%d %b %Y %H:%M') }}</div>
+                    {% endif %}
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    {% if active_session.status == 'open' %}
+                    <form method="post" action="{{ url_for('library.toggle_stock_audit_entry', entry_id=entry.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button type="submit" class="btn btn-sm {% if entry.is_present %}btn-outline-warning{% else %}btn-outline-success{% endif %}">
+                        {{ 'Mark Missing' if entry.is_present else 'Mark Present' }}
+                      </button>
+                    </form>
+                    {% elif not entry.is_present %}
+                    {% set actions = discrepancy_action_options.get(entry.id, []) %}
+                    {% if actions %}
+                    <form method="post" action="{{ url_for('library.resolve_stock_audit_discrepancy', entry_id=entry.id) }}" class="d-grid gap-2">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <select class="form-select form-select-sm" name="discrepancy_action" required>
+                        <option value="">Resolve discrepancy</option>
+                        {% for action_value, action_label in actions %}
+                        <option value="{{ action_value }}" {% if entry.discrepancy_status == action_value %}selected{% endif %}>{{ action_label }}</option>
+                        {% endfor %}
+                      </select>
+                      <input type="text" class="form-control form-control-sm" name="note" maxlength="255" placeholder="Optional note">
+                      <button type="submit" class="btn btn-sm btn-outline-dark">Apply</button>
+                    </form>
+                    {% else %}
+                    <span class="text-muted small">No further action</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-muted small">Session completed</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          {% if active_session.status == 'open' %}
+          <div class="d-flex justify-content-end mt-4">
+            <form method="post" action="{{ url_for('library.finalize_stock_audit', session_id=active_session.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-primary">Finalize Audit</button>
+            </form>
+          </div>
+          {% else %}
+          <div class="alert alert-light border mt-4 mb-0">
+            Completed by {{ active_session.completed_by.name if active_session.completed_by else 'librarian' }}{% if active_session.completed_at %} on {{ active_session.completed_at.strftime('%d %b %Y %H:%M') }}{% endif %}.
+            Missing copies in this session: <strong>{{ active_session.missing_count }}</strong>.
+          </div>
+          <div class="small text-muted mt-3">
+            Use the discrepancy action forms on missing rows to mark copies as lost, damaged, or follow-up required.
+          </div>
+          {% endif %}
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-clipboard2-data fs-1 d-block mb-3 opacity-25"></i>
+          Start a stock audit to begin shelf verification.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="qrScannerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <div>
+          <h5 class="modal-title mb-1">QR Scanner</h5>
+          <div class="text-muted small">Point the camera at a copy label. The scan result will fill the selected field automatically.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-0">
+        <div id="qrScannerViewport" class="rounded border overflow-hidden bg-dark-subtle" style="min-height: 320px;"></div>
+        <div class="d-flex justify-content-between align-items-center gap-3 mt-3">
+          <div class="small text-muted" id="qrScannerStatus">Camera scanner is idle.</div>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="qrScannerStopButton">Stop Scanner</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  const qrModalElement = document.getElementById('qrScannerModal');
+  const qrViewportId = 'qrScannerViewport';
+  const qrStatus = document.getElementById('qrScannerStatus');
+  const qrStopButton = document.getElementById('qrScannerStopButton');
+  const qrTriggers = document.querySelectorAll('.qr-scan-trigger');
+  const qrModal = qrModalElement ? new bootstrap.Modal(qrModalElement) : null;
+  let qrScanner = null;
+  let qrTargetInputId = null;
+  let qrStarting = false;
+
+  async function stopQrScanner() {
+    if (!qrScanner) return;
+    try { await qrScanner.stop(); } catch (error) {}
+    try { await qrScanner.clear(); } catch (error) {}
+    qrScanner = null;
+    qrStarting = false;
+    if (qrStatus) qrStatus.textContent = 'Camera scanner is idle.';
+  }
+
+  async function startQrScanner(targetInputId) {
+    if (!qrModal || !window.Html5Qrcode) {
+      if (qrStatus) qrStatus.textContent = 'QR scanner library is unavailable in this browser.';
+      return;
+    }
+    qrTargetInputId = targetInputId;
+    qrModal.show();
+    if (qrStarting) return;
+    await stopQrScanner();
+    qrStarting = true;
+    qrScanner = new Html5Qrcode(qrViewportId);
+    if (qrStatus) qrStatus.textContent = 'Starting camera scanner...';
+    try {
+      await qrScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 240, height: 240 } },
+        async (decodedText) => {
+          const input = document.getElementById(qrTargetInputId);
+          if (input) {
+            input.value = decodedText;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (qrStatus) qrStatus.textContent = 'QR captured successfully.';
+          await stopQrScanner();
+          qrModal.hide();
+        },
+        () => {}
+      );
+      if (qrStatus) qrStatus.textContent = 'Point the camera at a copy label.';
+    } catch (error) {
+      if (qrStatus) qrStatus.textContent = 'Unable to access the camera scanner. You can still paste QR text manually.';
+      await stopQrScanner();
+    } finally {
+      qrStarting = false;
+    }
+  }
+
+  qrTriggers.forEach((button) => {
+    button.addEventListener('click', () => startQrScanner(button.dataset.scanTarget));
+  });
+  qrStopButton?.addEventListener('click', async () => { await stopQrScanner(); });
+  qrModalElement?.addEventListener('hidden.bs.modal', async () => { await stopQrScanner(); });
+</script>
+{% endblock %}

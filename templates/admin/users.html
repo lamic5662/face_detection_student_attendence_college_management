@@ -16,6 +16,7 @@
           <option value="teacher" {% if selected_role == 'teacher' %}selected{% endif %}>Teacher</option>
           <option value="student" {% if selected_role == 'student' %}selected{% endif %}>Student</option>
           <option value="parent"  {% if selected_role == 'parent'  %}selected{% endif %}>Parent</option>
+          <option value="librarian"  {% if selected_role == 'librarian'  %}selected{% endif %}>Librarian</option>
         </select>
       </div>
       <div class="col-md-4">
@@ -75,9 +76,9 @@
               {% endif %}
             </td>
             <td data-label="Role">
-              <span class="badge {% if u.role == 'admin' %}bg-danger-subtle text-danger{% elif u.role == 'teacher' %}bg-primary-subtle text-primary{% elif u.role == 'parent' %}bg-warning-subtle text-warning{% else %}bg-success-subtle text-success{% endif %}">
-                <i class="bi bi-{% if u.role == 'admin' %}shield-fill{% elif u.role == 'teacher' %}person-badge{% elif u.role == 'parent' %}house-heart-fill{% else %}person{% endif %} me-1"></i>
-                {{ u.role.capitalize() }}
+              <span class="badge {% if u.role == 'admin' %}bg-danger-subtle text-danger{% elif u.role == 'teacher' %}bg-primary-subtle text-primary{% elif u.role == 'parent' %}bg-warning-subtle text-warning{% elif u.role == 'librarian' %}bg-secondary-subtle text-secondary{% else %}bg-success-subtle text-success{% endif %}">
+                <i class="bi bi-{% if u.role == 'admin' %}shield-fill{% elif u.role == 'teacher' %}person-badge{% elif u.role == 'parent' %}house-heart-fill{% elif u.role == 'librarian' %}journal-richtext{% else %}person{% endif %} me-1"></i>
+                {{ u.role.replace('_', ' ')|title }}
               </span>
             </td>
             <td class="text-muted small" data-label="Created">{{ u.created_at.strftime('%d %b %Y') }}</td>

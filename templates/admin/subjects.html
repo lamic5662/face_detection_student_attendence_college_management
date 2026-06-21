@@ -60,6 +60,7 @@
             <th class="px-2">Code</th>
             <th>Name</th>
             <th>Department</th>
+            <th>University</th>
             <th>Semester</th>
             <th>Teacher</th>
             <th>Credits</th>
@@ -77,6 +78,14 @@
             <td class="px-2" data-label="Code"><span class="badge bg-info-subtle text-info">{{ s.code }}</span></td>
             <td class="fw-semibold" data-label="Name">{{ s.name }}</td>
             <td data-label="Department"><span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span></td>
+            <td data-label="University">
+              {% if s.department.resolved_university %}
+              <span class="badge bg-info-subtle text-info">{{ s.department.resolved_university.code }}</span>
+              <div class="text-muted small mt-1">{{ s.department.resolved_university.name }}</div>
+              {% else %}
+              <span class="text-muted small">Independent</span>
+              {% endif %}
+            </td>
             <td data-label="Semester"><span class="badge bg-secondary-subtle text-secondary">Sem {{ s.semester }}</span></td>
             <td data-label="Teacher">
               <div class="d-flex align-items-center gap-1">
@@ -169,7 +178,7 @@
           </script>
 
           {% else %}
-          <tr><td colspan="9" class="text-center text-muted py-5">No subjects found.</td></tr>
+          <tr><td colspan="10" class="text-center text-muted py-5">No subjects found.</td></tr>
           {% endfor %}
         </tbody>
       </table>

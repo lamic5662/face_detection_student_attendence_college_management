@@ -18,11 +18,11 @@ class User(UserMixin, db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
-    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=False, index=True)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.id'), nullable=True, index=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.Enum('super_admin', 'admin', 'sub_admin', 'teacher', 'student', 'parent'), nullable=False)
+    role = db.Column(db.Enum('super_admin', 'admin', 'sub_admin', 'teacher', 'student', 'parent', 'librarian'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     must_change_password = db.Column(db.Boolean, nullable=False, default=False)
     password_changed_at = db.Column(db.DateTime, nullable=True)
@@ -98,6 +98,14 @@ class User(UserMixin, db.Model):
     @property
     def is_parent(self):
         return self.role == 'parent'
+
+    @property
+    def is_librarian(self):
+        return self.role == 'librarian'
+
+    @property
+    def full_name(self):
+        return self.name
 
     def __repr__(self):
         return f'<User {self.email} ({self.role})>'

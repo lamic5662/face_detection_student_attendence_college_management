@@ -17,10 +17,14 @@
           <div class="mb-3">
             <div class="d-flex align-items-center justify-content-between mb-1">
               <label class="form-label fw-semibold mb-0">Content <span class="text-danger">*</span></label>
+              {% if ai_assistant_enabled %}
               <button type="button" class="btn btn-sm btn-outline-primary" id="aiGenBtn"
                       onclick="aiGenerateNotice()" style="font-size:.8rem;">
                 <i class="bi bi-stars me-1"></i>AI Generate
               </button>
+              {% elif current_user.role in ('admin', 'teacher', 'super_admin') %}
+              <span class="text-muted small">AI Generate unavailable{% if ai_assistant_unavailable_reason %}: {{ ai_assistant_unavailable_reason }}{% endif %}</span>
+              {% endif %}
             </div>
             <div class="input-group mb-2 d-none" id="aiTopicRow">
               <input type="text" class="form-control form-control-sm" id="aiTopicInput"

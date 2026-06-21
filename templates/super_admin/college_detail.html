@@ -13,7 +13,7 @@
         <i class="bi bi-x-octagon-fill fs-5"></i>
         <div>
           <div class="fw-semibold">Plan expired {{ (-days_left) }} day{{ 's' if days_left != -1 }} ago</div>
-          <div class="small">This college's {{ college.plan_meta.label }} plan has expired. Update the plan to keep them active.</div>
+          <div class="small">This college's {{ plan_state.display_plan_meta.label }}{% if not plan_state.display_plan_meta.label.endswith('Plan') %} plan{% endif %} has expired. Update the plan to keep them active.</div>
         </div>
       </div>
       <button class="btn btn-sm btn-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#planModal">
@@ -43,12 +43,31 @@
   <div>
     <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
       <span class="badge bg-light text-dark border">{{ college.code }}</span>
+      {% if college.affiliated_universities %}
+        {% for university in college.affiliated_universities %}
+        <a href="{{ url_for('super_admin.university_detail', university_id=university.id) }}"
+           class="badge bg-primary-subtle text-primary fw-semibold text-decoration-none">
+          <i class="bi bi-bank2 me-1"></i>{{ university.code }}
+        </a>
+        {% endfor %}
+      {% elif college.university %}
+      <a href="{{ url_for('super_admin.university_detail', university_id=college.university.id) }}"
+         class="badge bg-primary-subtle text-primary fw-semibold text-decoration-none">
+        <i class="bi bi-bank2 me-1"></i>{{ college.university.code }}
+      </a>
+      {% else %}
+      <span class="badge bg-secondary-subtle text-secondary fw-semibold">Independent</span>
+      {% endif %}
       <span class="badge {% if college.is_active %}bg-success{% else %}bg-secondary{% endif %}">
         {{ 'Active' if college.is_active else 'Inactive' }}
       </span>
-      <span class="badge bg-{{ college.plan_meta.color }}-subtle text-{{ college.plan_meta.color }} fw-semibold">
-        <i class="bi {{ college.plan_meta.icon }} me-1"></i>{{ college.plan_meta.label }} Plan
+      <span class="badge bg-{{ plan_state.display_plan_meta.color }}-subtle text-{{ plan_state.display_plan_meta.color }} fw-semibold">
+        <i class="bi {{ plan_state.display_plan_meta.icon }} me-1"></i>{{ plan_state.display_plan_meta.label }}{% if not plan_state.display_plan_meta.label.endswith('Plan') %} Plan{% endif %}
       </span>
+      <span class="small fw-semibold text-{{ plan_state.display_plan_meta.color }}">{{ plan_state.display_plan_meta.price_label }}</span>
+      {% if not plan_state.matches_billing_plan %}
+      <span class="small text-muted">Billing tier: {{ plan_state.billing_plan_meta.label }}</span>
+      {% endif %}
       {% if college.plan_expired %}
       <span class="badge bg-danger">Plan Expired</span>
       {% endif %}
@@ -65,12 +84,46 @@
     <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#planModal">
       <i class="bi bi-layers me-1"></i>Manage Plan
     </button>
+    <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#planPricingModal">
+      <i class="bi bi-currency-exchange me-1"></i>Edit Plan Pricing
+    </button>
     <a href="{{ url_for('super_admin.broadcast') }}" class="btn btn-outline-secondary">
       <i class="bi bi-megaphone me-1"></i>Broadcast
     </a>
     <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>Back
     </a>
+  </div>
+</div>
+
+<div class="modal fade" id="planPricingModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-currency-exchange text-primary me-2"></i>Edit Plan Pricing</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('super_admin.update_plan_pricing') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-body">
+          <div class="small text-muted mb-3">
+            These price labels are global and will update all plan screens.
+          </div>
+          <div class="row g-3">
+            {% for plan_key, plan_meta in college_plans.items() %}
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ plan_meta.label }}</label>
+              <input type="text" name="price_{{ plan_key }}" class="form-control" value="{{ plan_meta.price_label }}" required>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Pricing</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -88,13 +141,14 @@
           <div class="mb-3">
             <label class="form-label fw-semibold small">Plan</label>
             <select name="plan" class="form-select" id="planSelect" onchange="updatePlanDesc(this)">
-              <option value="free"         {% if college.plan == 'free' %}selected{% endif %}>Free — Trial/Evaluation</option>
+              <option value="free"         {% if college.plan == 'free' %}selected{% endif %}>Free Trial — Full Access</option>
               <option value="starter"      {% if college.plan == 'starter' %}selected{% endif %}>Starter — Core Essentials</option>
               <option value="standard"     {% if college.plan == 'standard' %}selected{% endif %}>Standard — Full Academic Suite</option>
               <option value="professional" {% if college.plan == 'professional' %}selected{% endif %}>Professional — Standard + Fees, Parent, AI</option>
               <option value="enterprise"   {% if college.plan == 'enterprise' %}selected{% endif %}>Enterprise — All Modules</option>
             </select>
             <div id="planDesc" class="form-text mt-2"></div>
+            <div id="planPrice" class="small fw-semibold text-primary mt-1"></div>
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold small">Plan Expiry Date <span class="text-muted fw-normal">(optional)</span></label>
@@ -324,9 +378,42 @@
   <div class="col-xl-7">
     <div class="card border-0 shadow-sm h-100">
       <div class="card-header bg-transparent border-0 pt-4 px-4">
-        <h6 class="fw-semibold mb-0"><i class="bi bi-sliders2 text-primary me-2"></i>Feature Access Summary</h6>
+        <h6 class="fw-semibold mb-0"><i class="bi bi-bank2 text-primary me-2"></i>Affiliation & Feature Access</h6>
       </div>
       <div class="card-body px-4 pb-4">
+        <div class="mb-4">
+          <div class="small text-uppercase text-muted fw-semibold mb-2">University / Program Affiliation</div>
+          {% if college.affiliated_universities %}
+          <div class="d-flex flex-column gap-2">
+            {% for university in college.affiliated_universities %}
+            <div class="border rounded-4 p-3 bg-light-subtle">
+              <div class="fw-semibold">{{ university.name }}</div>
+              <div class="small text-muted">{{ university.code }}</div>
+              <div class="small text-muted mt-2">
+                Programs:
+                {% set ns = namespace(names=[]) %}
+                {% for department in college.departments %}
+                  {% if department.resolved_university and department.resolved_university.id == university.id %}
+                    {% set ns.names = ns.names + [department.name] %}
+                  {% endif %}
+                {% endfor %}
+                {{ ns.names|join(', ') if ns.names else 'Mapped through college default' }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% elif college.university %}
+          <div class="border rounded-4 p-3 bg-light-subtle">
+            <div class="fw-semibold">{{ college.university.name }}</div>
+            <div class="small text-muted">{{ college.university.code }} · Default college affiliation</div>
+            {% if college.university.description %}
+            <div class="small text-muted mt-2">{{ college.university.description }}</div>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="text-muted small">This college is currently not mapped to any university and no departments/programs have university links yet.</div>
+          {% endif %}
+        </div>
         <div class="mb-4">
           <div class="small text-uppercase text-muted fw-semibold mb-2">Enabled Modules</div>
           <div class="d-flex flex-wrap gap-2">
@@ -345,6 +432,47 @@
             {% else %}
             <span class="text-muted small">No blocked modules.</span>
             {% endfor %}
+          </div>
+        </div>
+        <div>
+          <div class="small text-uppercase text-muted fw-semibold mb-2">Program University Map</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Program / Department</th>
+                  <th>University</th>
+                  <th>Students</th>
+                  <th>Teachers</th>
+                  <th>Subjects</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for department in college.departments|sort(attribute='name') %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ department.name }}</div>
+                    <div class="small text-muted">{{ department.code }}</div>
+                  </td>
+                  <td>
+                    {% if department.resolved_university %}
+                    <span class="badge bg-info-subtle text-info">{{ department.resolved_university.code }}</span>
+                    <div class="small text-muted mt-1">{{ department.resolved_university.name }}</div>
+                    {% else %}
+                    <span class="text-muted small">Independent</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ department.students|length }}</td>
+                  <td>{{ department.teachers|length }}</td>
+                  <td>{{ department.subjects|length }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-3">No departments configured yet.</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -406,14 +534,20 @@
 {{ super() }}
 <script>
 const PLAN_DESCRIPTIONS = {
-  free:         'Trial/evaluation access. No production features enabled by default. Use to onboard a new college before contract is signed.',
+  free:         'Full module access for a limited trial period. If no expiry date is entered, a default trial window is applied automatically.',
   starter:      'Attendance, Notices, Academic Calendar, Timetable. Core essentials for a college just getting started.',
   standard:     'Everything in Starter + Exams, Learning Content, Classrooms, Leave Management, Batch Tracker, Report Emails, Digital ID Cards.',
   professional: 'Everything in Standard + Fees, Fee Reminders, Parent Portal, Analytics, AI Assistant.',
   enterprise:   'All modules unlocked — includes Face Biometrics, Live Location, File Manager. Full platform access.',
 };
+const PLAN_PRICES = {
+  {% for plan_key, plan_meta in college_plans.items() %}
+  {{ plan_key|tojson }}: {{ plan_meta.price_label|tojson }}{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
 function updatePlanDesc(select) {
   document.getElementById('planDesc').textContent = PLAN_DESCRIPTIONS[select.value] || '';
+  document.getElementById('planPrice').textContent = PLAN_PRICES[select.value] || '';
 }
 document.addEventListener('DOMContentLoaded', function () {
   const sel = document.getElementById('planSelect');

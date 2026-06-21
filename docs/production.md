@@ -112,6 +112,23 @@ flask --app run.py db upgrade
 flask --app run.py doctor
 ```
 
+To generate deployment-ready files for your real server before rollout, run:
+
+```bash
+flask --app run.py prepare-production \
+  --public-host portal.example.com \
+  --root-domain example.com \
+  --app-root /opt/smart_attendance
+```
+
+This writes a bundle into `deploy/generated/` containing:
+
+- `.env.production`
+- `smart_attendance.conf`
+- `smart_attendance.service`
+- `smart_attendance@.service`
+- `DEPLOYMENT.md`
+
 `doctor` fails if:
 
 - the database is unreachable

@@ -1,0 +1,38 @@
+<script>
+  function setupLibraryLiveSearch(root = document) {
+    root.querySelectorAll('form[data-live-search-form]').forEach((form) => {
+      const input = form.querySelector('[data-live-search-input]');
+      if (!input || input.dataset.liveSearchBound === '1') return;
+
+      const targetSelector = form.dataset.liveSearchTarget;
+      const itemSelector = form.dataset.liveSearchItems || '[data-live-search-item]';
+      const emptySelector = form.dataset.liveSearchEmpty;
+      const target = targetSelector ? root.querySelector(targetSelector) : null;
+      const emptyState = emptySelector ? root.querySelector(emptySelector) : null;
+      if (!target) return;
+
+      const applyFilter = () => {
+        const query = (input.value || '').trim().toLowerCase();
+        let visibleCount = 0;
+
+        target.querySelectorAll(itemSelector).forEach((item) => {
+          const haystack = (item.dataset.liveSearchText || item.textContent || '').toLowerCase();
+          const isVisible = !query || haystack.includes(query);
+          item.style.display = isVisible ? '' : 'none';
+          if (isVisible) visibleCount += 1;
+        });
+
+        if (emptyState) {
+          emptyState.classList.toggle('d-none', visibleCount !== 0);
+        }
+      };
+
+      input.addEventListener('input', applyFilter);
+      input.addEventListener('search', applyFilter);
+      input.dataset.liveSearchBound = '1';
+      applyFilter();
+    });
+  }
+
+  setupLibraryLiveSearch();
+</script>

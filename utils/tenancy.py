@@ -71,6 +71,9 @@ def load_request_college() -> College | None:
             from flask_login import current_user
 
             if getattr(current_user, 'is_authenticated', False):
+                if getattr(current_user, 'role', None) == 'super_admin':
+                    g.current_college = None
+                    return None
                 college = db_session_get_college(current_user.college_id)
         except Exception:
             college = college

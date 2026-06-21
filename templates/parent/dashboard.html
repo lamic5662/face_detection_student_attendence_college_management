@@ -9,6 +9,7 @@
 
 {% block content %}
 {% set visible_widgets = dashboard_prefs.visible_widget_keys if dashboard_prefs else [] %}
+{% set show_dashboard_customize_trigger = false %}
 {% include "partials/dashboard_customize.html" %}
 
 {% if not children_data %}
@@ -18,6 +19,41 @@
   <p class="text-muted small">Contact the college admin to link your child's account to this portal.</p>
 </div>
 {% else %}
+
+<div class="card border-0 shadow-sm mb-4 admin-ops-hero">
+  <div class="card-body px-4 py-4 d-flex flex-wrap align-items-start justify-content-between gap-3">
+    <div class="flex-grow-1">
+      <span class="dashboard-hero-kicker mb-2">Family Overview</span>
+      <h4 class="mb-2 fw-bold text-dark">Track attendance, fees, assignments, and notices for your children.</h4>
+      <div class="text-muted mb-3">Use this dashboard to review academic activity, upcoming exams, and live location updates where sharing is enabled.</div>
+      <div class="d-flex flex-wrap gap-2">
+        <span class="badge bg-primary-subtle text-primary px-3 py-2">
+          <i class="bi bi-people-fill me-1"></i>{{ children_data|length }} linked child{{ 'ren' if children_data|length != 1 else '' }}
+        </span>
+        {% set due_children = children_data|selectattr('fee_due', 'gt', 0)|list %}
+        {% if due_children %}
+        <span class="badge bg-warning-subtle text-warning px-3 py-2">
+          <i class="bi bi-receipt-cutoff me-1"></i>{{ due_children|length }} fee due
+        </span>
+        {% endif %}
+        {% set low_attendance_children = children_data|selectattr('low_subjects')|list %}
+        {% if low_attendance_children %}
+        <span class="badge bg-danger-subtle text-danger px-3 py-2">
+          <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ low_attendance_children|length }} need attention
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    {% if dashboard_prefs and dashboard_prefs.has_optional_items %}
+    <div class="dashboard-hero-actions d-flex flex-column flex-sm-row gap-2">
+      <button type="button" class="btn btn-outline-secondary admin-dashboard-customize-btn"
+              data-bs-toggle="modal" data-bs-target="#dashboardCustomizeModal">
+        <i class="bi bi-sliders2 me-2"></i>Customize Dashboard
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>
 
 {% if 'children_overview' in visible_widgets %}
 {% for item in children_data %}

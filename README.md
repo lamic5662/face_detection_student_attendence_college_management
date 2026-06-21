@@ -144,6 +144,7 @@ flask --app run.py create-college
 flask --app run.py create-admin
 flask --app run.py check-classes
 flask --app run.py doctor
+flask --app run.py prepare-production --public-host portal.example.com --root-domain example.com
 flask --app run.py tunnel-guide
 flask --app run.py start-mobile-tunnel
 flask --app run.py mobile-tunnel-status
@@ -155,6 +156,7 @@ flask --app run.py stop-local-cluster
 
 `check-classes` sends alerts when a scheduled class has passed and no attendance session was started.
 `doctor` runs deployment-readiness checks for database connectivity, host allowlists, limiter backend, and private upload paths.
+`prepare-production` generates a real deployment bundle under `deploy/generated/` with a production `.env`, Nginx config, systemd unit files, and a short rollout checklist for your actual domain and server path.
 `tunnel-guide` prints the ngrok steps for mobile password reset testing.
 `start-mobile-tunnel` starts a quick Cloudflare tunnel and writes its public URL to `PUBLIC_BASE_URL` in `.env`.
 `mobile-tunnel-status` shows the stored tunnel PID, URL, and log path.

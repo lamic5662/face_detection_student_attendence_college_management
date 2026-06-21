@@ -30,26 +30,58 @@ def get_map_tile_b64(lat, lng, zoom=16):
 
 def make_id_card_qr(student, card):
     """Return a base64 PNG data URI for the student's ID card QR code."""
+    card_no = (card.card_number if card and card.card_number
+               else f"{student.department.code}-{student.roll_number}")
+    lines = [
+        f"Name: {student.user.name}",
+        f"Roll: {student.roll_number}",
+        f"Dept: {student.department.name}",
+        f"Card: {card_no}",
+    ]
+    return make_qr_data_uri(lines)
+
+
+def make_qr_data_uri(lines, *, fill_color='#1a1a2e', back_color='white', box_size=8, border=2):
+    """Return a base64 PNG data URI for generic QR payload lines."""
     try:
         import qrcode
-        card_no = (card.card_number if card and card.card_number
-                   else f"{student.department.code}-{student.roll_number}")
-        lines = [
-            f"Name: {student.user.name}",
-            f"Roll: {student.roll_number}",
-            f"Dept: {student.department.name}",
-            f"Card: {card_no}",
-        ]
         qr = qrcode.QRCode(
             version=None,
             error_correction=qrcode.constants.ERROR_CORRECT_M,
-            box_size=8, border=2,
+            box_size=box_size, border=border,
         )
         qr.add_data('\n'.join(lines))
         qr.make(fit=True)
-        img = qr.make_image(fill_color='#1a1a2e', back_color='white')
+        img = qr.make_image(fill_color=fill_color, back_color=back_color)
         buf = io.BytesIO()
         img.save(buf, 'PNG')
         return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
     except Exception:
         return None
+
+
+def make_library_copy_qr(copy):
+    """QR payload for a physical library copy label."""
+    lines = [
+        f"Type: Library Copy",
+        f"Title: {copy.book.title}",
+        f"Accession: {copy.accession_number}",
+        f"Barcode: {copy.barcode or copy.accession_number}",
+        f"Location: {copy.location_label}",
+    ]
+    return make_qr_data_uri(lines, fill_color='#0d6efd')
+
+
+def make_library_borrower_qr(*, name, scan_value, borrower_type, department=None, semester=None):
+    """QR payload for a borrower card used at the library circulation desk."""
+    lines = [
+        "Type: Library Borrower",
+        f"Name: {name}",
+        f"Role: {borrower_type.title()}",
+        f"Scan: {scan_value}",
+    ]
+    if department:
+        lines.append(f"Department: {department}")
+    if semester:
+        lines.append(f"Semester: {semester}")
+    return make_qr_data_uri(lines, fill_color='#198754')

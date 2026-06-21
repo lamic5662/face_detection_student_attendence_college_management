@@ -18,6 +18,9 @@
         <div class="d-flex justify-content-center gap-2 flex-wrap mb-3">
           <span class="badge bg-primary-subtle text-primary px-3 py-2">{{ student.roll_number }}</span>
           <span class="badge bg-success-subtle text-success px-3 py-2">{{ student.department.name }}</span>
+          {% if student.department.resolved_university %}
+          <span class="badge bg-warning-subtle text-warning px-3 py-2">{{ student.department.resolved_university.name }} ({{ student.department.resolved_university.code }})</span>
+          {% endif %}
           <span class="badge bg-info-subtle text-info px-3 py-2">Semester {{ student.semester }}</span>
         </div>
         {% if student.is_face_enrolled %}

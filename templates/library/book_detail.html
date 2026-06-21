@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }}{% endblock %}
+{% block page_title %}<i class="bi bi-book-half me-2"></i>{{ book.title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+  <div>
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <span class="badge bg-secondary-subtle text-secondary">{{ book.book_type|title }}</span>
+      {% if book.category %}<span class="badge bg-info-subtle text-info-emphasis">{{ book.category.name }}</span>{% endif %}
+      {% if book.subject %}<span class="badge bg-light text-dark border">{{ book.subject.name }}</span>{% endif %}
+      {% if book.digital_enabled %}<span class="badge bg-success-subtle text-success-emphasis">{{ book.ebook_access_label }}</span>{% endif %}
+      {% if book.digital_enabled and not can_download_ebook %}<span class="badge bg-warning-subtle text-warning-emphasis">Download Locked</span>{% endif %}
+    </div>
+    <h2 class="h4 mb-1">{{ book.title }}</h2>
+    <div class="text-muted">{{ book.author }}{% if book.publisher %} · {{ book.publisher }}{% endif %}</div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap justify-content-lg-end">
+    {% if current_user.role == 'librarian' %}
+    <a href="{{ url_for('library.edit_book', book_id=book.id) }}" class="btn btn-outline-secondary">Edit</a>
+    <form
+      method="post"
+      action="{{ url_for('library.delete_book', book_id=book.id) }}"
+      data-confirm="Delete this book and its copies?"
+      data-confirm-title="Delete book?"
+      data-confirm-type="danger"
+      data-confirm-ok="Delete"
+    >
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="next_view" value="library.admin_dashboard">
+      <button type="submit" class="btn btn-outline-danger">Delete</button>
+    </form>
+    {% endif %}
+    {% if current_user.role in ['student', 'teacher'] and book.physical_enabled and book.available_copies == 0 %}
+      {% if current_user_reservation %}
+      <span class="btn {% if current_user_reservation.status == 'ready_for_pickup' %}btn-outline-success{% else %}btn-outline-warning{% endif %} disabled">
+        {{ 'Ready For Pickup' if current_user_reservation.status == 'ready_for_pickup' else 'Reservation Pending' }}
+      </span>
+      {% else %}
+      <form method="post" action="{{ url_for('library.reserve_book', book_id=book.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-outline-warning">
+          <i class="bi bi-clock-history me-1"></i>Reserve Book
+        </button>
+      </form>
+      {% endif %}
+    {% endif %}
+    {% if can_preview_ebook %}
+    <a href="{{ url_for('library.ebook_reader', book_id=book.id) }}" class="btn btn-outline-primary">
+      <i class="bi bi-book me-1"></i>{{ 'Continue Reading' if reader_progress else 'Open Reader' }}
+    </a>
+    {% endif %}
+    {% if can_download_ebook %}
+    <a href="{{ url_for('library.download_ebook', book_id=book.id) }}" class="btn btn-primary">
+      <i class="bi bi-download me-1"></i>Download E-Book
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        {% if book.book_type == 'digital' %}
+        <div class="small text-muted mb-2">E-Book Access</div>
+        <div class="fs-4 fw-bold mb-2">Read Inside The System</div>
+        <div class="text-muted small mb-3">No borrowing, due date, or circulation entry is required for this title.</div>
+        {% else %}
+        <div class="small text-muted mb-2">Availability</div>
+        <div class="fs-4 fw-bold mb-2">{{ book.available_copies }} / {{ book.total_copies }} copies available</div>
+        {% if book.pending_reservations %}
+        <div class="text-warning-emphasis small mb-2">{{ book.pending_reservations }} pending reservation(s) in queue.</div>
+        {% endif %}
+        {% if current_user_reservation and current_user_reservation.pickup_expires_at %}
+        <div class="text-success small mb-2">Your hold is ready. Pick up by {{ current_user_reservation.pickup_expires_at.strftime('%d %b %Y') }}.</div>
+        {% endif %}
+        {% if book.digital_enabled %}
+        <div class="text-muted small mb-3">This title also includes an e-book preview for direct reading.</div>
+        {% else %}
+        <div class="mb-3"></div>
+        {% endif %}
+        <div class="small text-muted mb-2">Default Location</div>
+        <div class="fw-semibold mb-3">{{ book.location_label }}</div>
+        {% endif %}
+        <div class="small text-muted mb-2">Department / Semester</div>
+        <div class="fw-semibold mb-3">
+          {{ book.department.name if book.department else 'All departments' }}
+          {% if book.semester %} · Semester {{ book.semester }}{% endif %}
+        </div>
+        {% if book.book_type != 'digital' %}
+        <div class="small text-muted mb-2">Legacy Shelf Note</div>
+        <div class="fw-semibold mb-3">{{ book.shelf_code or 'Not set' }}</div>
+        {% endif %}
+        <div class="small text-muted mb-2">ISBN</div>
+        <div class="fw-semibold">{{ book.isbn or 'Not set' }}</div>
+        {% if book.digital_enabled %}
+        <div class="small text-muted mb-2 mt-3">Reader Controls</div>
+        <div class="small">
+          <div><strong>{{ book.ebook_access_label }}</strong></div>
+          <div class="text-muted">
+            {% if can_download_ebook %}
+            Download is enabled.
+            {% else %}
+            Download is disabled for this e-book.
+            {% endif %}
+            {% if ebook_preview_limit %}
+            Preview limit: first {{ ebook_preview_limit }} page(s).
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-8">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h3 class="h5 mb-3">Description</h3>
+        <p class="mb-0 text-muted">{{ book.description or 'No description added yet.' }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if can_preview_ebook %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+    <div>
+      <h3 class="h5 mb-1">E-Book Reader</h3>
+      <div class="text-muted small">Open the internal reader to save your page, progress, and last reading position.</div>
+    </div>
+    <span class="badge bg-success-subtle text-success-emphasis text-uppercase">{{ ebook_extension or 'file' }}</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-lg-8">
+        <div class="rounded border bg-light p-4 h-100">
+          <div class="fw-semibold mb-2">Reader upgrade now tracks:</div>
+          <div class="small text-muted">
+            last page, progress percentage, last reading note, and recent access history.
+            {% if ebook_total_pages %} Total pages detected: {{ ebook_total_pages }}.{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="rounded border p-3 h-100">
+          <div class="small text-muted mb-2">My Reading Progress</div>
+          <div class="fw-semibold">
+            {% if reader_progress %}
+              {% if reader_progress.last_page %}Page {{ reader_progress.last_page }}{% else %}Reader opened{% endif %}
+            {% else %}
+            Not started
+            {% endif %}
+          </div>
+          <div class="small text-muted mb-3">
+            {% if reader_progress and reader_progress.progress_percent is not none %}
+            {{ '%.0f'|format(reader_progress.progress_percent) }}% saved
+            {% else %}
+            No saved progress yet
+            {% endif %}
+          </div>
+          <a href="{{ url_for('library.ebook_reader', book_id=book.id) }}" class="btn btn-primary w-100">
+            <i class="bi bi-book me-1"></i>{{ 'Continue Reader' if reader_progress else 'Open Reader' }}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if current_user.role == 'librarian' %}
+<div class="row g-4">
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+        <div>
+          <h3 class="h5 mb-1">Physical Copies</h3>
+          <div class="text-muted small">Track accession numbers against the hierarchy and legacy notes.</div>
+        </div>
+        {% if book.copies %}
+        <a href="{{ url_for('library.print_book_copy_labels', book_id=book.id) }}" class="btn btn-sm btn-outline-secondary" target="_blank">
+          <i class="bi bi-printer me-1"></i>Print All Labels
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if book.book_type in ['physical', 'hybrid'] %}
+        <form method="post" action="{{ url_for('library.add_copies', book_id=book.id) }}" class="row g-2 mb-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="col-md-4">
+            <input type="number" class="form-control" name="quantity" min="1" value="1" required>
+          </div>
+          <div class="col-md-5">
+            <select class="form-select rack-select" name="copy_location_rack_id" data-row-target="copyRackRow" data-column-target="copyRackColumn">
+              <option value="">Use book rack</option>
+              {% for rack in rack_choices %}
+              <option value="{{ rack.id }}" data-row-count="{{ rack.row_count or 0 }}" data-column-count="{{ rack.column_count or 0 }}" {% if default_rack and default_rack.id == rack.id %}selected{% endif %}>{{ rack.full_label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3 d-grid">
+            <button type="submit" class="btn btn-outline-primary">Add Copies</button>
+          </div>
+          <div class="col-md-6">
+            <select class="form-select rack-grid-select" name="copy_location_row" id="copyRackRow" data-selected="{{ default_row }}">
+              <option value="">Select row</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <select class="form-select rack-grid-select" name="copy_location_column" id="copyRackColumn" data-selected="{{ default_column }}">
+              <option value="">Select column</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <input type="text" class="form-control" name="rack_location" placeholder="Optional legacy note like Shelf B1">
+          </div>
+        </form>
+        {% endif %}
+
+        {% if book.copies %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Accession</th>
+                <th>Barcode</th>
+                <th>Location</th>
+                <th>Condition</th>
+                <th>Status</th>
+                <th>Workflow</th>
+                <th class="text-end">Label</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for copy in book.copies %}
+              <tr>
+                <td>{{ copy.accession_number }}</td>
+                <td><code>{{ copy.barcode or copy.accession_number }}</code></td>
+                <td>
+                  <div>{{ copy.location_label }}</div>
+                  {% if copy.rack_location %}
+                  <div class="small text-muted">Legacy: {{ copy.rack_location }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ copy.condition|title }}</td>
+                <td><span class="badge bg-secondary-subtle text-secondary">{{ copy.status|title }}</span></td>
+                <td>
+                  {% set actions = copy_action_options.get(copy.id, []) %}
+                  {% if actions %}
+                  <form method="post" action="{{ url_for('library.update_copy_workflow', copy_id=copy.id) }}" class="d-grid gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <select class="form-select form-select-sm copy-workflow-action" name="workflow_action" data-workflow-id="copyWorkflow{{ copy.id }}" required>
+                      <option value="">Choose action</option>
+                      {% for action_value, action_label in actions %}
+                      <option value="{{ action_value }}">{{ action_label }}</option>
+                      {% endfor %}
+                    </select>
+                    <select class="form-select form-select-sm workflow-condition-field d-none" id="copyWorkflow{{ copy.id }}" name="restored_condition">
+                      <option value="good">Good</option>
+                      <option value="fair">Fair</option>
+                      <option value="new">New</option>
+                    </select>
+                    <input type="text" class="form-control form-control-sm" name="workflow_note" maxlength="255" placeholder="Optional note">
+                    <button type="submit" class="btn btn-sm btn-outline-dark">Update</button>
+                  </form>
+                  {% else %}
+                  <span class="text-muted small">No action needed</span>
+                  {% endif %}
+                  {% if copy.replacement_of %}
+                  <div class="small text-muted mt-2">Replacement for {{ copy.replacement_of.accession_number }}</div>
+                  {% elif copy.replacement_copies %}
+                  <div class="small text-muted mt-2">Replaced by {{ copy.replacement_copies[0].accession_number }}</div>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <a href="{{ url_for('library.print_copy_label', copy_id=copy.id) }}" class="btn btn-sm btn-outline-primary" target="_blank">Print Label</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-muted">
+          {% if book.book_type == 'digital' %}
+          This title is digital-only, so no physical copies are created or issued.
+          {% else %}
+          No physical copies created yet.
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Current Loans & Digital Access</h3>
+        <div class="text-muted small">Live circulation and recent e-book activity.</div>
+      </div>
+      <div class="card-body">
+        {% if book.book_type == 'digital' %}
+        <div class="alert alert-info border-0">
+          E-books are accessed directly by students and teachers. They do not appear in issue, renew, or return circulation.
+        </div>
+        {% endif %}
+        {% if book.book_type != 'digital' %}
+        <h4 class="h6">Current Loans</h4>
+        {% if current_loans %}
+        <div class="list-group list-group-flush mb-4">
+          {% for loan in current_loans %}
+          <div class="list-group-item px-0">
+            <div class="fw-semibold">{{ loan.borrower_label }}</div>
+            <div class="small text-muted">{{ loan.copy.accession_number }} · Due {{ loan.due_at.strftime('%d %b %Y') }} · {{ loan.status|title }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted mb-4">No active loans for this title.</div>
+        {% endif %}
+        {% endif %}
+
+        <h4 class="h6 mt-4">Recent Inventory Workflow</h4>
+        {% if recent_inventory_events %}
+        <div class="list-group list-group-flush mb-4">
+          {% for event in recent_inventory_events %}
+          <div class="list-group-item px-0">
+            <div class="d-flex justify-content-between gap-3">
+              <div>
+                <div class="fw-semibold">{{ event.copy.accession_number }} · {{ event.action_label }}</div>
+                <div class="small text-muted">
+                  {{ event.previous_status or 'new' }}{% if event.new_status %} -> {{ event.new_status }}{% endif %}
+                  {% if event.previous_condition or event.new_condition %}
+                  · {{ event.previous_condition or 'n/a' }}{% if event.new_condition %} -> {{ event.new_condition }}{% endif %}
+                  {% endif %}
+                </div>
+                {% if event.notes %}
+                <div class="small text-muted mt-1">{{ event.notes }}</div>
+                {% endif %}
+              </div>
+              <div class="small text-muted text-end">
+                {{ event.created_by.name if event.created_by else 'System' }}<br>
+                {{ event.created_at.strftime('%d %b %Y %H:%M') }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted mb-4">No inventory workflow has been recorded for this title yet.</div>
+        {% endif %}
+
+        <h4 class="h6">Recent E-Book Access</h4>
+        {% if recent_access_logs %}
+        <div class="list-group list-group-flush">
+          {% for log in recent_access_logs %}
+          <div class="list-group-item px-0">
+            <div class="fw-semibold">{{ log.student.user.name if log.student else log.teacher.user.name if log.teacher else 'Admin' }}</div>
+            <div class="small text-muted">{{ log.action|title }} · {{ log.accessed_at.strftime('%d %b %Y %H:%M') }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted">No access logs for this title yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    {% if book.book_type == 'digital' %}
+    <h3 class="h5 mb-3">E-Book Access</h3>
+    <div class="text-muted">Read this title directly from the preview above. No borrow request, due date, or librarian issue step is required.</div>
+    {% else %}
+    <h3 class="h5 mb-3">Current Availability</h3>
+    {% if current_user_reservation %}
+    <div class="alert alert-warning border-0">
+      Your reservation is already in the queue for this title.
+    </div>
+    {% elif current_user.role in ['student', 'teacher'] and book.available_copies == 0 and book.physical_enabled %}
+    <div class="alert alert-light border">
+      All physical copies are currently unavailable. You can place a reservation and the librarian will see you in the queue.
+    </div>
+    {% endif %}
+    {% if current_loans %}
+    <div class="list-group list-group-flush">
+      {% for loan in current_loans %}
+      <div class="list-group-item px-0">
+        <div class="fw-semibold">{{ loan.copy.accession_number }}</div>
+        <div class="small text-muted">Due back {{ loan.due_at.strftime('%d %b %Y') }} · {{ loan.status|title }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-muted">No copies are currently on loan.</div>
+    {% endif %}
+    {% if pending_reservations %}
+    <div class="mt-4">
+      <h4 class="h6 mb-2">Reservation Queue</h4>
+      <div class="small text-muted">
+        {{ pending_reservations|length }} pending request(s) for this title.
+        {% if current_user_reservation %}You are already included in this queue.{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+  function fillRackGrid(selectEl) {
+    const rowTarget = document.getElementById(selectEl.dataset.rowTarget);
+    const columnTarget = document.getElementById(selectEl.dataset.columnTarget);
+    if (!rowTarget || !columnTarget) return;
+
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const rowCount = parseInt(selectedOption?.dataset.rowCount || '0', 10);
+    const columnCount = parseInt(selectedOption?.dataset.columnCount || '0', 10);
+    const selectedRow = rowTarget.dataset.selected || '';
+    const selectedColumn = columnTarget.dataset.selected || '';
+
+    rowTarget.innerHTML = '<option value="">Select row</option>';
+    columnTarget.innerHTML = '<option value="">Select column</option>';
+
+    for (let index = 1; index <= rowCount; index += 1) {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `Row ${index}`;
+      if (option.value === selectedRow) option.selected = true;
+      rowTarget.appendChild(option);
+    }
+
+    for (let index = 1; index <= columnCount; index += 1) {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = `Column ${index}`;
+      if (option.value === selectedColumn) option.selected = true;
+      columnTarget.appendChild(option);
+    }
+  }
+
+  document.querySelectorAll('.rack-select').forEach((selectEl) => {
+    fillRackGrid(selectEl);
+    selectEl.addEventListener('change', () => {
+      const rowTarget = document.getElementById(selectEl.dataset.rowTarget);
+      const columnTarget = document.getElementById(selectEl.dataset.columnTarget);
+      if (rowTarget) rowTarget.dataset.selected = '';
+      if (columnTarget) columnTarget.dataset.selected = '';
+      fillRackGrid(selectEl);
+    });
+  });
+
+  document.querySelectorAll('.copy-workflow-action').forEach((selectEl) => {
+    const toggleConditionField = () => {
+      const target = document.getElementById(selectEl.dataset.workflowId);
+      if (!target) return;
+      const needsCondition = ['mark_repaired', 'replacement_received'].includes(selectEl.value);
+      target.classList.toggle('d-none', !needsCondition);
+      target.required = needsCondition;
+    };
+    toggleConditionField();
+    selectEl.addEventListener('change', toggleConditionField);
+  });
+</script>
+{% endblock %}

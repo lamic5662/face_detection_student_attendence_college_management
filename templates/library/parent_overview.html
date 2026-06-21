@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Child Library Activity{% endblock %}
+{% block page_title %}<i class="bi bi-journal-bookmark-fill me-2"></i>Child Library Activity{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h2 class="h4 mb-1">Library Status</h2>
+  <div class="text-muted">Review borrowed books, due dates, and recent returns for linked children.</div>
+</div>
+
+{% if student_policy %}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <div class="fw-semibold mb-1">Student Library Rules</div>
+    <div class="small text-muted">
+      Students may keep up to {{ student_policy.max_active_loans }} active book(s) for {{ student_policy.due_days }} day(s), renew {{ student_policy.max_renewals }} time(s), and incur Rs. {{ '%.2f'|format(student_policy.fine_per_day) }} per overdue day.
+      {% if library_rule.grace_days %} Grace period: {{ library_rule.grace_days }} day(s).{% endif %}
+      Reservation pickup hold: {{ library_rule.reservation_hold_days }} day(s).
+    </div>
+    {% if library_rule.regulations %}
+    <div class="small text-muted mt-2">{{ library_rule.regulations }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get"
+          class="row g-3"
+          data-live-search-form
+          data-live-search-target="#parentLibrarySearchResults"
+          data-live-search-items="[data-live-search-item]"
+          data-live-search-empty="#parentLibrarySearchEmpty">
+      <div class="col-md-10">
+        <input type="text" class="form-control" name="q" value="{{ q }}" placeholder="Search child, book title, or accession number" data-live-search-input>
+      </div>
+      <div class="col-md-2 d-grid">
+        <button type="submit" class="btn btn-outline-secondary">Search</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if child_rows %}
+<div class="row g-4" id="parentLibrarySearchResults">
+  {% for row in child_rows %}
+  <div class="col-12" data-live-search-item data-live-search-text="{{ row.student.user.name }} {{ row.student.roll_number }} {% for loan in row.active_loans %} {{ loan.book.title }} {{ loan.copy.accession_number }} {% endfor %} {% for loan in row.history_loans %} {{ loan.book.title }} {{ loan.copy.accession_number }} {% endfor %} {% for fine in row.outstanding_fines %} {{ fine.book.title }} {{ fine.reason }} {% endfor %} {% for fine in row.fine_history %} {{ fine.book.title }} {{ fine.reason }} {% endfor %}">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">{{ row.student.user.name }}</h3>
+        <div class="text-muted small">{{ row.student.roll_number }} · Semester {{ row.student.semester }}</div>
+      </div>
+      <div class="card-body">
+        <div class="row g-4">
+          <div class="col-lg-4">
+            <h4 class="h6">Active Loans</h4>
+            {% if row.active_loans %}
+            <div class="list-group list-group-flush">
+              {% for loan in row.active_loans %}
+              <div class="list-group-item px-0">
+                <div class="fw-semibold">{{ loan.book.title }}</div>
+                <div class="small text-muted">
+                  {{ loan.copy.accession_number }} · Due {{ loan.due_at.strftime('%d %b %Y') }} · {{ loan.status|title }}
+                </div>
+                {% if loan.outstanding_fine_amount %}
+                <div class="small text-danger mt-1">Outstanding fine Rs. {{ '%.2f'|format(loan.outstanding_fine_amount) }}</div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-muted">No active library loans.</div>
+            {% endif %}
+          </div>
+          <div class="col-lg-4">
+            <h4 class="h6">Fine Ledger</h4>
+            <div class="rounded-4 border bg-light-subtle p-3 h-100">
+              <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                  <div class="fw-semibold">Outstanding</div>
+                  <div class="small text-muted">Unpaid or partially paid overdue fines.</div>
+                </div>
+                <div class="fw-bold text-danger">Rs. {{ '%.2f'|format(row.outstanding_fine_total) }}</div>
+              </div>
+              {% if row.outstanding_fines %}
+              <div class="list-group list-group-flush">
+                {% for fine in row.outstanding_fines %}
+                <div class="list-group-item px-0">
+                  <div class="fw-semibold">{{ fine.book.title }}</div>
+                  <div class="small text-muted">{{ fine.reason|title }} · {{ fine.status|title }}</div>
+                  <div class="small text-danger mt-1">Rs. {{ '%.2f'|format(fine.outstanding_amount) }} due</div>
+                </div>
+                {% endfor %}
+              </div>
+              {% elif row.fine_history %}
+              <div class="list-group list-group-flush">
+                {% for fine in row.fine_history %}
+                <div class="list-group-item px-0">
+                  <div class="fw-semibold">{{ fine.book.title }}</div>
+                  <div class="small text-muted">
+                    {{ fine.reason|title }} · {{ fine.status|title }}
+                    {% if fine.settled_at %} · {{ fine.settled_at.strftime('%d %b %Y') }}{% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="text-muted">No fine records.</div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <h4 class="h6">Recent History</h4>
+            {% if row.history_loans %}
+            <div class="list-group list-group-flush">
+              {% for loan in row.history_loans %}
+              <div class="list-group-item px-0">
+                <div class="fw-semibold">{{ loan.book.title }}</div>
+                <div class="small text-muted">
+                  Issued {{ loan.issued_at.strftime('%d %b %Y') }}
+                  {% if loan.returned_at %} · Returned {{ loan.returned_at.strftime('%d %b %Y') }}{% endif %}
+                  {% if loan.fine_amount %} · Fine Rs. {{ '%.2f'|format(loan.fine_amount) }}{% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-muted">No recent closed loans.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+<div class="card border-0 shadow-sm d-none" id="parentLibrarySearchEmpty">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-search fs-1 d-block mb-3 opacity-25"></i>
+    No child library activity matched this search.
+  </div>
+</div>
+{% else %}
+<div class="card border-0 shadow-sm">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-people fs-1 d-block mb-3 opacity-25"></i>
+    No linked children were found for this account.
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% include "library/_live_search_script.html" %}
+{% endblock %}

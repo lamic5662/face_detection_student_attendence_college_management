@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Plan Demo{% endblock %}
+{% block page_title %}<i class="bi bi-display me-2"></i>Plan Demo{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
+  <div>
+    <div class="badge bg-primary-subtle text-primary fw-semibold mb-2">Sales Demo Ready</div>
+    <h3 class="fw-bold mb-2">College Pricing & Module Demo</h3>
+    <p class="text-muted mb-0">
+      Use this page to explain each tier, its price, and the modules a college will receive.
+    </p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('super_admin.colleges') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-buildings me-1"></i>Colleges
+    </a>
+    <a href="{{ url_for('super_admin.dashboard') }}" class="btn btn-outline-primary">
+      <i class="bi bi-speedometer2 me-1"></i>Dashboard
+    </a>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  {% for card in demo_cards %}
+  <div class="col-lg-6 col-xl">
+    <div class="card border-0 shadow-sm h-100 plan-demo-card plan-demo-{{ card.key }}">
+      <div class="card-body p-4 d-flex flex-column h-100">
+        <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="plan-demo-icon bg-{{ card.meta.color }}-subtle text-{{ card.meta.color }}">
+              <i class="bi {{ card.meta.icon }}"></i>
+            </span>
+            <div>
+              <div class="fw-bold fs-5">{{ card.meta.label }}</div>
+              <div class="small fw-semibold text-{{ card.meta.color }}">{{ card.meta.price_label }}</div>
+            </div>
+          </div>
+          <span class="badge bg-light text-dark border">{{ card.feature_count }} modules</span>
+        </div>
+
+        <p class="text-muted small mb-3">{{ card.meta.description }}</p>
+        <div class="small fw-semibold text-dark mb-3">{{ card.highlight }}</div>
+
+        <div class="d-flex flex-column gap-3 mt-auto">
+          {% for group in card.grouped_features %}
+          <div class="plan-demo-group">
+            <div class="small text-uppercase fw-bold text-muted mb-2">{{ group.label }}</div>
+            <div class="d-flex flex-wrap gap-2">
+              {% for item in group.feature_items %}
+              <span class="badge rounded-pill bg-{{ card.meta.color }}-subtle text-{{ card.meta.color }} fw-normal px-3 py-2">
+                {{ item.label }}
+              </span>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-transparent border-0 pt-4 px-4 pb-2">
+    <h6 class="fw-bold mb-0"><i class="bi bi-table text-primary me-2"></i>Feature Comparison</h6>
+    <div class="small text-muted mt-1">A quick view you can use while explaining what changes from one tier to the next.</div>
+  </div>
+  <div class="card-body px-0 pb-0">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-4">Feature</th>
+            {% for card in demo_cards %}
+            <th class="text-center">
+              <div class="fw-semibold">{{ card.meta.label }}</div>
+              <div class="small text-muted">{{ card.meta.price_label }}</div>
+            </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for group_key, group in feature_groups.items() %}
+          <tr class="table-group-divider">
+            <td colspan="{{ demo_cards|length + 1 }}" class="ps-4 py-3 small text-uppercase fw-bold text-muted bg-body-tertiary">
+              {{ group.label }}
+            </td>
+          </tr>
+          {% for feature_key in group.features %}
+          {% set meta = feature_catalog[feature_key] %}
+          <tr>
+            <td class="ps-4">
+              <div class="fw-semibold">{{ meta.label }}</div>
+              <div class="small text-muted">{{ meta.description }}</div>
+            </td>
+            {% for card in demo_cards %}
+            <td class="text-center">
+              {% if feature_key in card.feature_keys %}
+              <span class="plan-demo-check text-success"><i class="bi bi-check-circle-fill"></i></span>
+              {% else %}
+              <span class="plan-demo-cross text-muted"><i class="bi bi-dash-circle"></i></span>
+              {% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+.plan-demo-card {
+  border-left: 4px solid transparent;
+}
+.plan-demo-free { border-left-color: #6c757d; }
+.plan-demo-starter { border-left-color: #0d6efd; }
+.plan-demo-standard { border-left-color: #0dcaf0; }
+.plan-demo-professional { border-left-color: #198754; }
+.plan-demo-enterprise { border-left-color: #ffc107; }
+.plan-demo-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+.plan-demo-group + .plan-demo-group {
+  border-top: 1px solid rgba(15, 23, 42, .08);
+  padding-top: 12px;
+}
+.plan-demo-check,
+.plan-demo-cross {
+  font-size: 1.1rem;
+}
+</style>
+{% endblock %}

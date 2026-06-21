@@ -91,7 +91,7 @@
             </td>
           </tr>
           <tr><td class="text-muted fw-semibold">Card Number</td>
-            <td>{{ card.card_number or (student.department.code ~ '-' ~ student.roll_number) }}</td></tr>
+            <td>{{ card.card_number or student.roll_number }}</td></tr>
           <tr><td class="text-muted fw-semibold">Submitted</td><td>{{ card.submitted_at.strftime('%d %b %Y, %H:%M') }}</td></tr>
           {% if card.reviewed_at %}
           <tr><td class="text-muted fw-semibold">Reviewed</td><td>{{ card.reviewed_at.strftime('%d %b %Y, %H:%M') }}</td></tr>

@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+{% block title %}Rack Assignment{% endblock %}
+{% block page_title %}<i class="bi bi-ui-checks-grid me-2"></i>Rack Assignment{% endblock %}
+
+{% block content %}
+<style>
+  .rack-grid-scroll {
+    overflow: auto;
+    padding-bottom: 0.5rem;
+    scrollbar-width: auto;
+    scrollbar-color: #94a3b8 #e2e8f0;
+  }
+
+  .rack-grid-scroll.is-large-grid {
+    max-height: 34rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 1rem;
+  }
+
+  .rack-grid-scroll.is-large-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .rack-grid-scroll.is-large-grid tbody th {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+  }
+
+  .rack-grid-scroll.is-large-grid thead th:first-child {
+    left: 0;
+    z-index: 3;
+  }
+
+  .rack-grid-scroll::-webkit-scrollbar {
+    height: 12px;
+    width: 12px;
+  }
+
+  .rack-grid-scroll::-webkit-scrollbar-track {
+    background: #e2e8f0;
+    border-radius: 999px;
+  }
+
+  .rack-grid-scroll::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 999px;
+  }
+
+  .rack-grid-scroll::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+  }
+
+  .rack-grid-scrollbar {
+    display: none;
+  }
+
+  .rack-grid-scrollbar.is-visible {
+    display: block;
+  }
+</style>
+
+<div class="mb-4">
+  <h2 class="h4 mb-1">Assign Rack Cells</h2>
+  <div class="text-muted">Assign each row and column cell to a department, semester, and subject.</div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get"
+          class="row g-3"
+          data-live-search-form
+          data-live-search-target="#rackAssignmentSearchResults"
+          data-live-search-items="[data-live-search-item]"
+          data-live-search-empty="#rackAssignmentSearchEmpty">
+      <div class="col-lg-4">
+        <input type="text" class="form-control" name="q" value="{{ filters.q }}" placeholder="Search rack, row, column, code, subject" data-live-search-input>
+      </div>
+      <div class="col-md-4 col-lg-2">
+        <select class="form-select" name="rack_id">
+          <option value="">All racks</option>
+          {% for rack in rack_choices %}
+          <option value="{{ rack.id }}" {% if filters.rack_id == rack.id %}selected{% endif %}>{{ rack.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 col-lg-2">
+        <select class="form-select" name="department_id">
+          <option value="">All departments</option>
+          {% for department in departments %}
+          <option value="{{ department.id }}" {% if filters.department_id == department.id %}selected{% endif %}>{{ department.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 col-lg-1">
+        <input type="number" class="form-control" name="semester" min="1" max="12" value="{{ filters.semester or '' }}" placeholder="Sem">
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <select class="form-select" name="subject_id">
+          <option value="">All subjects</option>
+          {% for subject in subjects %}
+          <option value="{{ subject.id }}" {% if filters.subject_id == subject.id %}selected{% endif %}>{{ subject.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3 col-lg-1 d-grid">
+        <button type="submit" class="btn btn-outline-secondary">Filter</button>
+      </div>
+      <div class="col-md-3 col-lg-2 d-grid">
+        <a href="{{ url_for('library.manage_rack_assignments') }}" class="btn btn-outline-secondary">Clear Filter</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">{{ 'Assign Cell' if edit_cell else 'Select A Cell' }}</h3>
+        <div class="text-muted small">Choose a rack cell from the list, then set its academic ownership.</div>
+      </div>
+      <div class="card-body">
+        {% if edit_cell %}
+        <form method="post" action="{{ url_for('library.edit_location', location_id=edit_cell.id) }}" class="row g-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="location_type" value="cell">
+          <input type="hidden" name="next_view" value="library.manage_rack_assignments">
+          <input type="hidden" name="parent_id" value="{{ edit_cell.parent_id }}">
+          <input type="hidden" name="name" value="{{ edit_cell.name }}">
+          <input type="hidden" name="code" value="{{ edit_cell.code or '' }}">
+          <input type="hidden" name="row_label" value="{{ edit_cell.row_label or '' }}">
+          <input type="hidden" name="column_label" value="{{ edit_cell.column_label or '' }}">
+
+          <div class="col-12">
+            <label class="form-label">Rack Cell</label>
+            <div class="form-control bg-light">{{ edit_cell.parent.full_label if edit_cell.parent else 'Unknown rack' }} · Row {{ edit_cell.row_label }} · Column {{ edit_cell.column_label }}</div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Department</label>
+            <select class="form-select department-select" name="department_id" data-subject-target="assignmentSubjectSelect">
+              {% set selected_department = request.form.get('department_id', edit_cell.department_id if edit_cell else '')|string %}
+              <option value="">Unassigned department</option>
+              {% for department in departments %}
+              <option value="{{ department.id }}" {% if selected_department == department.id|string %}selected{% endif %}>{{ department.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Semester</label>
+            <input type="number" class="form-control" name="semester" min="1" max="12" value="{{ request.form.get('semester', edit_cell.semester if edit_cell and edit_cell.semester else '') }}" placeholder="1">
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Subject</label>
+            <select class="form-select subject-select" name="subject_id" id="assignmentSubjectSelect" data-selected="{{ request.form.get('subject_id', edit_cell.subject_id if edit_cell else '')|string }}">
+              {% set selected_subject = request.form.get('subject_id', edit_cell.subject_id if edit_cell else '')|string %}
+              <option value="">Unassigned subject</option>
+              {% for subject in subjects %}
+              <option value="{{ subject.id }}" data-department-id="{{ subject.department_id or '' }}" {% if selected_subject == subject.id|string %}selected{% endif %}>{{ subject.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" name="notes" rows="3" placeholder="Optional cell note">{{ request.form.get('notes', edit_cell.notes if edit_cell else '') }}</textarea>
+          </div>
+
+          <div class="col-12 d-flex flex-column flex-md-row justify-content-between gap-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="cellActiveSwitch" name="is_active" value="1" {% if request.form.get('is_active', '1' if not edit_cell or edit_cell.is_active else '0') == '1' %}checked{% endif %}>
+              <label class="form-check-label" for="cellActiveSwitch">Active cell</label>
+            </div>
+            <div class="d-flex gap-2">
+              <form
+                method="post"
+                action="{{ url_for('library.delete_location', location_id=edit_cell.id) }}"
+                data-confirm="Delete this rack cell?"
+                data-confirm-title="Delete rack cell?"
+                data-confirm-type="danger"
+                data-confirm-ok="Delete"
+              >
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="next_view" value="library.manage_rack_assignments">
+                <button type="submit" class="btn btn-outline-danger">Delete</button>
+              </form>
+              <a href="{{ url_for('library.manage_rack_assignments') }}" class="btn btn-outline-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary">Save Assignment</button>
+            </div>
+          </div>
+        </form>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-ui-checks-grid fs-1 d-block mb-3 opacity-25"></i>
+          Select a rack cell from the table to assign it.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-7">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h3 class="h5 mb-1">Rack Grid View</h3>
+        <div class="text-muted small">Each rack is shown as a matrix so the librarian can assign row and column space visually.</div>
+      </div>
+      <div class="card-body">
+        {% if rack_groups %}
+          <div class="d-grid gap-4" id="rackAssignmentSearchResults">
+            {% for group in rack_groups %}
+            <div class="border rounded-4 p-3 p-lg-4 bg-light-subtle" data-live-search-item>
+              <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+                <div>
+                  <div class="fw-semibold">{{ group.rack.name }}</div>
+                  <div class="small text-muted">{{ group.rack.full_label }}</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                  <span class="badge bg-info-subtle text-info-emphasis">{{ group.rack.grid_label }}</span>
+                  <span class="badge bg-light text-dark border">{{ group.assigned_count }} assigned</span>
+                  <span class="badge bg-light text-dark border">{{ group.cells|length }} total cells</span>
+                </div>
+              </div>
+
+              {% if group.rows and group.columns %}
+              <div class="rack-grid-scroll{% if group.rows|length >= 10 or group.columns|length >= 10 %} is-large-grid{% endif %}" data-rack-grid-scroll>
+                <table class="table table-bordered align-middle text-center mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th class="text-start">Row \ Column</th>
+                      {% for column in group.columns %}
+                      <th>Col {{ column }}</th>
+                      {% endfor %}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in group.rows %}
+                    <tr>
+                      <th class="text-start bg-light">Row {{ row }}</th>
+                      {% for column in group.columns %}
+                        {% set cell = group.cell_map.get(row ~ ':' ~ column) %}
+                      <td class="text-start" style="min-width: 160px;">
+                        {% if cell %}
+                        <div class="fw-semibold small">{{ cell.subject.name if cell.subject else 'Unassigned subject' }}</div>
+                        <div class="small text-muted">{{ cell.department.name if cell.department else 'No department' }}</div>
+                        <div class="small text-muted">{{ 'Semester ' ~ cell.semester if cell.semester else 'No semester' }}</div>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                          <a href="{{ url_for('library.manage_rack_assignments', edit_id=cell.id) }}" class="btn btn-sm btn-outline-primary">Assign</a>
+                          <form
+                            method="post"
+                            action="{{ url_for('library.delete_location', location_id=cell.id) }}"
+                            data-confirm="Delete this rack cell?"
+                            data-confirm-title="Delete rack cell?"
+                            data-confirm-type="danger"
+                            data-confirm-ok="Delete"
+                          >
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="next_view" value="library.manage_rack_assignments">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                          </form>
+                        </div>
+                        {% else %}
+                        <div class="small text-muted">Missing cell</div>
+                        {% endif %}
+                      </td>
+                      {% endfor %}
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <div class="small text-muted mt-2">
+                {% if group.rows|length >= 10 or group.columns|length >= 10 %}
+                This rack is using both vertical and horizontal scrolling because it has 10 or more rows or columns.
+                {% else %}
+                Use the horizontal scrollbar or the slider below when the rack has many columns.
+                {% endif %}
+              </div>
+              <div class="mt-3 rack-grid-scrollbar" data-rack-grid-slider-wrap>
+                <label class="form-label small text-muted mb-1">Grid Slider</label>
+                <input
+                  type="range"
+                  class="form-range"
+                  min="0"
+                  max="0"
+                  step="1"
+                  value="0"
+                  data-rack-grid-slider
+                  aria-label="Scroll rack grid horizontally"
+                >
+              </div>
+              {% else %}
+              <div class="text-muted small">This rack does not have a valid row/column grid yet.</div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          <div class="text-center text-muted py-4 d-none" id="rackAssignmentSearchEmpty">
+            No rack assignments matched this search.
+          </div>
+        {% else %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-grid fs-1 d-block mb-3 opacity-25"></i>
+          No racks created yet. Create a rack first.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% include "library/_live_search_script.html" %}
+<script>
+  function filterSubjectsByDepartment(departmentSelect) {
+    const subjectTarget = document.getElementById(departmentSelect.dataset.subjectTarget);
+    if (!subjectTarget) return;
+
+    const selectedDepartment = departmentSelect.value || '';
+    const selectedSubject = subjectTarget.dataset.selected || '';
+    if (!subjectTarget._originalOptions) {
+      subjectTarget._originalOptions = Array.from(subjectTarget.querySelectorAll('option')).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+        departmentId: option.dataset.departmentId || '',
+      }));
+    }
+
+    subjectTarget.innerHTML = '';
+    subjectTarget._originalOptions.forEach((optionData) => {
+      if (optionData.value && selectedDepartment && optionData.departmentId !== selectedDepartment) {
+        return;
+      }
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      option.dataset.departmentId = optionData.departmentId;
+      if (optionData.value === selectedSubject) option.selected = true;
+      subjectTarget.appendChild(option);
+    });
+
+    if (!subjectTarget.value) {
+      subjectTarget.dataset.selected = '';
+    }
+  }
+
+  document.querySelectorAll('.department-select').forEach((selectEl) => {
+    filterSubjectsByDepartment(selectEl);
+    const subjectTarget = document.getElementById(selectEl.dataset.subjectTarget);
+    if (subjectTarget) {
+      subjectTarget.addEventListener('change', () => {
+        subjectTarget.dataset.selected = subjectTarget.value;
+      });
+    }
+    selectEl.addEventListener('change', () => {
+      if (subjectTarget) {
+        subjectTarget.dataset.selected = '';
+      }
+      filterSubjectsByDepartment(selectEl);
+    });
+  });
+
+  document.querySelectorAll('[data-rack-grid-scroll]').forEach((scrollArea) => {
+    const wrapper = scrollArea.parentElement.querySelector('[data-rack-grid-slider-wrap]');
+    const slider = wrapper?.querySelector('[data-rack-grid-slider]');
+    if (!wrapper || !slider) return;
+
+    const syncSlider = () => {
+      const maxScroll = Math.max(0, scrollArea.scrollWidth - scrollArea.clientWidth);
+      slider.max = String(maxScroll);
+      slider.value = String(Math.min(scrollArea.scrollLeft, maxScroll));
+      wrapper.classList.toggle('is-visible', maxScroll > 0);
+    };
+
+    slider.addEventListener('input', () => {
+      scrollArea.scrollLeft = Number(slider.value || 0);
+    });
+
+    scrollArea.addEventListener('scroll', () => {
+      slider.value = String(scrollArea.scrollLeft);
+    });
+
+    window.addEventListener('resize', syncSlider);
+    syncSlider();
+  });
+</script>
+{% endblock %}

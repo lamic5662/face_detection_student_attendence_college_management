@@ -10,6 +10,7 @@
 .guide-cover.teacher{background:linear-gradient(135deg,#198754,#0dcaf0)}
 .guide-cover.student {background:linear-gradient(135deg,#0dcaf0,#0d6efd)}
 .guide-cover.parent  {background:linear-gradient(135deg,#fd7e14,#dc3545)}
+.guide-cover.librarian{background:linear-gradient(135deg,#475569,#0f766e)}
 
 .section-num{display:inline-flex;align-items:center;justify-content:center;
   width:32px;height:32px;border-radius:50%;background:#0d6efd;color:#fff;
@@ -851,6 +852,115 @@
 
 {% endif %}
 {# ═══ END PARENT ════════════════════════════════════════════ #}
+
+<!-- ═══════════════════════════════════════════════════════
+     LIBRARIAN GUIDE
+════════════════════════════════════════════════════════ -->
+{% if r == 'librarian' %}
+
+<div class="card border-0 shadow-sm mb-4 no-print">
+  <div class="card-body px-4 py-3">
+    <h6 class="fw-bold mb-3"><i class="bi bi-list-ul me-2 text-secondary"></i>Table of Contents</h6>
+    <div class="row g-2">
+      {% for num, title in [('1','Library Dashboard'),('2','Rack Setup'),('3','Rack Assignment'),('4','Add Books'),('5','Catalog & Search'),('6','Hierarchy Tree'),('7','Issue, Return & Renew'),('8','E-Books & Digital Access')] %}
+      <div class="col-md-6">
+        <a href="#librarian-s{{ num }}" class="text-decoration-none text-dark d-flex align-items-center gap-2">
+          <span class="badge bg-secondary-subtle text-secondary fw-semibold" style="min-width:28px">{{ num }}</span>
+          <span class="small">{{ title }}</span>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s1">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">1</span>Library Dashboard</h5>
+    <p class="text-muted small">The library dashboard is the control room for daily circulation work.</p>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>Open <strong>Sidebar → Library Dashboard</strong> to view active loans, overdue books, total books, available copies, and recent library activity.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>Use the search bar on the page to quickly filter visible books without reloading the page.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>From this dashboard you can issue a copy, return a copy, renew a loan, and open the full catalog or rack tools.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Watch the overdue section first every morning. It is the fastest way to see which books need follow-up.</div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s2">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">2</span>Rack Setup</h5>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>Open <strong>Sidebar → Rack Setup</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>Create a rack by entering its <strong>name</strong>, optional <strong>code</strong>, and total <strong>rows</strong> and <strong>columns</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>Save the rack. The system uses that grid size to generate the child row/column cells automatically.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">4</span><div>Use <strong>Edit</strong> if the rack capacity changes later.</div></div>
+    <div class="warn-box mt-2"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>A rack only stores structure. Department, semester, and subject ownership should be assigned to cells, not to the rack itself.</div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s3">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">3</span>Rack Assignment</h5>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>Open <strong>Sidebar → Rack Assignment</strong> to assign each rack cell to an academic scope.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>Use the filter bar to narrow by rack, department, semester, or subject. Use <strong>Clear Filter</strong> to reset everything.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>Choose a cell and set its <strong>Department</strong>, <strong>Semester</strong>, and <strong>Subject</strong>. Save the cell assignment.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">4</span><div>The grid view helps you see the entire rack visually, including which cells are already assigned.</div></div>
+    <div class="tip-box mt-2"><i class="bi bi-lightbulb-fill text-warning me-2"></i>Assign cells before adding books. That lets the add-book form suggest the correct rack row and column automatically.</div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s4">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">4</span>Add Books</h5>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>Open <strong>Sidebar → Add Books</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>Enter the book <strong>title</strong>, <strong>author</strong>, and <strong>book type</strong> first.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>Select <strong>Department</strong>, <strong>Semester</strong>, and <strong>Subject</strong>. The system then narrows the rack list and can suggest the right rack row and column.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">4</span><div>For physical or hybrid books, select the correct <strong>Rack</strong>, <strong>Row</strong>, and <strong>Column</strong>. For pure digital books, rack selection is not required.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">5</span><div>Use <strong>Optional Details</strong> for publisher, edition, ISBN, tags, and description only when needed.</div></div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s5">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">5</span>Catalog &amp; Search</h5>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>Open <strong>Sidebar → Catalog</strong> to browse all books in the library.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>Search by title, author, ISBN, or tags.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>Use filters for <strong>Category</strong>, <strong>Department</strong>, <strong>Semester</strong>, <strong>Subject</strong>, and <strong>Format</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">4</span><div>Use <strong>Clear Filter</strong> to return to the full catalog.</div></div>
+    <div class="info-box mt-2"><i class="bi bi-info-circle-fill text-primary me-2"></i>The subject filter changes according to the selected department and semester, so only valid subjects are shown.</div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s6">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">6</span>Hierarchy Tree</h5>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>Open <strong>Sidebar → Hierarchy Tree</strong> to inspect the full library structure.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>The tree loads <strong>collapsed by default</strong>. Expand only the racks you want to inspect.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>Use the tree to move quickly into <strong>Edit Rack</strong>, <strong>Assign Cell</strong>, or <strong>Add Book</strong>.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">4</span><div>Use the top filter bar to narrow the tree by department, semester, or subject before expanding nodes.</div></div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s7">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">7</span>Issue, Return &amp; Renew</h5>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>Use the loan controls on the library dashboard to issue a copy to a student or teacher.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>Select the borrower, choose the copy, and set the due period.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>When a book comes back, use <strong>Return</strong> to close the loan. Use <strong>Renew</strong> to extend a valid active loan.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">4</span><div>Overdue copies are highlighted automatically, so they can be followed up before reissue.</div></div>
+  </div>
+</div>
+
+<div class="guide-section card border-0 shadow-sm mb-4" id="librarian-s8">
+  <div class="card-body px-4 py-4">
+    <h5 class="fw-bold d-flex align-items-center gap-2 mb-3"><span class="section-num" style="background:#475569">8</span>E-Books &amp; Digital Access</h5>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">1</span><div>For <strong>digital</strong> or <strong>hybrid</strong> books, upload a PDF or EPUB in the e-book section of the add-book form.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">2</span><div>Digital books appear in the catalog with an <strong>E-Book</strong> badge.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">3</span><div>Students and teachers can open allowed e-books from the catalog or book detail screen according to their access.</div></div>
+    <div class="step-row"><span class="step-badge" style="background:#eef2ff;color:#334155">4</span><div>If a file is outdated, edit the book and upload a replacement file.</div></div>
+  </div>
+</div>
+
+{% endif %}
+{# ═══ END LIBRARIAN ════════════════════════════════════════ #}
 
 <!-- Footer (visible in PDF) -->
 <div class="text-center text-muted small mt-5 pt-4 border-top">

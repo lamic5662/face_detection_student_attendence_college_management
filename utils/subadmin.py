@@ -16,6 +16,7 @@ SUBADMIN_MODULES: dict[str, str] = {
     'file_manager': 'File Manager',
     'reports': 'Semester Schedules & Reports',
     'classrooms': 'Classroom Management',
+    'library': 'Library Management',
 }
 
 # Map endpoint name → (module, required_action) or None (always allowed for sub-admins)
@@ -120,6 +121,19 @@ ENDPOINT_PERMISSION_MAP: dict[str, tuple[str, str] | None] = {
     'classroom.delete_booking': ('classrooms', 'delete'),
     'classroom.bulk_delete_bookings': ('classrooms', 'delete'),
 
+    # Library
+    'library.index': ('library', 'view'),
+    'library.admin_dashboard': ('library', 'view'),
+    'library.catalog': ('library', 'view'),
+    'library.book_detail': ('library', 'view'),
+    'library.download_ebook': ('library', 'view'),
+    'library.create_book': ('library', 'edit'),
+    'library.edit_book': ('library', 'edit'),
+    'library.add_copies': ('library', 'edit'),
+    'library.issue_book': ('library', 'edit'),
+    'library.return_loan': ('library', 'edit'),
+    'library.renew_loan': ('library', 'edit'),
+
     # Leave Management
     'leave.admin_leaves': ('leaves', 'view'),
     'leave.admin_review_leave': ('leaves', 'edit'),
@@ -166,11 +180,13 @@ NAV_KEY_TO_MODULE: dict[str, str | None] = {
     'file_manager': 'file_manager',
     'timetable': 'timetable',
     'classrooms': 'classrooms',
+    'library': 'library',
     'exams': 'exams',
     'marksheets': 'exams',
     'signatures': 'exams',
     'fees': 'fees',
     'parents': 'parents',
+    'librarians': None,
     'settings': None,  # filtered out via explicit check
     'digital_id_cards': 'id_cards',
     'all_users': None,  # sub-admin cannot manage users
@@ -180,7 +196,7 @@ NAV_KEY_TO_MODULE: dict[str, str | None] = {
 }
 
 # Nav keys completely hidden from sub-admins regardless of permissions
-_SUBADMIN_HIDDEN_NAV_KEYS = {'settings', 'all_users', 'sub_admins'}
+_SUBADMIN_HIDDEN_NAV_KEYS = {'settings', 'all_users', 'sub_admins', 'librarians'}
 
 
 def get_subadmin_module_permissions(user_id: int, college_id: int) -> dict[str, set[str]]:

@@ -5,6 +5,7 @@ from collections import OrderedDict
 from flask import g, has_request_context
 
 from extensions import db
+from models.college import College, COLLEGE_PLANS, normalize_college_plan_key, resolved_college_plans
 from models.college_feature import CollegeFeatureAccess
 
 
@@ -18,6 +19,7 @@ FEATURE_GROUPS = OrderedDict(
                 'features': [
                     'attendance',
                     'learning_content',
+                    'library',
                     'exams',
                     'notices',
                     'calendar',
@@ -68,6 +70,10 @@ FEATURE_CATALOG = {
     'learning_content': {
         'label': 'Learning Content',
         'description': 'Notes, assignments, content preview, submissions, and teacher grading workflows.',
+    },
+    'library': {
+        'label': 'Library & E-Library',
+        'description': 'Physical circulation, digital books, catalog browsing, and borrower tracking.',
     },
     'exams': {
         'label': 'Exams & Marksheets',
@@ -163,7 +169,7 @@ FEATURE_PRESETS = OrderedDict(
                 'label': 'Standard',
                 'icon': 'bi-award',
                 'color': 'primary',
-                'description': 'Full academic experience — adds learning content, exams, classrooms, leaves, batch tracking, report emails, and digital ID cards.',
+                'description': 'Full academic experience — adds learning content, library, exams, classrooms, leaves, batch tracking, report emails, and digital ID cards.',
                 'features': [
                     'attendance',
                     'notices',
@@ -171,6 +177,7 @@ FEATURE_PRESETS = OrderedDict(
                     'timetable',
                     'classrooms',
                     'learning_content',
+                    'library',
                     'exams',
                     'leaves',
                     'batch_tracker',
@@ -193,6 +200,7 @@ FEATURE_PRESETS = OrderedDict(
                     'timetable',
                     'classrooms',
                     'learning_content',
+                    'library',
                     'exams',
                     'leaves',
                     'batch_tracker',
@@ -220,6 +228,16 @@ FEATURE_PRESETS = OrderedDict(
 )
 
 
+CUSTOM_PLAN_META = {
+    'label': 'Custom Plan',
+    'color': 'info',
+    'icon': 'bi-sliders2',
+    'description': 'This college has a custom module mix that does not match a standard tier exactly.',
+    'price_label': 'Custom module access',
+    'includes': [],
+}
+
+
 NAV_ITEM_FEATURES = {
     'admin': {
         'notice_board': 'notices',
@@ -238,10 +256,13 @@ NAV_ITEM_FEATURES = {
         'digital_id_cards': 'digital_id_cards',
         'batch_tracker': 'batch_tracker',
         'semester_schedules': 'batch_tracker',
+        'library': 'library',
+        'librarians': 'library',
     },
     'teacher': {
         'attendance_sessions': 'attendance',
         'content_manager': 'learning_content',
+        'library': 'library',
         'notice_board': 'notices',
         'academic_calendar': 'calendar',
         'leave_management': 'leaves',
@@ -253,6 +274,7 @@ NAV_ITEM_FEATURES = {
     'student': {
         'my_attendance': 'attendance',
         'study_materials': 'learning_content',
+        'library': 'library',
         'my_results': 'exams',
         'notice_board': 'notices',
         'leave_applications': 'leaves',
@@ -267,9 +289,18 @@ NAV_ITEM_FEATURES = {
     'parent': {
         'dashboard': 'parent_portal',
         'assignments': 'learning_content',
+        'library': 'library',
         'marksheets': 'exams',
         'notice_board': 'notices',
         'academic_calendar': 'calendar',
+    },
+    'librarian': {
+        'dashboard': 'library',
+        'catalog': 'library',
+        'rack_setup': 'library',
+        'rack_assignments': 'library',
+        'add_books': 'library',
+        'hierarchy_tree': 'library',
     },
 }
 
@@ -315,6 +346,7 @@ ENDPOINT_PREFIX_FEATURES = (
     ('timetable.', {'timetable'}),
     ('classroom.', {'classrooms'}),
     ('ai.', {'ai_assistant'}),
+    ('library.', {'library'}),
 )
 
 
@@ -329,6 +361,10 @@ ENDPOINT_FEATURES = {
     'admin.link_parent_child': {'parent_portal'},
     'admin.unlink_parent_child': {'parent_portal'},
     'admin.delete_parent': {'parent_portal'},
+    'admin.librarians': {'library'},
+    'admin.add_librarian': {'library'},
+    'admin.edit_librarian': {'library'},
+    'admin.delete_librarian': {'library'},
     'admin.id_card_template': {'digital_id_cards'},
     'admin.id_cards': {'digital_id_cards'},
     'admin.approve_id_card': {'digital_id_cards'},
@@ -393,6 +429,7 @@ ENDPOINT_FEATURES = {
     'student.content_preview': {'learning_content'},
     'student.submit_assignment': {'learning_content'},
     'student.submission_file': {'learning_content'},
+    'library.parent_overview': {'library', 'parent_portal'},
     'parent.dashboard': {'parent_portal'},
     'parent.child_detail': {'parent_portal'},
     'parent.child_location': {'parent_portal', 'live_location'},
@@ -430,6 +467,11 @@ def normalize_feature_keys(requested_keys) -> list[str]:
     return keys
 
 
+def enabled_feature_keys_from_matrix(feature_matrix: dict[str, bool] | None) -> list[str]:
+    matrix = feature_matrix or {}
+    return [key for key in FEATURE_CATALOG if matrix.get(key, False)]
+
+
 def preset_feature_keys(preset_key: str | None) -> list[str]:
     preset = FEATURE_PRESETS.get((preset_key or '').strip())
     if not preset:
@@ -437,7 +479,54 @@ def preset_feature_keys(preset_key: str | None) -> list[str]:
     return normalize_feature_keys(preset['features'])
 
 
-def _default_matrix() -> dict[str, bool]:
+def plan_feature_keys(plan_key: str | None) -> list[str]:
+    normalized = normalize_college_plan_key(plan_key)
+    plan_meta = COLLEGE_PLANS.get(normalized, COLLEGE_PLANS['free'])
+    includes = plan_meta.get('includes', [])
+    if normalized in {'enterprise', 'free'} or '*' in includes:
+        return list(FEATURE_CATALOG.keys())
+    return normalize_feature_keys(includes)
+
+
+def resolve_college_plan_state(plan_key: str | None, feature_matrix: dict[str, bool] | None) -> dict:
+    plans = resolved_college_plans()
+    billing_plan_key = normalize_college_plan_key(plan_key)
+    billing_plan_meta = dict(plans.get(billing_plan_key, plans['free']))
+    enabled_keys = frozenset(enabled_feature_keys_from_matrix(feature_matrix))
+
+    if enabled_keys == frozenset(plan_feature_keys(billing_plan_key)):
+        return {
+            'billing_plan_key': billing_plan_key,
+            'billing_plan_meta': billing_plan_meta,
+            'display_plan_key': billing_plan_key,
+            'display_plan_meta': dict(billing_plan_meta),
+            'is_custom': False,
+            'matches_billing_plan': True,
+        }
+
+    for candidate in ('starter', 'standard', 'professional'):
+        if enabled_keys == frozenset(plan_feature_keys(candidate)):
+            return {
+                'billing_plan_key': billing_plan_key,
+                'billing_plan_meta': billing_plan_meta,
+                'display_plan_key': candidate,
+                'display_plan_meta': dict(plans[candidate]),
+                'is_custom': False,
+                'matches_billing_plan': candidate == billing_plan_key,
+            }
+
+    custom_meta = dict(CUSTOM_PLAN_META)
+    return {
+        'billing_plan_key': billing_plan_key,
+        'billing_plan_meta': billing_plan_meta,
+        'display_plan_key': None,
+        'display_plan_meta': custom_meta,
+        'is_custom': True,
+        'matches_billing_plan': False,
+    }
+
+
+def _default_matrix(plan_key: str | None = None) -> dict[str, bool]:
     return {key: True for key in FEATURE_CATALOG}
 
 
@@ -489,6 +578,10 @@ def college_has_feature(college_or_id, feature_key: str) -> bool:
         return True
 
     college_id = getattr(college_or_id, 'id', college_or_id)
+    if college_id is not None:
+        college = db.session.get(College, college_id)
+        if college is not None and college.plan_expired:
+            return False
     return college_feature_matrix(college_id).get(feature_key, True)
 
 

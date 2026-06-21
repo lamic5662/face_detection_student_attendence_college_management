@@ -68,6 +68,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Faculty</th>
+            <th>University</th>
             <th>Subjects</th>
             <th>Status</th>
             <th>Actions</th>
@@ -93,6 +94,14 @@
               {% endif %}
             </td>
             <td data-label="Faculty"><span class="badge bg-primary-subtle text-primary">{{ t.department.name }}</span></td>
+            <td data-label="University">
+              {% if t.department.resolved_university %}
+              <span class="badge bg-info-subtle text-info">{{ t.department.resolved_university.code }}</span>
+              <div class="text-muted small mt-1">{{ t.department.resolved_university.name }}</div>
+              {% else %}
+              <span class="text-muted small">Independent</span>
+              {% endif %}
+            </td>
             <td data-label="Subjects"><span class="badge bg-info-subtle text-info">{{ t.subjects|length }}</span></td>
             <td data-label="Status">
               <span class="badge {% if t.user.is_active %}bg-success{% else %}bg-secondary{% endif %}">
@@ -170,7 +179,7 @@
           </div>
           {% else %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-5">
+            <td colspan="9" class="text-center text-muted py-5">
               <i class="bi bi-person-badge fs-1 d-block mb-2 opacity-25"></i>
               No teachers found{% if selected_dept or search %} for the selected filters{% endif %}.
             </td>

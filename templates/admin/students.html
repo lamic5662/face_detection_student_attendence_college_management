@@ -101,6 +101,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Faculty</th>
+            <th>University</th>
             <th>Semester</th>
             <th>Progress</th>
             <th>Face</th>
@@ -134,6 +135,14 @@
             </td>
             <td data-label="Faculty">
               <span class="badge bg-primary-subtle text-primary">{{ s.department.code }}</span>
+            </td>
+            <td data-label="University">
+              {% if s.department.resolved_university %}
+              <span class="badge bg-info-subtle text-info">{{ s.department.resolved_university.code }}</span>
+              <div class="text-muted small mt-1">{{ s.department.resolved_university.name }}</div>
+              {% else %}
+              <span class="text-muted small">Independent</span>
+              {% endif %}
             </td>
             <td data-label="Semester"><span class="badge bg-light text-dark border">Sem {{ s.semester }}</span></td>
             <td data-label="Progress">
@@ -326,7 +335,7 @@
               <!-- Manual input -->
               <input type="text" name="roll_number" id="manualRoll"
                      class="form-control text-uppercase"
-                     placeholder="e.g. BCA-2024-01" required>
+                     placeholder="e.g. TU-BCA-2024-001" required>
 
               <!-- Auto preview -->
               <div id="autoIdPreview" class="d-none">
@@ -340,7 +349,7 @@
                 </div>
                 <div class="form-text">
                   <i class="bi bi-lightbulb me-1 text-warning"></i>
-                  Format: <code>COLLEGE-DEPT-ADMISSIONYEAR-SEQ</code> — unique and permanent for this student.
+                  Format: <code>UNIVERSITY-DEPT-ADMISSIONYEAR-SEQ</code> — unique and permanent for this student.
                 </div>
               </div>
             </div>

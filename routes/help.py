@@ -9,6 +9,7 @@ ROLES_META = {
     'teacher': {'color': 'success',  'icon': 'bi-person-badge-fill', 'label': 'Teacher'},
     'student': {'color': 'info',     'icon': 'bi-mortarboard-fill',  'label': 'Student'},
     'parent':  {'color': 'warning',  'icon': 'bi-house-heart-fill',  'label': 'Parent'},
+    'librarian': {'color': 'secondary', 'icon': 'bi-journal-richtext', 'label': 'Librarian'},
 }
 
 
@@ -20,7 +21,7 @@ def guide():
     if role == 'super_admin':
         active_role = 'admin'
     if role in ('admin', 'super_admin'):
-        roles = ['admin', 'teacher', 'student', 'parent']
+        roles = ['admin', 'teacher', 'student', 'parent', 'librarian']
     else:
         roles = [role]
     return render_template('help/guide.html',
@@ -38,7 +39,7 @@ def guide_role(role_name):
         abort(403)
     roles = [role_name]
     if current_user.role in ('admin', 'super_admin'):
-        roles = ['admin', 'teacher', 'student', 'parent']
+        roles = ['admin', 'teacher', 'student', 'parent', 'librarian']
     return render_template('help/guide.html',
                            roles=roles,
                            active_role=role_name,

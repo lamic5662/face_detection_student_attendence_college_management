@@ -76,6 +76,10 @@ class Config:
         'CONTENT_UPLOAD_FOLDER',
         os.path.join(PRIVATE_UPLOAD_FOLDER, 'content'),
     )
+    LIBRARY_UPLOAD_FOLDER = os.environ.get(
+        'LIBRARY_UPLOAD_FOLDER',
+        os.path.join(PRIVATE_UPLOAD_FOLDER, 'library'),
+    )
     ASSIGNMENT_UPLOAD_FOLDER = os.environ.get(
         'ASSIGNMENT_UPLOAD_FOLDER',
         os.path.join(PRIVATE_UPLOAD_FOLDER, 'assignment_submissions'),
@@ -103,6 +107,7 @@ class Config:
     REQUIRED_BLINKS = 1
     LIVENESS_STATE_TTL_SECONDS = int(os.environ.get('LIVENESS_STATE_TTL_SECONDS', 600))
     PASSWORD_SETUP_TOKEN_MAX_AGE = int(os.environ.get('PASSWORD_SETUP_TOKEN_MAX_AGE', 86400))
+    FREE_TRIAL_DAYS = int(os.environ.get('FREE_TRIAL_DAYS', 14))
 
     # ── Rate limiting ─────────────────────────────────────────────────────────
     RATELIMIT_STORAGE_URI = (
